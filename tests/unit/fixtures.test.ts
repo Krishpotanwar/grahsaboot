@@ -51,4 +51,9 @@ describe('fixture server', () => {
     expect(r.headers.get('access-control-allow-origin')).toBe('*')
     expect([...new Uint8Array(await r.arrayBuffer())].slice(0, 4)).toEqual([0x49, 0x49, 42, 0])
   })
+  it('answers a malformed body with 400 and keeps serving', async () => {
+    const bad = await fetch(`${srv.url}/stac/search`, { method: 'POST', body: 'not json' })
+    expect(bad.status).toBe(400)
+    expect((await fetch(`${srv.url}/tle`)).status).toBe(200)
+  })
 })

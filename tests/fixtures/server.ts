@@ -46,7 +46,7 @@ async function readBody(req: IncomingMessage): Promise<string> {
 }
 
 function handler(base: () => string) {
-  return async (req: IncomingMessage, res: ServerResponse) => {
+  const route = async (req: IncomingMessage, res: ServerResponse) => {
     const url = new URL(req.url ?? '/', 'http://x')
     if (req.method === 'OPTIONS') {
       res.writeHead(204, {
@@ -58,9 +58,11 @@ function handler(base: () => string) {
     }
     if (url.pathname === '/stac/search' && req.method === 'POST') {
       const body = JSON.parse((await readBody(req)) || '{}') as { datetime?: string }
-      const [from, to] = (body.datetime ?? '0000/9999').split('/')
+      const [a = '', b = a] = (body.datetime ?? '').split('/') // a single instant is both ends
+      const from = a === '' || a === '..' ? '0000' : a
+      const to = b === '' || b === '..' ? '9999' : b
       const feats = FIXTURE_DATES.filter(
-        (d) => `${d.date}T05:30:00Z` >= from! && `${d.date}T05:30:00Z` <= to!,
+        (d) => `${d.date}T05:30:00Z` >= from && `${d.date}T05:30:00Z` <= to,
       ).map((d) => fixtureItem(base(), d))
       return send(
         res,
@@ -100,6 +102,8 @@ function handler(base: () => string) {
       }
       if (range) {
         const start = Number(range[1])
+        if (start >= file.length)
+          return send(res, 416, '', 'text/plain', { 'content-range': `bytes */${file.length}` })
         const end = Math.min(file.length - 1, range[2] ? Number(range[2]) : file.length - 1)
         return send(res, 206, file.subarray(start, end + 1), 'image/tiff', {
           ...common,
@@ -129,6 +133,9 @@ function handler(base: () => string) {
     if (url.pathname.startsWith('/tiles/')) return send(res, 200, BLANK_PNG, 'image/png')
     return send(res, 404, 'not found', 'text/plain')
   }
+  // A bad request must answer 400, never take the whole fixture server down.
+  return (req: IncomingMessage, res: ServerResponse) =>
+    route(req, res).catch((e) => send(res, 400, String(e), 'text/plain'))
 }
 
 export function startFixtureServer(port = 0): Promise<{ url: string; close(): Promise<void> }> {
