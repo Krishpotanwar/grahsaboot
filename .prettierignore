@@ -1,5 +1,7 @@
 dist
 node_modules
-docs/geoverify
+docs
+.superpowers
+output
 supabase/.temp
 *.tif

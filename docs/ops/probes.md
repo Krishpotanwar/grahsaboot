@@ -14,4 +14,4 @@
 ## P7 notes
 
 - Beyond the scaffold, a throwaway entry (not committed) importing Base UI 1.8, Motion 14, MapLibre 6.12 (with `?worker&url`), terra-draw, geotiff 3, proj4, satellite.js 7, supabase-js and Fontsource Geist typechecked under TS 7.0.2 strict and bundled with Vite 8.3.2.
-- `vite build` prints one `SOURCEMAP_BROKEN` notice from `@tailwindcss/vite`: it returns no CSS map while `build.sourcemap` is true. Benign: no CSS map is emitted and the JS chunk is identical with the notice filtered out.
+- `vite build` would print one `SOURCEMAP_BROKEN` notice from `@tailwindcss/vite` (it returns no CSS map while `build.sourcemap` is true). `vite.config.ts` filters that one notice; no CSS map is emitted and the JS chunk is identical either way.
