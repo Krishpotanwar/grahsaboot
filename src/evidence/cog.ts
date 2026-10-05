@@ -25,7 +25,9 @@ async function wrap(tiff: GeoTIFF): Promise<Cog> {
 }
 
 export async function openCogUrl(url: string, signal?: AbortSignal): Promise<Cog> {
-  return wrap(await fromUrl(url, { allowFullFile: false }, signal))
+  const cog = await wrap(await fromUrl(url, { allowFullFile: false }, signal))
+  signal?.throwIfAborted()
+  return cog
 }
 
 export async function openCogBuffer(buf: ArrayBuffer): Promise<Cog> {
@@ -41,5 +43,6 @@ export function levelInfoFor(
   if (!size) throw new Error(`NO_LEVEL:${level}`)
   const expectW = asset.shape[1] / 2 ** level
   if (Math.abs(size.width - expectW) > 1) throw new Error('COG_LAYOUT')
+  if (Math.abs(size.height - asset.shape[0] / 2 ** level) > 1) throw new Error('COG_LAYOUT')
   return levelFromTransform(asset.transform, asset.shape, level, size.width, size.height)
 }

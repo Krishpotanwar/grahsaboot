@@ -39,6 +39,10 @@ describe('cog', () => {
     )
     expect(() => levelInfoFor(ASSET, cog, 3)).toThrow('NO_LEVEL:3')
   })
+  it('rejects a pyramid whose height is not 2x per level', async () => {
+    const cog = await openCogBuffer(toArrayBuffer(makeTci(false)))
+    expect(() => levelInfoFor({ transform: TCI_TRANSFORM, shape: [1000, 256] }, cog, 1)).toThrow('COG_LAYOUT')
+  })
   it('reads identical bytes over HTTP range requests', async () => {
     const local = await openCogBuffer(toArrayBuffer(makeTci(true)))
     const remote = await openCogUrl(`${srv.url}/cog/2025-12-20/TCI.tif`)
