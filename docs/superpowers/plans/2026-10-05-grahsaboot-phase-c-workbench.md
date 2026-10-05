@@ -1334,7 +1334,7 @@ import { pickDefaults, quartilesDone } from './defaults.ts'
 import type { DateEntry } from './runner.ts'
 
 const e = (date: string, label: 'CLEAR' | 'PARTIAL' | 'OBSCURED' | 'NOT_COVERED' | null, valid = 1, status: DateEntry['status'] = 'checked'): DateEntry =>
-  ({ date, status, error: null, thumb: null, full: null, candidate: {} as never, quality: label ? ({ stats: { label, validFraction: valid } } as never) : null })
+  ({ date, status, error: null, thumb: null, full: null, candidate: {} as never, quality: label ? ({ stats: { label, clearFraction: valid } } as never) : null })
 
 describe('pickDefaults', () => {
   it('takes the clearest pass in each outer quartile', () => {
@@ -1590,7 +1590,7 @@ export function quartilesDone(entries: DateEntry[], from: string, to: string): b
 export function pickDefaults(entries: DateEntry[], from: string, to: string): { before: string | null; after: string | null } {
   const ok = entries.filter(isUsable)
   if (ok.length < 2) return { before: null, after: null }
-  const v = (e: DateEntry) => e.quality!.stats.validFraction
+  const v = (e: DateEntry) => e.quality!.stats.clearFraction
   const early = ok.filter((e) => fraction(e.date, from, to) <= 0.25).sort((a, b) => v(b) - v(a) || a.date.localeCompare(b.date))
   const late = ok.filter((e) => fraction(e.date, from, to) >= 0.75).sort((a, b) => v(b) - v(a) || b.date.localeCompare(a.date))
   const before = (early[0] ?? ok[0]!).date
@@ -1875,7 +1875,7 @@ type Mode = 'swipe' | 'side' | 'diff'
 function Caption({ slot }: { slot: NonNullable<Slot> }) {
   return (
     <p className="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[0.75rem] text-fg-2 num">
-      <span>{flow.workbench.caption(fmtDate(slot.date), slot.stats ? pct(slot.stats.validFraction) : 0)}</span>
+      <span>{flow.workbench.caption(fmtDate(slot.date), slot.stats ? pct(slot.stats.clearFraction) : 0)}</span>
       {slot.stats && <QualityTag label={slot.stats.label} />}
     </p>
   )
@@ -2201,7 +2201,7 @@ export function Timeline({ entries, from, to, current, before, after, pinned, th
           <p className="font-mono num">{fmtDate(cur.date)}</p>
           {cur.quality && <QualityTag label={cur.quality.stats.label} />}
         </div>
-        {cur.quality && <p className="text-sm text-fg-2">{copy.quality[cur.quality.stats.label].help} {pct(cur.quality.stats.validFraction)}%.</p>}
+        {cur.quality && <p className="text-sm text-fg-2">{copy.quality[cur.quality.stats.label].help} {pct(cur.quality.stats.clearFraction)}%.</p>}
         {thumbGrid && (cur.thumb ? <FrameCanvas rgba={cur.thumb.display.rgba} width={thumbGrid.width} height={thumbGrid.height} label={flow.workbench.photoAlt(flow.workbench.timelineLabel, fmtDate(cur.date))} /> : cur.quality && (cur.quality.stats.label === 'CLEAR' || cur.quality.stats.label === 'PARTIAL') ? <Skeleton className="aspect-square w-full" /> : null)}
         <div className="flex flex-wrap gap-2">
           <Button size="sm" onClick={() => onBefore(cur.date)} disabled={!after || cur.date >= after}>{flow.workbench.useBefore}</Button>
@@ -2845,7 +2845,7 @@ inv = setBeforeAfter(inv, '2025-01-10', '2025-12-20', T)
 inv = addNote(inv, { kind: 'change', body: '<script>alert(1)</script> roof', date: '2025-12-20', sectionIdx: null }, T, 'n1')
 inv = setClaim(inv, { text: 'Done "by" Dec & <ok>', date: '2025-12-01', criterion: 'Roof' }, T)
 const summary = { kind: 'site', areaKm2: 1.15, extentKm: 1.52, lengthKm: null, bbox: [79.08, 21.14, 79.09, 21.15], parts: [{ idx: 0, fromM: 0, toM: 0, geometry: { kind: 'site', rings: [] } }] } as AoiSummary
-const stats = (label: string, v: number) => ({ policy: 'scl-v1', counts: [], total: 10, validFraction: v, uncertainFraction: 0, nodataFraction: 0, label }) as never
+const stats = (label: string, v: number) => ({ policy: 'scl-v2', counts: [], total: 10, clearFraction: v, validFraction: v, uncertainFraction: 0, obstructedFraction: 1 - v, nodataFraction: 0, label }) as never
 const entry = (date: string, label: string, v: number): DateEntry => ({
   date, status: 'checked', error: null, thumb: null,
   candidate: { date, coversAoi: true, alternates: [], item: { id: `S2B_44QKJ_${date.replaceAll('-', '')}_0_L2A`, collection: 'sentinel-2-l2a', datetime: `${date}T05:30:00Z`, date, epsg: 32644, cloudCover: 1, baseline: '05.11', nodataPct: 0, footprint: [], visual: { href: 'https://sentinel-cogs.s3.us-west-2.amazonaws.com/x/TCI.tif', transform: [10, 0, 300000, 0, -10, 2341000], shape: [256, 256] }, scl: { href: 'https://sentinel-cogs.s3.us-west-2.amazonaws.com/x/SCL.tif', transform: [20, 0, 300000, 0, -20, 2341000], shape: [128, 128] } } },
@@ -2865,7 +2865,7 @@ describe('buildProvenance', () => {
     const p = buildProvenance(inv, summary, entries, '0.1.0', T)
     expect(p.schema).toBe('grahsaboot.provenance/1')
     expect(p.frames).toHaveLength(4)
-    expect(p.frames[0]).toMatchObject({ date: '2025-01-10', asset: 'scl', level: 0, recipe: 'scl-v1', window: [45, 46, 103, 107], sha256: 'a'.repeat(64), crs: 'EPSG:32644', verification: null })
+    expect(p.frames[0]).toMatchObject({ date: '2025-01-10', asset: 'scl', level: 0, recipe: 'scl-v2', window: [45, 46, 103, 107], sha256: 'a'.repeat(64), crs: 'EPSG:32644', verification: null })
     expect(p.frames[1]).toMatchObject({ asset: 'visual', recipe: 'frame-v1', window: [92, 94, 203, 211], transform: [10, 0, 300000, 0, -10, 2341000] })
     expect(p.notes[0]!.body).toBe('<script>alert(1)</script> roof')
     expect(p.attribution).toContain('Contains modified Copernicus Sentinel data 2025')
@@ -2945,7 +2945,7 @@ export function buildProvenance(inv: Investigation, summary: AoiSummary, entries
     const it = e.candidate.item
     const base = { date: e.date, collection: it.collection, itemId: it.id, acquiredAt: it.datetime, processingBaseline: it.baseline, crs: `EPSG:${it.epsg}`, verification: null }
     const out: ProvenanceFrame[] = []
-    if (e.quality) out.push({ ...base, asset: 'scl', href: it.scl.href, level: 0, window: e.quality.window, transform: it.scl.transform, recipe: RECIPES.scl, sha256: e.quality.sha256, quality: { ...e.quality.stats, parts: e.quality.parts.map((p) => ({ idx: p.idx, label: p.stats.label, validFraction: p.stats.validFraction })) } })
+    if (e.quality) out.push({ ...base, asset: 'scl', href: it.scl.href, level: 0, window: e.quality.window, transform: it.scl.transform, recipe: RECIPES.scl, sha256: e.quality.sha256, quality: { ...e.quality.stats, parts: e.quality.parts.map((p) => ({ idx: p.idx, label: p.stats.label, clearFraction: p.stats.clearFraction, validFraction: p.stats.validFraction })) } })
     const f = e.full ?? e.thumb
     if (f) out.push({ ...base, asset: 'visual', href: it.visual.href, level: f.level, window: f.window, transform: scaled(it.visual.transform, f.level), recipe: RECIPES.frame, sha256: f.sha256 })
     return out
@@ -3006,7 +3006,7 @@ export function buildReportHtml(a: { inv: Investigation; summary: AoiSummary; im
   const looked = s.kind === 'site' ? flow.outline.summarySite(s.areaKm2, s.extentKm) : flow.outline.summaryRoad(s.lengthKm ?? 0, s.parts.length)
   const fig = (img: ReportImage) => `
     <figure class="grid"><img src="${img.displayUrl}" alt="${e(flow.workbench.photoAlt(img.role === 'before' ? flow.workbench.before : flow.workbench.after, fmtDate(img.date)))}">
-    <figcaption class="mono">${e(flow.workbench.caption(fmtDate(img.date), img.stats ? pct(img.stats.validFraction) : 0))} · <span class="badge">${e(word(img.stats))}</span><br>SHA-256 ${e(img.sha256)}</figcaption></figure>`
+    <figcaption class="mono">${e(flow.workbench.caption(fmtDate(img.date), img.stats ? pct(img.stats.clearFraction) : 0))} · <span class="badge">${e(word(img.stats))}</span><br>SHA-256 ${e(img.sha256)}</figcaption></figure>`
   const grid = s.kind === 'road' && pinned.length
     ? `<h2>${e(flow.report.sections.grid)}</h2><table><thead><tr><th>km</th>${pinned.map((x) => `<th>${e(fmtDate(x.date))}</th>`).join('')}</tr></thead><tbody>${s.parts
         .map((p) => `<tr><th>${e(flow.workbench.section(p.fromM, p.toM))}</th>${pinned.map((x) => `<td>${e(word(x.quality?.parts.find((q) => q.idx === p.idx)?.stats))}</td>`).join('')}</tr>`)
@@ -3027,7 +3027,7 @@ ${a.preparedBy.trim() ? `<p>${e(flow.report.preparedBy.replace(' (optional)', ''
 ${a.images.length ? `<p class="mono">${e(flow.report.nativeNote)}</p><div class="grid two">${a.images.map((i) => `<img class="native" src="${i.nativeUrl}" alt="">`).join('')}</div>` : ''}
 <h2>${e(flow.report.sections.timeline)}</h2>
 <table><thead><tr><th>Date</th><th>View</th><th>Clear</th><th>Source</th></tr></thead><tbody>${pinned
-    .map((x) => `<tr><td>${e(fmtDate(x.date))}</td><td>${e(word(x.quality?.stats))}</td><td>${x.quality ? pct(x.quality.stats.validFraction) : 0}%</td><td class="mono">${e(x.candidate.item.id)}</td></tr>`)
+    .map((x) => `<tr><td>${e(fmtDate(x.date))}</td><td>${e(word(x.quality?.stats))}</td><td>${x.quality ? pct(x.quality.stats.clearFraction) : 0}%</td><td class="mono">${e(x.candidate.item.id)}</td></tr>`)
     .join('')}</tbody></table>
 ${grid}
 <h2>${e(flow.report.sections.notes)}</h2>

@@ -41,14 +41,14 @@ The product works anonymously and fully locally after Phase C (explore, investig
 ## Global Constraints (copied from the spec; every task includes these)
 
 - Imagery: Sentinel-2 L2A from Earth Search `sentinel-2-l2a` (never `sentinel-2-c1-l2a` alone). Planetary Computer is the fallback. Assets `visual` (TCI) and `scl`. No paid imagery, no Sentinel Hub in v1.
-- Evidence recipes: `frame-v1` (SHA-256 of raw `readRasters` bytes for an integer window), `scl-v1` (valid {4,5,6}, uncertain {2,7}, invalid {0,1,3,8,9,10,11}; labels below), `display-v1` (shared EPSG:3857 grid), `diff-v1`.
-- `scl-v1` labels:
+- Evidence recipes: `frame-v1` (SHA-256 of raw `readRasters` bytes for an integer window), `scl-v2` (clear view = valid {4,5,6} + uncertain {2,7}; obstructed {1,3,8,9,10,11}; no data {0}; labels below), `display-v1` (shared EPSG:3857 grid), `diff-v1`.
+- `scl-v2` labels (computed on the clear-view share):
 
   | Label | Rule |
   |---|---|
   | `NOT_COVERED` | no-data share ≥ 0.5, or the AOI is fully outside the scene |
-  | `CLEAR` | valid ≥ 0.95 |
-  | `OBSCURED` | valid ≤ 0.05 |
+  | `CLEAR` | clear view ≥ 0.95 |
+  | `OBSCURED` | clear view ≤ 0.05 |
   | `PARTIAL` | anything between |
 
 - Limits:

@@ -81,7 +81,7 @@ Out (later, each with a trigger in §13): automatic change detection/hotspots (A
 |---|---|---|
 | `src/geo/` | Coordinate parsing (with a swapped-order hint), outline validation measured in UTM, coarsened bbox | `src/evidence` (proj4) |
 | `src/stac/` | Earth Search search with paging cap, item parsing/validation, per-date item selection, Planetary Computer fallback | fetch |
-| `src/evidence/` (pure TS, runtime-neutral) | `frame-v1` window maths + SHA-256, AOI rasterisation (even-odd sites, flat-capped road corridors), road parts every 2 km (`partsOf`), `scl-v1` quality stats + labels, `display-v1` reprojection, `diff-v1` | proj4, WebCrypto |
+| `src/evidence/` (pure TS, runtime-neutral) | `frame-v1` window maths + SHA-256, AOI rasterisation (even-odd sites, flat-capped road corridors), road parts every 2 km (`partsOf`), `scl-v2` quality stats + labels, `display-v1` reprojection, `diff-v1` | proj4, WebCrypto |
 | `src/workers/imagery.worker.ts` | geotiff I/O, calls `src/evidence`, IndexedDB window cache | geotiff, evidence |
 | `src/sats/` + `sats.worker.ts` | OMM → satrec, positions 1 Hz, tracks/swaths 30 s, next-pass estimate | satellite.js |
 | `src/map/` | MapLibre setup, basemap switching (theme/zoom), terrain, buildings, satellites layers, evidence image sources, tier handling | maplibre-gl |
@@ -110,17 +110,18 @@ Out (later, each with a trigger in §13): automatic change detection/hotspots (A
 - Fallback: Planetary Computer STAC (`sentinel-2-l2a`, assets `visual`/`SCL`, SAS token via its anonymous token endpoint) when Earth Search fails 3 times in a row. Recorded per frame as `collection`.
 - Copy: "The catalogue may omit a few acquisitions."
 
-### 5.2 Quality first (`scl-v1`)
+### 5.2 Quality first (`scl-v2`)
 - Read the SCL window (native 20 m, image 0 of `SCL.tif`) covering the AOI bbox + 2 px. About 20–60 KB per date.
 - Rasterise the AOI in the item's UTM CRS with the **pixel-centre rule on a 10 m grid**, with SCL nearest-upsampled 2×. Measured error ≤ 1 pp versus a 2 m truth.
-- Classes: valid = {4 vegetation, 5 not-vegetated, 6 water}; uncertain = {2 dark/topographic shadow, 7 unclassified}; invalid = {0 no data, 1 defective, 3 cloud shadow, 8 cloud medium, 9 cloud high, 10 cirrus, 11 snow}.
-- Labels (policy `scl-v1`, versioned, thresholds adjustable):
+- Classes: valid = {4 vegetation, 5 not-vegetated, 6 water}; uncertain = {2 dark/topographic shadow, 7 unclassified}; obstructed = {1 defective, 3 cloud shadow, 8 cloud medium, 9 cloud high, 10 cirrus, 11 snow}; no data = {0}.
+- **Clear view = valid + uncertain.** A real-data survey (Navi Mumbai, 24 dates, 2018–2025) found older processing baselines (`00.01`, `02.xx`, `03.01`, i.e. most 2017–2021 photos) put 73–86% of visibly cloud-free construction ground in classes 2 and 7. Under the first rule (`scl-v1`, valid only) about a quarter of clear photos read "PARTIAL"; `scl-v2` labels them as people see them, and Details still shows the valid/uncertain/obstructed split.
+- Labels (policy `scl-v2`, versioned, thresholds adjustable):
 
   | Label | Rule |
   |---|---|
-  | `CLEAR` | valid ≥ 0.95 |
-  | `PARTIAL` | 0.05 < valid < 0.95 |
-  | `OBSCURED` | valid ≤ 0.05 |
+  | `CLEAR` | clear view ≥ 0.95 |
+  | `PARTIAL` | 0.05 < clear view < 0.95 |
+  | `OBSCURED` | clear view ≤ 0.05 |
   | `NOT_COVERED` | no-data share ≥ 0.5 (outline area outside the scene counts as no-data), or the outline is entirely outside the scene |
 
   Raw class shares are always shown next to the label.
@@ -150,9 +151,9 @@ type VerifyResponse = {
     asset: 'visual' | 'scl'; level: 0 | 1; status: 'verified' | 'mismatch';
     server_sha256: string; frame_id: string; verified_at: string;
     quality: null | {                              // SCL frames only
-      policy: 'scl-v1'; label: string; counts: number[]; total: number;
-      validFraction: number; uncertainFraction: number; nodataFraction: number;
-      parts: Array<{ idx: number; fromM: number; toM: number; label: string; validFraction: number /* …same fields */ }>;
+      policy: 'scl-v2'; label: string; counts: number[]; total: number;
+      clearFraction: number; validFraction: number; uncertainFraction: number; obstructedFraction: number; nodataFraction: number;
+      parts: Array<{ idx: number; fromM: number; toM: number; label: string; clearFraction: number /* …same fields */ }>;
     };
   }>;
 };
@@ -163,14 +164,14 @@ Steps:
 3. Rate limit: ≤ 600 frame checks per user per 24 h, else `429`. Checks are counted from the audit log, so re-checking the same frames counts too.
 4. Fetch the STAC item by id server-side; check its date is inside the investigation range and its footprint intersects the AOI.
 5. Per frame: HEAD the asset (record ETag, Last-Modified, `x-amz-checksum-crc64nvme` if present; record STAC `file:checksum` if present); check window bounds and coverage; read; hash; compare.
-6. For SCL frames, compute the **authoritative** `scl-v1` stats for the site or each road section. Sections come from the shared `partsOf`, the same code the browser runs.
+6. For SCL frames, compute the **authoritative** `scl-v2` stats for the site or each road section. Sections come from the shared `partsOf`, the same code the browser runs.
 7. Upsert `frames` rows (service role) on (investigation, item, asset, level), refreshing `verified_at`, so saving again is idempotent.
 8. Return.
 
 Errors: `400` shape, `401`, `404` investigation or item, `422` window/date/coverage, `429`, `502` upstream (retryable by the client with backoff, max 3). A `mismatch` is stored, never hidden. CPU budget is 2 s per call: ≤ 4 frames per call, client batches per date (TCI L0/L1 + SCL).
 
 ### 5.6 Provenance
-Every frame records: `collection, item_id, acquired_at, processing_baseline, asset, href, level, window, crs, transform, recipe ('frame-v1'|'scl-v1'), sha256, source_identity {stac_checksum?, etag, last_modified, crc64nvme?}, verification {status, verified_at} | null, quality`. Re-opening a saved investigation later can re-check: if the source changed, show "Source file changed since capture" (the export remains the durable copy). Attribution on every view and export: "Contains modified Copernicus Sentinel data [year]".
+Every frame records: `collection, item_id, acquired_at, processing_baseline, asset, href, level, window, crs, transform, recipe ('frame-v1'|'scl-v2'), sha256, source_identity {stac_checksum?, etag, last_modified, crc64nvme?}, verification {status, verified_at} | null, quality`. Re-opening a saved investigation later can re-check: if the source changed, show "Source file changed since capture" (the export remains the durable copy). Attribution on every view and export: "Contains modified Copernicus Sentinel data [year]".
 
 ## 6. Roads
 - Input: LineString (≤ 200 vertices, 0.2–10 km), full corridor width 5–200 m (default 30 m, must be confirmed; the helper text explains why).
@@ -442,7 +443,7 @@ Other things users are told:
 ## 11. Testing
 | Layer | Tool | Covers |
 |---|---|---|
-| Logic | Vitest 5 | coordinate parsing; geometry validation + sections; STAC parsing + per-date selection + paging cap; `frame-v1` window maths + SHA-256 vectors; `scl-v1` counts/labels on synthetic rasters; `display-v1` alignment; `diff-v1`; tier chooser; satellite positions/passes on a frozen TLE + clock; provenance schema; report HTML escaping |
+| Logic | Vitest 5 | coordinate parsing; geometry validation + sections; STAC parsing + per-date selection + paging cap; `frame-v1` window maths + SHA-256 vectors; `scl-v2` counts/labels on synthetic rasters; `display-v1` alignment; `diff-v1`; tier chooser; satellite positions/passes on a frozen TLE + clock; provenance schema; report HTML escaping |
 | DB | Vitest + PGlite + PostGIS + an `auth` shim | RLS isolation between two users, constraints, freeze, limits (including re-checks at the frame cap), audit triggers (every frame check), consent, keep-alive, purge function, cascade on user deletion |
 | Function | Deno test (`npx deno test`) | `verify` as a pure handler with injected dependencies and fixture GeoTIFFs: verified, mismatch, foreign investigation (404), window out of bounds, date outside range, rate limit, upstream 5xx, malformed or path-like input, host allowlist |
 | E2E | Playwright 1.63 (Chromium, Firefox, WebKit) | site journey, road journey, swipe keyboard, report export, theme toggle, lite mode, all with STAC/COG/TLE/Supabase routes intercepted by fixtures; plus one opt-in live smoke test (`LIVE=1`) against real Earth Search/AWS |

@@ -19,9 +19,9 @@
   | Recipe | Definition |
   |---|---|
   | `frame-v1` | SHA-256 hex of the raw `readRasters({ window, samples, interleave: true })` bytes |
-  | `scl-v1` | valid {4,5,6}, uncertain {2,7}, every other class invalid |
+  | `scl-v2` | clear view = valid {4,5,6} + uncertain {2,7}; obstructed {1,3,8,9,10,11}; no data {0} |
 
-- Labels: `NOT_COVERED` if total = 0 or no-data ≥ 0.5; else `CLEAR` if valid ≥ 0.95; `OBSCURED` if valid ≤ 0.05; else `PARTIAL`.
+- Labels: `NOT_COVERED` if total = 0 or no-data ≥ 0.5; else `CLEAR` if clear view ≥ 0.95; `OBSCURED` if clear view ≤ 0.05; else `PARTIAL`. (scl-v2: older processing baselines put most clear construction ground in classes 2/7, so those count as clear view; the split stays visible in Details.)
 - Limits:
   - Site: ≤ 200 vertices, ≤ 9 km², ≤ 4.25 km across.
   - Road: ≤ 200 vertices, 0.2–10 km, integer width 5–200 m (default 30), 2 km sections.
@@ -119,7 +119,17 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   worker: { format: 'es' },
-  build: { target: 'es2022', sourcemap: true },
+  build: {
+    target: 'es2022',
+    sourcemap: true,
+    // @tailwindcss/vite emits CSS without a map; its one SOURCEMAP_BROKEN notice is expected noise.
+    rolldownOptions: {
+      onLog: (level, log, handler) =>
+        log.code === 'SOURCEMAP_BROKEN' && log.plugin?.startsWith('@tailwindcss/vite')
+          ? undefined
+          : handler(level, log),
+    },
+  },
   test: {
     include: ['src/**/*.test.ts', 'tests/unit/**/*.test.ts', 'tests/db/**/*.test.ts', 'worker/**/*.test.ts'],
     environment: 'node',
@@ -129,13 +139,9 @@ export default defineConfig({
 ```
 If `/// <reference types="vitest/config" />` does not type the `test` key in Vitest 5, replace the import with `import { defineConfig } from 'vitest/config'`. That is a drift fix; note it in the commit.
 
-`src/vite-env.d.ts`:
+`src/vite-env.d.ts` (Vite's client types already declare `*?worker&url` imports):
 ```ts
 /// <reference types="vite/client" />
-declare module '*?worker&url' {
-  const url: string
-  export default url
-}
 ```
 
 `index.html`:
@@ -175,9 +181,9 @@ createRoot(document.getElementById('root')!).render(
 )
 ```
 
-`src/styles.css`:
+`src/styles.css` (Tailwind scans only `src/`, never the docs or other untracked files):
 ```css
-@import 'tailwindcss';
+@import 'tailwindcss' source('../src');
 ```
 
 `.prettierrc.json`:
@@ -189,7 +195,9 @@ createRoot(document.getElementById('root')!).render(
 ```
 dist
 node_modules
-docs/geoverify
+docs
+.superpowers
+output
 supabase/.temp
 *.tif
 ```
@@ -362,9 +370,9 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
   export type AoiGeometry = { kind: 'site'; rings: LonLat[][] } | { kind: 'road'; line: LonLat[]; widthM: number }
   export interface AoiPart { idx: number; fromM: number; toM: number; geometry: AoiGeometry }
   export type QualityLabel = 'CLEAR' | 'PARTIAL' | 'OBSCURED' | 'NOT_COVERED'
-  export interface QualityStats { policy: 'scl-v1'; counts: number[]; total: number; validFraction: number; uncertainFraction: number; nodataFraction: number; label: QualityLabel }
+  export interface QualityStats { policy: 'scl-v2'; counts: number[]; total: number; clearFraction: number; validFraction: number; uncertainFraction: number; obstructedFraction: number; nodataFraction: number; label: QualityLabel }
   export interface DisplayGrid { minX: number; minY: number; maxX: number; maxY: number; width: number; height: number; cornersLonLat: [LonLat, LonLat, LonLat, LonLat] }
-  export const RECIPES: { frame: 'frame-v1'; scl: 'scl-v1'; display: 'display-v1'; diff: 'diff-v1' }
+  export const RECIPES: { frame: 'frame-v1'; scl: 'scl-v2'; display: 'display-v1'; diff: 'diff-v1' }
   ```
 - `src/evidence/utm.ts`:
   - `utmEpsgFor(lon, lat): number`
@@ -556,12 +564,15 @@ export interface AoiPart {
 export type QualityLabel = 'CLEAR' | 'PARTIAL' | 'OBSCURED' | 'NOT_COVERED'
 
 export interface QualityStats {
-  policy: 'scl-v1'
+  policy: 'scl-v2'
   /** Sub-pixel counts per SCL class 0..11 (outside-scene area counted as class 0). */
   counts: number[]
   total: number
+  /** Ground visible from above: validFraction + uncertainFraction. Labels and "clear view %" use this. */
+  clearFraction: number
   validFraction: number
   uncertainFraction: number
+  obstructedFraction: number
   nodataFraction: number
   label: QualityLabel
 }
@@ -577,7 +588,7 @@ export interface DisplayGrid {
   cornersLonLat: [LonLat, LonLat, LonLat, LonLat]
 }
 
-export const RECIPES = { frame: 'frame-v1', scl: 'scl-v1', display: 'display-v1', diff: 'diff-v1' } as const
+export const RECIPES = { frame: 'frame-v1', scl: 'scl-v2', display: 'display-v1', diff: 'diff-v1' } as const
 ```
 
 - [ ] **Step 4: Implement `src/evidence/utm.ts`**
@@ -1004,7 +1015,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 
 ---
 
-### Task A5: AOI rasterisation and cloud-check statistics (`scl-v1`)
+### Task A5: AOI rasterisation and cloud-check statistics (`scl-v2`)
 
 **Files:**
 - Create: `src/evidence/mask.ts`, `src/evidence/scl.ts`
@@ -1016,8 +1027,8 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
   - `rasterizeAoi(aoi: AoiGeometry, epsg: number, win: Window, lvl: LevelInfo, sub = 1): Uint8Array`: 1 = sub-cell centre inside. Sites use even-odd scanline fill; roads use distance ≤ width/2 with flat end caps.
   - `countMask(mask: Uint8Array): number`
   - `sclStats(classes: Uint8Array, winW: number, winH: number, mask: Uint8Array, sub: number, outsideCount = 0): QualityStats`
-  - `labelFor(valid: number, nodata: number, total: number): QualityLabel`
-  - `isValidClass(c: number): boolean`
+  - `labelFor(clear: number, nodata: number, total: number): QualityLabel`
+  - `isClearClass(c: number): boolean` (true for 2, 4, 5, 6, 7: ground the eye can see)
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1063,7 +1074,7 @@ describe('rasterizeAoi', () => {
 `src/evidence/scl.test.ts`:
 ```ts
 import { describe, expect, it } from 'vitest'
-import { labelFor, sclStats } from './scl.ts'
+import { isClearClass, labelFor, sclStats } from './scl.ts'
 
 const grid = (w: number, h: number, f: (x: number, y: number) => number) =>
   Uint8Array.from({ length: w * h }, (_, i) => f(i % w, Math.floor(i / w)))
@@ -1076,8 +1087,14 @@ describe('labelFor', () => {
     [0.05, 0, 10, 'OBSCURED'],
     [0.5, 0.5, 10, 'NOT_COVERED'],
     [1, 0, 0, 'NOT_COVERED'],
-  ] as const)('valid=%s nodata=%s total=%s → %s', (v, n, t, label) => {
-    expect(labelFor(v, n, t)).toBe(label)
+  ] as const)('clear=%s nodata=%s total=%s → %s', (c, n, t, label) => {
+    expect(labelFor(c, n, t)).toBe(label)
+  })
+})
+
+describe('isClearClass', () => {
+  it('is true for ground the eye can see: 2, 4, 5, 6, 7', () => {
+    expect([...Array(12).keys()].filter(isClearClass)).toEqual([2, 4, 5, 6, 7])
   })
 })
 
@@ -1086,17 +1103,33 @@ describe('sclStats', () => {
     const s = sclStats(grid(4, 4, () => 5), 4, 4, all(4, 4, 2), 2)
     expect(s.total).toBe(64)
     expect(s.counts[5]).toBe(64)
+    expect(s.clearFraction).toBe(1)
     expect(s.label).toBe('CLEAR')
-    expect(s.policy).toBe('scl-v1')
+    expect(s.policy).toBe('scl-v2')
   })
   it('splits half cloud into PARTIAL', () => {
     const s = sclStats(grid(10, 4, (x) => (x >= 5 ? 9 : 4)), 10, 4, all(10, 4, 1), 1)
-    expect(s.validFraction).toBeCloseTo(0.5, 6)
+    expect(s.clearFraction).toBeCloseTo(0.5, 6)
+    expect(s.obstructedFraction).toBeCloseTo(0.5, 6)
     expect(s.label).toBe('PARTIAL')
   })
-  it('treats uncertain classes separately and counts outside area as no-data', () => {
+  it('counts unclassified and dark ground as clear view (older baselines label clear construction ground 7)', () => {
+    // Real case: Navi Mumbai, 22 Feb 2018, baseline 00.01 — 63% class 7 and 14% class 2 on a cloud-free photo.
+    const s = sclStats(grid(4, 4, (x) => (x === 0 ? 2 : 7)), 4, 4, all(4, 4, 1), 1)
+    expect(s.validFraction).toBe(0)
+    expect(s.uncertainFraction).toBe(1)
+    expect(s.clearFraction).toBe(1)
+    expect(s.label).toBe('CLEAR')
+  })
+  it('treats cloud shadow and cirrus as obstruction', () => {
+    const s = sclStats(grid(4, 4, (x) => (x < 2 ? 3 : 10)), 4, 4, all(4, 4, 1), 1)
+    expect(s.obstructedFraction).toBe(1)
+    expect(s.label).toBe('OBSCURED')
+  })
+  it('counts the outside-scene area as no-data', () => {
     const s = sclStats(grid(4, 4, (x) => (x === 0 ? 7 : 4)), 4, 4, all(4, 4, 1), 1, 16)
     expect(s.uncertainFraction).toBeCloseTo(4 / 32, 6)
+    expect(s.clearFraction).toBeCloseTo(0.5, 6)
     expect(s.nodataFraction).toBeCloseTo(0.5, 6)
     expect(s.label).toBe('NOT_COVERED')
   })
@@ -1202,14 +1235,17 @@ function fillCorridor(mask: Uint8Array, w: number, h: number, x0: number, y0: nu
 import type { QualityLabel, QualityStats } from './types.ts'
 
 const VALID = [4, 5, 6]
+/** 2 dark area / topographic shadow, 7 unclassified: visible ground the classifier could not name. Older processing
+ * baselines (Earth Search 2017–21) put most clear, bright construction ground here, so it counts as clear view. */
 const UNCERTAIN = [2, 7]
+const OBSTRUCTED = [1, 3, 8, 9, 10, 11]
 
-export const isValidClass = (c: number) => c === 4 || c === 5 || c === 6
+export const isClearClass = (c: number) => c === 2 || (c >= 4 && c <= 7)
 
-export function labelFor(valid: number, nodata: number, total: number): QualityLabel {
+export function labelFor(clear: number, nodata: number, total: number): QualityLabel {
   if (total === 0 || nodata >= 0.5) return 'NOT_COVERED'
-  if (valid >= 0.95) return 'CLEAR'
-  if (valid <= 0.05) return 'OBSCURED'
+  if (clear >= 0.95) return 'CLEAR'
+  if (clear <= 0.05) return 'OBSCURED'
   return 'PARTIAL'
 }
 
@@ -1229,15 +1265,19 @@ export function sclStats(classes: Uint8Array, winW: number, winH: number, mask: 
   const total = counts.reduce((a, b) => a + b, 0)
   const frac = (ids: number[]) => (total ? ids.reduce((a, i) => a + counts[i]!, 0) / total : 0)
   const validFraction = frac(VALID)
+  const uncertainFraction = frac(UNCERTAIN)
+  const clearFraction = validFraction + uncertainFraction
   const nodataFraction = frac([0])
   return {
-    policy: 'scl-v1',
+    policy: 'scl-v2',
     counts,
     total,
+    clearFraction,
     validFraction,
-    uncertainFraction: frac(UNCERTAIN),
+    uncertainFraction,
+    obstructedFraction: frac(OBSTRUCTED),
     nodataFraction,
-    label: labelFor(validFraction, nodataFraction, total),
+    label: labelFor(clearFraction, nodataFraction, total),
   }
 }
 ```
@@ -1251,7 +1291,7 @@ Expected: PASS (mask 4, scl 9, plus earlier evidence tests).
 
 ```bash
 git add src/evidence/mask.ts src/evidence/scl.ts src/evidence/mask.test.ts src/evidence/scl.test.ts
-git commit -m "feat(evidence): scanline/corridor rasteriser and scl-v1 cloud-check stats
+git commit -m "feat(evidence): scanline/corridor rasteriser and scl-v2 cloud-check stats
 
 Co-Authored-By: Claude <noreply@anthropic.com>"
 ```
@@ -2695,7 +2735,7 @@ export function idbByteCache(name = 'gs-bytes', max = 300): ByteCache {
 
 ```ts
 import {
-  aoiPixelWindow, aoiPointsUtm, countMask, isValidClass, levelInfoFor, partsOf, rasterizeAoi, reprojectToGrid, sclStats, sha256Hex, windowSize,
+  aoiPixelWindow, aoiPointsUtm, countMask, isClearClass, levelInfoFor, partsOf, rasterizeAoi, reprojectToGrid, sclStats, sha256Hex, windowSize,
   type AoiGeometry, type Cog, type DisplayGrid, type QualityStats, type Window,
 } from '../evidence/index.ts'
 import type { ByteCache } from '../lib/byte-cache.ts'
@@ -2748,7 +2788,7 @@ async function readCached(deps: CoreDeps, cog: Cog, href: string, level: number,
   return bytes
 }
 
-const EMPTY_STATS: QualityStats = { policy: 'scl-v1', counts: new Array(12).fill(0), total: 0, validFraction: 0, uncertainFraction: 0, nodataFraction: 0, label: 'NOT_COVERED' }
+const EMPTY_STATS: QualityStats = { policy: 'scl-v2', counts: new Array(12).fill(0), total: 0, clearFraction: 0, validFraction: 0, uncertainFraction: 0, obstructedFraction: 0, nodataFraction: 0, label: 'NOT_COVERED' }
 
 export async function runQuality(deps: CoreDeps, req: QualityRequest, signal?: AbortSignal): Promise<QualityResult> {
   signal?.throwIfAborted()
@@ -2773,7 +2813,7 @@ export async function runQuality(deps: CoreDeps, req: QualityRequest, signal?: A
   if (req.grid) {
     const cls = reprojectToGrid({ data: bytes, width, height, samples: 1, win: wins.clamped, lvl, epsg: req.item.epsg, nodataZero: false }, req.grid, 'nearest')
     invalid = new Uint8Array(req.grid.width * req.grid.height)
-    for (let i = 0; i < invalid.length; i++) invalid[i] = cls[i * 4 + 3] === 0 || !isValidClass(cls[i * 4]!) ? 1 : 0
+    for (let i = 0; i < invalid.length; i++) invalid[i] = cls[i * 4 + 3] === 0 || !isClearClass(cls[i * 4]!) ? 1 : 0
   }
   return {
     window: wins.clamped,

@@ -314,7 +314,7 @@ create table public.frames (
   transform double precision[] not null check (cardinality(transform) = 6),
   href text not null,
   source_identity jsonb not null default '{}',
-  recipe text not null check (recipe in ('frame-v1', 'scl-v1')),
+  recipe text not null check (recipe in ('frame-v1', 'scl-v2')),
   client_sha256 text not null check (client_sha256 ~ '^[0-9a-f]{64}$'),
   server_sha256 text not null check (server_sha256 ~ '^[0-9a-f]{64}$'),
   status text not null check (status in ('verified', 'mismatch')),
@@ -1095,7 +1095,7 @@ function bbox(points: LonLat[]): [number, number, number, number] {
 }
 const overlaps = (a: number[], b: number[]) => a[0]! <= b[2]! && b[0]! <= a[2]! && a[1]! <= b[3]! && b[1]! <= a[3]!
 const scaled = (t: number[], level: number) => [t[0]! * 2 ** level, t[1]!, t[2]!, t[3]!, t[4]! * 2 ** level, t[5]!]
-const summarise = (s: QualityStats) => ({ label: s.label, validFraction: s.validFraction, uncertainFraction: s.uncertainFraction, nodataFraction: s.nodataFraction, counts: s.counts, total: s.total, policy: s.policy })
+const summarise = (s: QualityStats) => ({ label: s.label, clearFraction: s.clearFraction, validFraction: s.validFraction, uncertainFraction: s.uncertainFraction, obstructedFraction: s.obstructedFraction, nodataFraction: s.nodataFraction, counts: s.counts, total: s.total, policy: s.policy })
 
 export async function handleVerify(deps: VerifyDeps, raw: unknown): Promise<{ status: number; body: unknown }> {
   const req = parseRequest(raw)
@@ -1964,7 +1964,7 @@ export function buildProvenance(inv: Investigation, summary: AoiSummary, entries
       return v ? { status: v.status, verifiedAt: v.verifiedAt, serverSha256: v.serverSha256 } : null
     }
     const out: ProvenanceFrame[] = []
-    if (e.quality) out.push({ ...base, verification: check('scl', 0, e.quality.sha256), asset: 'scl', href: it.scl.href, level: 0, window: e.quality.window, transform: it.scl.transform, recipe: RECIPES.scl, sha256: e.quality.sha256, quality: { ...e.quality.stats, parts: e.quality.parts.map((p) => ({ idx: p.idx, label: p.stats.label, validFraction: p.stats.validFraction })) } })
+    if (e.quality) out.push({ ...base, verification: check('scl', 0, e.quality.sha256), asset: 'scl', href: it.scl.href, level: 0, window: e.quality.window, transform: it.scl.transform, recipe: RECIPES.scl, sha256: e.quality.sha256, quality: { ...e.quality.stats, parts: e.quality.parts.map((p) => ({ idx: p.idx, label: p.stats.label, clearFraction: p.stats.clearFraction, validFraction: p.stats.validFraction })) } })
     const f = e.full ?? e.thumb
     if (f) out.push({ ...base, verification: check('visual', f.level, f.sha256), asset: 'visual', href: it.visual.href, level: f.level, window: f.window, transform: scaled(it.visual.transform, f.level), recipe: RECIPES.frame, sha256: f.sha256 })
     return out
@@ -2041,7 +2041,7 @@ export function buildReportHtml(a: { inv: Investigation; summary: AoiSummary; im
   const looked = s.kind === 'site' ? flow.outline.summarySite(s.areaKm2, s.extentKm) : flow.outline.summaryRoad(s.lengthKm ?? 0, s.parts.length)
   const fig = (img: ReportImage) => `
     <figure class="grid"><img src="${img.displayUrl}" alt="${e(flow.workbench.photoAlt(img.role === 'before' ? flow.workbench.before : flow.workbench.after, fmtDate(img.date)))}">
-    <figcaption class="mono">${e(flow.workbench.caption(fmtDate(img.date), img.stats ? pct(img.stats.validFraction) : 0))} · <span class="badge">${e(word(img.stats))}</span><br>SHA-256 ${e(img.sha256)}</figcaption></figure>`
+    <figcaption class="mono">${e(flow.workbench.caption(fmtDate(img.date), img.stats ? pct(img.stats.clearFraction) : 0))} · <span class="badge">${e(word(img.stats))}</span><br>SHA-256 ${e(img.sha256)}</figcaption></figure>`
   const grid = s.kind === 'road' && pinned.length
     ? `<h2>${e(flow.report.sections.grid)}</h2><table><thead><tr><th>km</th>${pinned.map((x) => `<th>${e(fmtDate(x.date))}</th>`).join('')}</tr></thead><tbody>${s.parts
         .map((p) => `<tr><th>${e(flow.workbench.section(p.fromM, p.toM))}</th>${pinned.map((x) => `<td>${e(word(x.quality?.parts.find((q) => q.idx === p.idx)?.stats))}</td>`).join('')}</tr>`)
@@ -2062,7 +2062,7 @@ ${a.preparedBy.trim() ? `<p>${e(flow.report.preparedBy.replace(' (optional)', ''
 ${a.images.length ? `<p class="mono">${e(flow.report.nativeNote)}</p><div class="grid two">${a.images.map((i) => `<img class="native" src="${i.nativeUrl}" alt="">`).join('')}</div>` : ''}
 <h2>${e(flow.report.sections.timeline)}</h2>
 <table><thead><tr><th>Date</th><th>View</th><th>Clear</th><th>${e(flow.report.checkColumn)}</th><th>Source</th></tr></thead><tbody>${pinned
-    .map((x, i) => `<tr><td>${e(fmtDate(x.date))}</td><td>${e(word(x.quality?.stats))}</td><td>${x.quality ? pct(x.quality.stats.validFraction) : 0}%</td><td>${e(flow.report.check[checks[i]!.status])}</td><td class="mono">${e(x.candidate.item.id)}</td></tr>`)
+    .map((x, i) => `<tr><td>${e(fmtDate(x.date))}</td><td>${e(word(x.quality?.stats))}</td><td>${x.quality ? pct(x.quality.stats.clearFraction) : 0}%</td><td>${e(flow.report.check[checks[i]!.status])}</td><td class="mono">${e(x.candidate.item.id)}</td></tr>`)
     .join('')}</tbody></table>
 ${grid}
 <h2>${e(flow.report.sections.notes)}</h2>
