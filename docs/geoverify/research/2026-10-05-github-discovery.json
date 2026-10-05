@@ -1,0 +1,65 @@
+[
+  {
+    "query": "claude-code workflow in:name,description stars:>10000",
+    "url": "https://api.github.com/search/repositories?q=claude-code+workflow+in%3Aname%2Cdescription+stars%3A%3E10000&sort=stars&order=desc&per_page=10",
+    "total_count": 8,
+    "incomplete_results": false,
+    "results": [
+      {
+        "full_name": "anthropics/claude-code",
+        "stargazers_count": 149403,
+        "html_url": "https://github.com/anthropics/claude-code",
+        "description": "Claude Code is an agentic coding tool that lives in your terminal, understands your codebase, and helps you code faster by executing routine tasks, explaining complex code, and handling git workflows - all through natural language commands."
+      },
+      {
+        "full_name": "ruvnet/ruflo",
+        "stargazers_count": 73852,
+        "html_url": "https://github.com/ruvnet/ruflo",
+        "description": "\ud83c\udf0a The original agent harness. Deploy intelligent multi-player swarms, coordinate autonomous workflows, and build conversational AI systems. Features adaptive memory, self-learning intelligence, federation, vector RAG integration, and native Claude Code / Codex / Hermes and many more Integrated"
+      },
+      {
+        "full_name": "ToolJet/ToolJet",
+        "stargazers_count": 41036,
+        "html_url": "https://github.com/ToolJet/ToolJet",
+        "description": "Open-source foundation of ToolJet AI - the enterprise app generation platform for internal tools, dashboards, business applications, workflows and AI agents. Build visually, from a prompt, or from Claude Code, Codex and Cursor over MCP \ud83d\ude80"
+      },
+      {
+        "full_name": "Donchitos/Claude-Code-Game-Studios",
+        "stargazers_count": 25733,
+        "html_url": "https://github.com/Donchitos/Claude-Code-Game-Studios",
+        "description": "Turn Claude Code into a full game dev studio \u2014 49 AI agents, 72 workflow skills, and a complete coordination system mirroring real studio hierarchy."
+      },
+      {
+        "full_name": "czlonkowski/n8n-mcp",
+        "stargazers_count": 23037,
+        "html_url": "https://github.com/czlonkowski/n8n-mcp",
+        "description": "A MCP for Claude Desktop / Claude Code / Windsurf / Cursor to build n8n workflows for you "
+      },
+      {
+        "full_name": "travisvn/awesome-claude-skills",
+        "stargazers_count": 15263,
+        "html_url": "https://github.com/travisvn/awesome-claude-skills",
+        "description": "A curated list of awesome Claude Skills, resources, and tools for customizing Claude AI workflows \u2014 particularly Claude Code"
+      },
+      {
+        "full_name": "google/artemis",
+        "stargazers_count": 10960,
+        "html_url": "https://github.com/google/artemis",
+        "description": "ARTEMIS turns natural-language instructions into reliable Android automation. It automates end-to-end workflows, captures logs, and integrates seamlessly with AI coding assistants such as Antigravity, Codex, and Claude Code.  It also achieves 99%+ success rate on AndroidWorld Benchmark."
+      },
+      {
+        "full_name": "ykdojo/claude-code-tips",
+        "stargazers_count": 10190,
+        "html_url": "https://github.com/ykdojo/claude-code-tips",
+        "description": "45+ tips for getting the most out of Claude Code, from basics to advanced - includes a custom status line script and Claude Code running itself in a container. Also includes the dx plugin: skills for everyday dev workflows."
+      }
+    ]
+  },
+  {
+    "query": "claude-code best-practices in:name,description stars:>10000",
+    "url": "https://api.github.com/search/repositories?q=claude-code+best-practices+in%3Aname%2Cdescription+stars%3A%3E10000&sort=stars&order=desc&per_page=10",
+    "total_count": 0,
+    "incomplete_results": false,
+    "results": []
+  }
+]

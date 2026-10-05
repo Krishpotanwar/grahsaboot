@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.wrangler/
+.env
+.env.*
+!.env.example
+supabase/.temp/
+supabase/.branches/
+test-results/
+playwright-report/
+coverage/
+.DS_Store

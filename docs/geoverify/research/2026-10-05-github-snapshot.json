@@ -1,0 +1,1907 @@
+{
+  "retrieved_at_utc": "2026-10-04T19:25:08.969895+00:00",
+  "document_date_local": "2026-10-05",
+  "timezone": "Asia/Kolkata",
+  "method": "Unauthenticated GitHub REST repository metadata and default-branch head commit; read-only; no repository code executed. Candidate sample is not a comprehensive ranking.",
+  "repositories": [
+    {
+      "requested_repository": "anthropics/claude-code",
+      "metadata_request": {
+        "url": "https://api.github.com/repos/anthropics/claude-code",
+        "server_date": "Sun, 04 Oct 2026 19:25:05 GMT",
+        "rate_limit_remaining": "58"
+      },
+      "repository": {
+        "full_name": "anthropics/claude-code",
+        "html_url": "https://github.com/anthropics/claude-code",
+        "description": "Claude Code is an agentic coding tool that lives in your terminal, understands your codebase, and helps you code faster by executing routine tasks, explaining complex code, and handling git workflows - all through natural language commands.",
+        "stargazers_count": 149403,
+        "forks_count": 25483,
+        "subscribers_count": 907,
+        "archived": false,
+        "disabled": false,
+        "default_branch": "main",
+        "pushed_at": "2026-10-03T23:07:17Z",
+        "updated_at": "2026-10-04T19:16:50Z",
+        "license": null,
+        "topics": [],
+        "homepage": "https://code.claude.com/docs/en/overview",
+        "owner": {
+          "login": "anthropics",
+          "id": 76263028,
+          "node_id": "MDEyOk9yZ2FuaXphdGlvbjc2MjYzMDI4",
+          "avatar_url": "https://avatars.githubusercontent.com/u/76263028?v=4",
+          "gravatar_id": "",
+          "url": "https://api.github.com/users/anthropics",
+          "html_url": "https://github.com/anthropics",
+          "followers_url": "https://api.github.com/users/anthropics/followers",
+          "following_url": "https://api.github.com/users/anthropics/following{/other_user}",
+          "gists_url": "https://api.github.com/users/anthropics/gists{/gist_id}",
+          "starred_url": "https://api.github.com/users/anthropics/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/anthropics/subscriptions",
+          "organizations_url": "https://api.github.com/users/anthropics/orgs",
+          "repos_url": "https://api.github.com/users/anthropics/repos",
+          "events_url": "https://api.github.com/users/anthropics/events{/privacy}",
+          "received_events_url": "https://api.github.com/users/anthropics/received_events",
+          "type": "Organization",
+          "user_view_type": "public",
+          "site_admin": false
+        }
+      },
+      "head_commit": {
+        "url": "https://api.github.com/repos/anthropics/claude-code/commits/main",
+        "server_date": "Sun, 04 Oct 2026 19:25:05 GMT",
+        "sha": "2bfb629dfaff0c8318047a4beb93cf1dc5b58b18",
+        "commit_date": "2026-10-03T23:06:56Z",
+        "html_url": "https://github.com/anthropics/claude-code/commit/2bfb629dfaff0c8318047a4beb93cf1dc5b58b18"
+      },
+      "readme_inspection": {
+        "pinned_raw_url": "https://raw.githubusercontent.com/anthropics/claude-code/2bfb629dfaff0c8318047a4beb93cf1dc5b58b18/README.md",
+        "length_characters": 2873,
+        "headers": [
+          "# Claude Code",
+          "## Get started",
+          "## Plugins",
+          "## Reporting Bugs",
+          "## Connect on Discord",
+          "## Data collection, usage, and retention",
+          "### How we use your data",
+          "### Privacy safeguards"
+        ]
+      }
+    },
+    {
+      "requested_repository": "obra/superpowers",
+      "metadata_request": {
+        "url": "https://api.github.com/repos/obra/superpowers",
+        "server_date": "Sun, 04 Oct 2026 19:25:05 GMT",
+        "rate_limit_remaining": "57"
+      },
+      "repository": {
+        "full_name": "obra/superpowers",
+        "html_url": "https://github.com/obra/superpowers",
+        "description": "An agentic skills framework & software development methodology that works.",
+        "stargazers_count": 295227,
+        "forks_count": 26382,
+        "subscribers_count": 1088,
+        "archived": false,
+        "disabled": false,
+        "default_branch": "main",
+        "pushed_at": "2026-09-27T02:37:47Z",
+        "updated_at": "2026-10-04T19:16:35Z",
+        "license": {
+          "key": "mit",
+          "name": "MIT License",
+          "spdx_id": "MIT",
+          "url": "https://api.github.com/licenses/mit",
+          "node_id": "MDc6TGljZW5zZTEz"
+        },
+        "topics": [
+          "ai",
+          "brainstorming",
+          "coding",
+          "obra",
+          "sdlc",
+          "skills",
+          "subagent-driven-development",
+          "superpowers"
+        ],
+        "homepage": "",
+        "owner": {
+          "login": "obra",
+          "id": 45416,
+          "node_id": "MDQ6VXNlcjQ1NDE2",
+          "avatar_url": "https://avatars.githubusercontent.com/u/45416?v=4",
+          "gravatar_id": "",
+          "url": "https://api.github.com/users/obra",
+          "html_url": "https://github.com/obra",
+          "followers_url": "https://api.github.com/users/obra/followers",
+          "following_url": "https://api.github.com/users/obra/following{/other_user}",
+          "gists_url": "https://api.github.com/users/obra/gists{/gist_id}",
+          "starred_url": "https://api.github.com/users/obra/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/obra/subscriptions",
+          "organizations_url": "https://api.github.com/users/obra/orgs",
+          "repos_url": "https://api.github.com/users/obra/repos",
+          "events_url": "https://api.github.com/users/obra/events{/privacy}",
+          "received_events_url": "https://api.github.com/users/obra/received_events",
+          "type": "User",
+          "user_view_type": "public",
+          "site_admin": false
+        }
+      },
+      "head_commit": {
+        "url": "https://api.github.com/repos/obra/superpowers/commits/main",
+        "server_date": "Sun, 04 Oct 2026 19:25:05 GMT",
+        "sha": "8ca22dba9a94f28898bbce59f2537ff4d87c747d",
+        "commit_date": "2026-09-25T18:06:27Z",
+        "html_url": "https://github.com/obra/superpowers/commit/8ca22dba9a94f28898bbce59f2537ff4d87c747d"
+      },
+      "readme_inspection": {
+        "pinned_raw_url": "https://raw.githubusercontent.com/obra/superpowers/8ca22dba9a94f28898bbce59f2537ff4d87c747d/README.md",
+        "length_characters": 14377,
+        "headers": [
+          "# Superpowers",
+          "## Table of Contents",
+          "## How it works",
+          "## Commercial Services",
+          "## Installation",
+          "### Claude Code",
+          "### Antigravity",
+          "### Codex App",
+          "### Codex CLI",
+          "### Cursor",
+          "### Devin CLI",
+          "### Factory Droid",
+          "### Gemini CLI",
+          "### GitHub Copilot CLI",
+          "### Grok Build CLI",
+          "### Kimi Code",
+          "### OpenCode",
+          "### Pi",
+          "### Qwen Code",
+          "### Hermes Agent",
+          "### Muse",
+          "## The Basic Workflow",
+          "## When Something Goes Wrong",
+          "## Community"
+        ]
+      }
+    },
+    {
+      "requested_repository": "affaan-m/everything-claude-code",
+      "metadata_request": {
+        "url": "https://api.github.com/repositories/1136590548",
+        "server_date": "Sun, 04 Oct 2026 19:25:05 GMT",
+        "rate_limit_remaining": "51"
+      },
+      "repository": {
+        "full_name": "affaan-m/ECC",
+        "html_url": "https://github.com/affaan-m/ECC",
+        "description": "The agent harness performance optimization system. Skills, instincts, memory, security, and research-first development for Claude Code, Codex, Opencode, Cursor and beyond.",
+        "stargazers_count": 272808,
+        "forks_count": 40732,
+        "subscribers_count": 1370,
+        "archived": false,
+        "disabled": false,
+        "default_branch": "main",
+        "pushed_at": "2026-10-02T02:01:14Z",
+        "updated_at": "2026-10-04T19:23:24Z",
+        "license": {
+          "key": "mit",
+          "name": "MIT License",
+          "spdx_id": "MIT",
+          "url": "https://api.github.com/licenses/mit",
+          "node_id": "MDc6TGljZW5zZTEz"
+        },
+        "topics": [
+          "ai-agents",
+          "anthropic",
+          "claude",
+          "claude-code",
+          "developer-tools",
+          "llm",
+          "mcp",
+          "productivity"
+        ],
+        "homepage": "https://ecc.tools",
+        "owner": {
+          "login": "affaan-m",
+          "id": 124439313,
+          "node_id": "U_kgDOB2rLEQ",
+          "avatar_url": "https://avatars.githubusercontent.com/u/124439313?v=4",
+          "gravatar_id": "",
+          "url": "https://api.github.com/users/affaan-m",
+          "html_url": "https://github.com/affaan-m",
+          "followers_url": "https://api.github.com/users/affaan-m/followers",
+          "following_url": "https://api.github.com/users/affaan-m/following{/other_user}",
+          "gists_url": "https://api.github.com/users/affaan-m/gists{/gist_id}",
+          "starred_url": "https://api.github.com/users/affaan-m/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/affaan-m/subscriptions",
+          "organizations_url": "https://api.github.com/users/affaan-m/orgs",
+          "repos_url": "https://api.github.com/users/affaan-m/repos",
+          "events_url": "https://api.github.com/users/affaan-m/events{/privacy}",
+          "received_events_url": "https://api.github.com/users/affaan-m/received_events",
+          "type": "User",
+          "user_view_type": "public",
+          "site_admin": false
+        }
+      },
+      "head_commit": {
+        "url": "https://api.github.com/repos/affaan-m/ECC/commits/main",
+        "server_date": "Sun, 04 Oct 2026 19:25:06 GMT",
+        "sha": "ef648e01899ba3e8dc6371642deaaf64b4477775",
+        "commit_date": "2026-10-02T02:01:14Z",
+        "html_url": "https://github.com/affaan-m/ECC/commit/ef648e01899ba3e8dc6371642deaaf64b4477775"
+      },
+      "readme_inspection": {
+        "pinned_raw_url": "https://raw.githubusercontent.com/affaan-m/ECC/ef648e01899ba3e8dc6371642deaaf64b4477775/README.md",
+        "length_characters": 106535,
+        "headers": [
+          "## Install with Claude Code",
+          "# ECC",
+          "## Install ECC",
+          "### Recommended: universal guided setup",
+          "### Pick one path only (per harness)",
+          "### Claude Code details",
+          "### Codex App and CLI",
+          "### Other agents and editors",
+          "## Advanced Install Options",
+          "### Low-context / no-hooks path",
+          "### Find the right components first",
+          "# Just agents",
+          "# Rules directories (common + language-specific)",
+          "# Core/general skills only (Claude Code loads skills from direct children",
+          "# of ~/.claude/skills; do not nest manual installs under ~/.claude/skills/ecc/)",
+          "# Optional: maintained slash-command compatibility during migration",
+          "### Reset / Uninstall ECC",
+          "## Start Using ECC",
+          "## Self-Hosted Models and Custom Endpoints",
+          "### Self-host Kimi with ECC + It\u00f4 compute",
+          "### It\u00f4 compute CLI bridge",
+          "## What's New",
+          "### v2.0.0: The Agent Harness Operating System (Jun 2026)",
+          "## What's Inside"
+        ]
+      }
+    },
+    {
+      "requested_repository": "gsd-build/get-shit-done",
+      "metadata_request": {
+        "url": "https://api.github.com/repos/gsd-build/get-shit-done",
+        "server_date": "Sun, 04 Oct 2026 19:25:05 GMT",
+        "rate_limit_remaining": "59"
+      },
+      "repository": {
+        "full_name": "gsd-build/get-shit-done",
+        "html_url": "https://github.com/gsd-build/get-shit-done",
+        "description": "A light-weight and powerful meta-prompting, context engineering and spec-driven development system for Claude Code by T\u00c2CHES.",
+        "stargazers_count": 64385,
+        "forks_count": 5437,
+        "subscribers_count": 277,
+        "archived": true,
+        "disabled": false,
+        "default_branch": "main",
+        "pushed_at": "2026-05-31T17:46:54Z",
+        "updated_at": "2026-10-04T17:45:47Z",
+        "license": {
+          "key": "mit",
+          "name": "MIT License",
+          "spdx_id": "MIT",
+          "url": "https://api.github.com/licenses/mit",
+          "node_id": "MDc6TGljZW5zZTEz"
+        },
+        "topics": [
+          "claude-code",
+          "context-engineering",
+          "meta-prompting",
+          "spec-driven-development"
+        ],
+        "homepage": "",
+        "owner": {
+          "login": "gsd-build",
+          "id": 260490621,
+          "node_id": "O_kgDOD4bFfQ",
+          "avatar_url": "https://avatars.githubusercontent.com/u/260490621?v=4",
+          "gravatar_id": "",
+          "url": "https://api.github.com/users/gsd-build",
+          "html_url": "https://github.com/gsd-build",
+          "followers_url": "https://api.github.com/users/gsd-build/followers",
+          "following_url": "https://api.github.com/users/gsd-build/following{/other_user}",
+          "gists_url": "https://api.github.com/users/gsd-build/gists{/gist_id}",
+          "starred_url": "https://api.github.com/users/gsd-build/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/gsd-build/subscriptions",
+          "organizations_url": "https://api.github.com/users/gsd-build/orgs",
+          "repos_url": "https://api.github.com/users/gsd-build/repos",
+          "events_url": "https://api.github.com/users/gsd-build/events{/privacy}",
+          "received_events_url": "https://api.github.com/users/gsd-build/received_events",
+          "type": "Organization",
+          "user_view_type": "public",
+          "site_admin": false
+        }
+      },
+      "head_commit": {
+        "url": "https://api.github.com/repos/gsd-build/get-shit-done/commits/main",
+        "server_date": "Sun, 04 Oct 2026 19:25:05 GMT",
+        "sha": "bdcaab2c752d9a33a1a1ca9acf3a3c81fb991815",
+        "commit_date": "2026-05-31T13:34:35Z",
+        "html_url": "https://github.com/gsd-build/get-shit-done/commit/bdcaab2c752d9a33a1a1ca9acf3a3c81fb991815"
+      },
+      "readme_inspection": {
+        "pinned_raw_url": "https://raw.githubusercontent.com/gsd-build/get-shit-done/bdcaab2c752d9a33a1a1ca9acf3a3c81fb991815/README.md",
+        "length_characters": 329,
+        "headers": [
+          "# GSD Has Moved"
+        ]
+      }
+    },
+    {
+      "requested_repository": "garrytan/gstack",
+      "metadata_request": {
+        "url": "https://api.github.com/repos/garrytan/gstack",
+        "server_date": "Sun, 04 Oct 2026 19:25:05 GMT",
+        "rate_limit_remaining": "56"
+      },
+      "repository": {
+        "full_name": "garrytan/gstack",
+        "html_url": "https://github.com/garrytan/gstack",
+        "description": "Use Garry Tan's exact Claude Code setup: 23 opinionated tools that serve as CEO, Designer, Eng Manager, Release Manager, Doc Engineer, and QA",
+        "stargazers_count": 135100,
+        "forks_count": 20089,
+        "subscribers_count": 786,
+        "archived": false,
+        "disabled": false,
+        "default_branch": "main",
+        "pushed_at": "2026-10-04T19:24:25Z",
+        "updated_at": "2026-10-04T19:21:10Z",
+        "license": {
+          "key": "mit",
+          "name": "MIT License",
+          "spdx_id": "MIT",
+          "url": "https://api.github.com/licenses/mit",
+          "node_id": "MDc6TGljZW5zZTEz"
+        },
+        "topics": [],
+        "homepage": "",
+        "owner": {
+          "login": "garrytan",
+          "id": 19957,
+          "node_id": "MDQ6VXNlcjE5OTU3",
+          "avatar_url": "https://avatars.githubusercontent.com/u/19957?v=4",
+          "gravatar_id": "",
+          "url": "https://api.github.com/users/garrytan",
+          "html_url": "https://github.com/garrytan",
+          "followers_url": "https://api.github.com/users/garrytan/followers",
+          "following_url": "https://api.github.com/users/garrytan/following{/other_user}",
+          "gists_url": "https://api.github.com/users/garrytan/gists{/gist_id}",
+          "starred_url": "https://api.github.com/users/garrytan/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/garrytan/subscriptions",
+          "organizations_url": "https://api.github.com/users/garrytan/orgs",
+          "repos_url": "https://api.github.com/users/garrytan/repos",
+          "events_url": "https://api.github.com/users/garrytan/events{/privacy}",
+          "received_events_url": "https://api.github.com/users/garrytan/received_events",
+          "type": "User",
+          "user_view_type": "public",
+          "site_admin": false
+        }
+      },
+      "head_commit": {
+        "url": "https://api.github.com/repos/garrytan/gstack/commits/main",
+        "server_date": "Sun, 04 Oct 2026 19:25:05 GMT",
+        "sha": "2db0b3adc84b95be08d08bda4f9799ca7fa8665e",
+        "commit_date": "2026-10-04T14:58:41Z",
+        "html_url": "https://github.com/garrytan/gstack/commit/2db0b3adc84b95be08d08bda4f9799ca7fa8665e"
+      },
+      "readme_inspection": {
+        "pinned_raw_url": "https://raw.githubusercontent.com/garrytan/gstack/2db0b3adc84b95be08d08bda4f9799ca7fa8665e/README.md",
+        "length_characters": 78682,
+        "headers": [
+          "# gstack",
+          "## Quick start",
+          "## Install \u2014 about 30 seconds",
+          "### Step 1: Install on your machine",
+          "### Step 2: Team mode \u2014 auto-update for shared repos (recommended)",
+          "### OpenClaw",
+          "### Native OpenClaw Skills (via ClawHub)",
+          "### Other AI Agents",
+          "## See it work",
+          "## The sprint",
+          "### QA without a webpage",
+          "### Which review should I use?",
+          "### Power tools",
+          "### Standalone binaries",
+          "### Domain skills + raw CDP escape hatch",
+          "### Karpathy's four failure modes? Already covered.",
+          "## Parallel sprints",
+          "## 10-15 parallel sprints",
+          "### Voice input (AquaVoice, Whisper, etc.)",
+          "## Uninstall",
+          "### Option 1: Run the uninstall script",
+          "### Option 2: Manual removal (no local repo)",
+          "# 1. Stop browse daemons",
+          "# 2. Remove per-skill directories whose SKILL.md points into gstack/"
+        ]
+      }
+    },
+    {
+      "requested_repository": "github/spec-kit",
+      "metadata_request": {
+        "url": "https://api.github.com/repos/github/spec-kit",
+        "server_date": "Sun, 04 Oct 2026 19:25:06 GMT",
+        "rate_limit_remaining": "48"
+      },
+      "repository": {
+        "full_name": "github/spec-kit",
+        "html_url": "https://github.com/github/spec-kit",
+        "description": "\ud83d\udcab Toolkit to help you get started with SDD or any other process!",
+        "stargazers_count": 140112,
+        "forks_count": 12542,
+        "subscribers_count": 717,
+        "archived": false,
+        "disabled": false,
+        "default_branch": "main",
+        "pushed_at": "2026-10-03T16:48:20Z",
+        "updated_at": "2026-10-04T19:20:52Z",
+        "license": {
+          "key": "mit",
+          "name": "MIT License",
+          "spdx_id": "MIT",
+          "url": "https://api.github.com/licenses/mit",
+          "node_id": "MDc6TGljZW5zZTEz"
+        },
+        "topics": [
+          "ai",
+          "copilot",
+          "development",
+          "engineering",
+          "prd",
+          "spec",
+          "spec-driven"
+        ],
+        "homepage": "https://github.github.com/spec-kit/",
+        "owner": {
+          "login": "github",
+          "id": 9919,
+          "node_id": "MDEyOk9yZ2FuaXphdGlvbjk5MTk=",
+          "avatar_url": "https://avatars.githubusercontent.com/u/9919?v=4",
+          "gravatar_id": "",
+          "url": "https://api.github.com/users/github",
+          "html_url": "https://github.com/github",
+          "followers_url": "https://api.github.com/users/github/followers",
+          "following_url": "https://api.github.com/users/github/following{/other_user}",
+          "gists_url": "https://api.github.com/users/github/gists{/gist_id}",
+          "starred_url": "https://api.github.com/users/github/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/github/subscriptions",
+          "organizations_url": "https://api.github.com/users/github/orgs",
+          "repos_url": "https://api.github.com/users/github/repos",
+          "events_url": "https://api.github.com/users/github/events{/privacy}",
+          "received_events_url": "https://api.github.com/users/github/received_events",
+          "type": "Organization",
+          "user_view_type": "public",
+          "site_admin": false
+        }
+      },
+      "head_commit": {
+        "url": "https://api.github.com/repos/github/spec-kit/commits/main",
+        "server_date": "Sun, 04 Oct 2026 19:25:06 GMT",
+        "sha": "ae5ade7234be5cb1d975f736c4e06dd46d1326d6",
+        "commit_date": "2026-10-03T16:48:19Z",
+        "html_url": "https://github.com/github/spec-kit/commit/ae5ade7234be5cb1d975f736c4e06dd46d1326d6"
+      },
+      "readme_inspection": {
+        "pinned_raw_url": "https://raw.githubusercontent.com/github/spec-kit/ae5ade7234be5cb1d975f736c4e06dd46d1326d6/README.md",
+        "length_characters": 9134,
+        "headers": [
+          "## Choose your process",
+          "## Get started",
+          "## Spec-Driven Development",
+          "## Bug fixing",
+          "## Idea assessment",
+          "## Customize or bring your own process",
+          "## Documentation",
+          "## Star history",
+          "## Support and contributing"
+        ]
+      }
+    },
+    {
+      "requested_repository": "openai/codex",
+      "metadata_request": {
+        "url": "https://api.github.com/repos/openai/codex",
+        "server_date": "Sun, 04 Oct 2026 19:25:06 GMT",
+        "rate_limit_remaining": "47"
+      },
+      "repository": {
+        "full_name": "openai/codex",
+        "html_url": "https://github.com/openai/codex",
+        "description": "Lightweight coding agent that runs in your terminal",
+        "stargazers_count": 127845,
+        "forks_count": 20017,
+        "subscribers_count": 653,
+        "archived": false,
+        "disabled": false,
+        "default_branch": "main",
+        "pushed_at": "2026-10-04T19:07:53Z",
+        "updated_at": "2026-10-04T19:18:06Z",
+        "license": {
+          "key": "apache-2.0",
+          "name": "Apache License 2.0",
+          "spdx_id": "Apache-2.0",
+          "url": "https://api.github.com/licenses/apache-2.0",
+          "node_id": "MDc6TGljZW5zZTI="
+        },
+        "topics": [],
+        "homepage": "",
+        "owner": {
+          "login": "openai",
+          "id": 14957082,
+          "node_id": "MDEyOk9yZ2FuaXphdGlvbjE0OTU3MDgy",
+          "avatar_url": "https://avatars.githubusercontent.com/u/14957082?v=4",
+          "gravatar_id": "",
+          "url": "https://api.github.com/users/openai",
+          "html_url": "https://github.com/openai",
+          "followers_url": "https://api.github.com/users/openai/followers",
+          "following_url": "https://api.github.com/users/openai/following{/other_user}",
+          "gists_url": "https://api.github.com/users/openai/gists{/gist_id}",
+          "starred_url": "https://api.github.com/users/openai/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/openai/subscriptions",
+          "organizations_url": "https://api.github.com/users/openai/orgs",
+          "repos_url": "https://api.github.com/users/openai/repos",
+          "events_url": "https://api.github.com/users/openai/events{/privacy}",
+          "received_events_url": "https://api.github.com/users/openai/received_events",
+          "type": "Organization",
+          "user_view_type": "public",
+          "site_admin": false
+        }
+      },
+      "head_commit": {
+        "url": "https://api.github.com/repos/openai/codex/commits/main",
+        "server_date": "Sun, 04 Oct 2026 19:25:06 GMT",
+        "sha": "de3721a7be07054c8c2a41102b5a501f34155361",
+        "commit_date": "2026-10-04T19:07:36Z",
+        "html_url": "https://github.com/openai/codex/commit/de3721a7be07054c8c2a41102b5a501f34155361"
+      },
+      "readme_inspection": {
+        "pinned_raw_url": "https://raw.githubusercontent.com/openai/codex/de3721a7be07054c8c2a41102b5a501f34155361/README.md",
+        "length_characters": 3334,
+        "headers": [
+          "## Quickstart",
+          "### Installing and running Codex CLI",
+          "# Install using npm",
+          "# Install using Homebrew",
+          "### Using Codex with your ChatGPT plan",
+          "## Docs"
+        ]
+      }
+    },
+    {
+      "requested_repository": "Aider-AI/aider",
+      "metadata_request": {
+        "url": "https://api.github.com/repos/Aider-AI/aider",
+        "server_date": "Sun, 04 Oct 2026 19:25:06 GMT",
+        "rate_limit_remaining": "46"
+      },
+      "repository": {
+        "full_name": "Aider-AI/aider",
+        "html_url": "https://github.com/Aider-AI/aider",
+        "description": "aider is AI pair programming in your terminal",
+        "stargazers_count": 49379,
+        "forks_count": 5030,
+        "subscribers_count": 271,
+        "archived": false,
+        "disabled": false,
+        "default_branch": "main",
+        "pushed_at": "2026-05-22T14:02:20Z",
+        "updated_at": "2026-10-04T18:36:22Z",
+        "license": {
+          "key": "apache-2.0",
+          "name": "Apache License 2.0",
+          "spdx_id": "Apache-2.0",
+          "url": "https://api.github.com/licenses/apache-2.0",
+          "node_id": "MDc6TGljZW5zZTI="
+        },
+        "topics": [
+          "anthropic",
+          "chatgpt",
+          "claude-3",
+          "cli",
+          "command-line",
+          "gemini",
+          "gpt-3",
+          "gpt-35-turbo",
+          "gpt-4",
+          "gpt-4o",
+          "llama",
+          "openai",
+          "sonnet"
+        ],
+        "homepage": "https://aider.chat/",
+        "owner": {
+          "login": "Aider-AI",
+          "id": 172139148,
+          "node_id": "O_kgDOCkKijA",
+          "avatar_url": "https://avatars.githubusercontent.com/u/172139148?v=4",
+          "gravatar_id": "",
+          "url": "https://api.github.com/users/Aider-AI",
+          "html_url": "https://github.com/Aider-AI",
+          "followers_url": "https://api.github.com/users/Aider-AI/followers",
+          "following_url": "https://api.github.com/users/Aider-AI/following{/other_user}",
+          "gists_url": "https://api.github.com/users/Aider-AI/gists{/gist_id}",
+          "starred_url": "https://api.github.com/users/Aider-AI/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/Aider-AI/subscriptions",
+          "organizations_url": "https://api.github.com/users/Aider-AI/orgs",
+          "repos_url": "https://api.github.com/users/Aider-AI/repos",
+          "events_url": "https://api.github.com/users/Aider-AI/events{/privacy}",
+          "received_events_url": "https://api.github.com/users/Aider-AI/received_events",
+          "type": "Organization",
+          "user_view_type": "public",
+          "site_admin": false
+        }
+      },
+      "head_commit": {
+        "url": "https://api.github.com/repos/Aider-AI/aider/commits/main",
+        "server_date": "Sun, 04 Oct 2026 19:25:06 GMT",
+        "sha": "5dc9490bb35f9729ef2c95d00a19ccd30c26339c",
+        "commit_date": "2026-05-22T14:02:20Z",
+        "html_url": "https://github.com/Aider-AI/aider/commit/5dc9490bb35f9729ef2c95d00a19ccd30c26339c"
+      },
+      "readme_inspection": {
+        "pinned_raw_url": "https://raw.githubusercontent.com/Aider-AI/aider/5dc9490bb35f9729ef2c95d00a19ccd30c26339c/README.md",
+        "length_characters": 12324,
+        "headers": [
+          "## Features",
+          "### [Cloud and local LLMs](https://aider.chat/docs/llms.html)",
+          "### [Maps your codebase](https://aider.chat/docs/repomap.html)",
+          "### [100+ code languages](https://aider.chat/docs/languages.html)",
+          "### [Git integration](https://aider.chat/docs/git.html)",
+          "### [Use in your IDE](https://aider.chat/docs/usage/watch.html)",
+          "### [Images & web pages](https://aider.chat/docs/usage/images-urls.html)",
+          "### [Voice-to-code](https://aider.chat/docs/usage/voice.html)",
+          "### [Linting & testing](https://aider.chat/docs/usage/lint-test.html)",
+          "### [Copy/paste to web chat](https://aider.chat/docs/usage/copypaste.html)",
+          "## Getting Started",
+          "# Change directory into your codebase",
+          "# DeepSeek",
+          "# Claude 3.7 Sonnet",
+          "# o3-mini",
+          "## More Information",
+          "### Documentation",
+          "### Community & Resources",
+          "## Kind Words From Users"
+        ]
+      }
+    },
+    {
+      "requested_repository": "OpenHands/OpenHands",
+      "metadata_request": {
+        "url": "https://api.github.com/repos/OpenHands/OpenHands",
+        "server_date": "Sun, 04 Oct 2026 19:25:06 GMT",
+        "rate_limit_remaining": "45"
+      },
+      "repository": {
+        "full_name": "OpenHands/OpenHands",
+        "html_url": "https://github.com/OpenHands/OpenHands",
+        "description": "\ud83d\ude4c OpenHands: AI-Driven Development",
+        "stargazers_count": 89985,
+        "forks_count": 11889,
+        "subscribers_count": 496,
+        "archived": false,
+        "disabled": false,
+        "default_branch": "main",
+        "pushed_at": "2026-10-04T14:08:09Z",
+        "updated_at": "2026-10-04T19:17:20Z",
+        "license": {
+          "key": "mit",
+          "name": "MIT License",
+          "spdx_id": "MIT",
+          "url": "https://api.github.com/licenses/mit",
+          "node_id": "MDc6TGljZW5zZTEz"
+        },
+        "topics": [
+          "agent",
+          "artificial-intelligence",
+          "chatgpt",
+          "claude-ai",
+          "cli",
+          "developer-tools",
+          "gpt",
+          "llm",
+          "openai"
+        ],
+        "homepage": "https://openhands.dev",
+        "owner": {
+          "login": "OpenHands",
+          "id": 225919603,
+          "node_id": "O_kgDODXdCcw",
+          "avatar_url": "https://avatars.githubusercontent.com/u/225919603?v=4",
+          "gravatar_id": "",
+          "url": "https://api.github.com/users/OpenHands",
+          "html_url": "https://github.com/OpenHands",
+          "followers_url": "https://api.github.com/users/OpenHands/followers",
+          "following_url": "https://api.github.com/users/OpenHands/following{/other_user}",
+          "gists_url": "https://api.github.com/users/OpenHands/gists{/gist_id}",
+          "starred_url": "https://api.github.com/users/OpenHands/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/OpenHands/subscriptions",
+          "organizations_url": "https://api.github.com/users/OpenHands/orgs",
+          "repos_url": "https://api.github.com/users/OpenHands/repos",
+          "events_url": "https://api.github.com/users/OpenHands/events{/privacy}",
+          "received_events_url": "https://api.github.com/users/OpenHands/received_events",
+          "type": "Organization",
+          "user_view_type": "public",
+          "site_admin": false
+        }
+      },
+      "head_commit": {
+        "url": "https://api.github.com/repos/OpenHands/OpenHands/commits/main",
+        "server_date": "Sun, 04 Oct 2026 19:25:06 GMT",
+        "sha": "35dc8aafaad2d883cf0c6629dea857eb2235895e",
+        "commit_date": "2026-10-04T14:06:58Z",
+        "html_url": "https://github.com/OpenHands/OpenHands/commit/35dc8aafaad2d883cf0c6629dea857eb2235895e"
+      },
+      "readme_inspection": {
+        "pinned_raw_url": "https://raw.githubusercontent.com/OpenHands/OpenHands/35dc8aafaad2d883cf0c6629dea857eb2235895e/README.md",
+        "length_characters": 12826,
+        "headers": [
+          "## Quickstart",
+          "### Option 1: Without a Sandbox",
+          "### Option 2: With a Docker Sandbox",
+          "### Option 3: With Multiple Docker Sandboxes",
+          "### Option 4: From Source",
+          "# Architecture",
+          "### Repository boundaries",
+          "## More documentation"
+        ]
+      }
+    },
+    {
+      "requested_repository": "ruvnet/ruflo",
+      "metadata_request": {
+        "url": "https://api.github.com/repos/ruvnet/ruflo",
+        "server_date": "Sun, 04 Oct 2026 19:25:06 GMT",
+        "rate_limit_remaining": "42"
+      },
+      "repository": {
+        "full_name": "ruvnet/ruflo",
+        "html_url": "https://github.com/ruvnet/ruflo",
+        "description": "\ud83c\udf0a The original agent harness. Deploy intelligent multi-player swarms, coordinate autonomous workflows, and build conversational AI systems. Features adaptive memory, self-learning intelligence, federation, vector RAG integration, and native Claude Code / Codex / Hermes and many more Integrated",
+        "stargazers_count": 73852,
+        "forks_count": 8776,
+        "subscribers_count": 463,
+        "archived": false,
+        "disabled": false,
+        "default_branch": "main",
+        "pushed_at": "2026-10-04T19:24:57Z",
+        "updated_at": "2026-10-04T19:25:03Z",
+        "license": {
+          "key": "mit",
+          "name": "MIT License",
+          "spdx_id": "MIT",
+          "url": "https://api.github.com/licenses/mit",
+          "node_id": "MDc6TGljZW5zZTEz"
+        },
+        "topics": [
+          "agentic-ai",
+          "agentic-framework",
+          "agentic-workflow",
+          "agents",
+          "ai-agents",
+          "ai-assistant",
+          "ai-skills",
+          "autonomous-agents",
+          "claude",
+          "codex",
+          "dsh-plugin",
+          "harness",
+          "mcp-server",
+          "multi-agent",
+          "multi-agent-systems",
+          "npm",
+          "skills",
+          "swarm",
+          "swarm-intelligence",
+          "typescript"
+        ],
+        "homepage": "https://Cognitum.One",
+        "owner": {
+          "login": "ruvnet",
+          "id": 2934394,
+          "node_id": "MDQ6VXNlcjI5MzQzOTQ=",
+          "avatar_url": "https://avatars.githubusercontent.com/u/2934394?v=4",
+          "gravatar_id": "",
+          "url": "https://api.github.com/users/ruvnet",
+          "html_url": "https://github.com/ruvnet",
+          "followers_url": "https://api.github.com/users/ruvnet/followers",
+          "following_url": "https://api.github.com/users/ruvnet/following{/other_user}",
+          "gists_url": "https://api.github.com/users/ruvnet/gists{/gist_id}",
+          "starred_url": "https://api.github.com/users/ruvnet/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/ruvnet/subscriptions",
+          "organizations_url": "https://api.github.com/users/ruvnet/orgs",
+          "repos_url": "https://api.github.com/users/ruvnet/repos",
+          "events_url": "https://api.github.com/users/ruvnet/events{/privacy}",
+          "received_events_url": "https://api.github.com/users/ruvnet/received_events",
+          "type": "User",
+          "user_view_type": "public",
+          "site_admin": false
+        }
+      },
+      "head_commit": {
+        "url": "https://api.github.com/repos/ruvnet/ruflo/commits/main",
+        "server_date": "Sun, 04 Oct 2026 19:25:07 GMT",
+        "sha": "bd3daee85422e3f2be1973656babcfba0db8df1f",
+        "commit_date": "2026-10-04T19:24:57Z",
+        "html_url": "https://github.com/ruvnet/ruflo/commit/bd3daee85422e3f2be1973656babcfba0db8df1f"
+      },
+      "readme_inspection": {
+        "pinned_raw_url": "https://raw.githubusercontent.com/ruvnet/ruflo/bd3daee85422e3f2be1973656babcfba0db8df1f/README.md",
+        "length_characters": 26598,
+        "headers": [
+          "# Ruflo",
+          "## Quick Start",
+          "### Path A \u2014 Claude Code Plugins (lite, slash commands only)",
+          "# Add the marketplace",
+          "# Install core + any plugins you need",
+          "### CLI Install",
+          "# One-line install (POSIX shells only \u2014 see Windows note below)",
+          "# Interactive setup wizard \u2014 runs identically on every platform",
+          "# Quick non-interactive init",
+          "# npx ruflo@latest init",
+          "# Or install globally",
+          "### MCP Server",
+          "# Add Ruflo as an MCP server in Claude Code",
+          "## What You Get",
+          "### Agent Federation \u2014 Slack for Agents",
+          "# Team A: initialize federation and generate keypair",
+          "# Team A: join Team B's federation endpoint",
+          "# Team A: send a task \u2014 PII is stripped automatically before it leaves",
+          "# Team A: check peer trust levels and session health",
+          "# Claude Code plugin",
+          "# Or via CLI",
+          "## Documentation",
+          "## Support",
+          "## License"
+        ]
+      }
+    },
+    {
+      "requested_repository": "hesreallyhim/awesome-claude-code",
+      "metadata_request": {
+        "url": "https://api.github.com/repos/hesreallyhim/awesome-claude-code",
+        "server_date": "Sun, 04 Oct 2026 19:25:06 GMT",
+        "rate_limit_remaining": "39"
+      },
+      "repository": {
+        "full_name": "hesreallyhim/awesome-claude-code",
+        "html_url": "https://github.com/hesreallyhim/awesome-claude-code",
+        "description": "A hand-picked collection of the finest of resources for the most awesome of agents, Claude Code, the undisputed champion of coding companions, from the unstoppable team at Anthropic PBC. A delectable showcase of top tier skills, ambidextrous agents, scintillating status lines, top notch developer tooling, and also we have plugins",
+        "stargazers_count": 55065,
+        "forks_count": 4785,
+        "subscribers_count": 332,
+        "archived": false,
+        "disabled": false,
+        "default_branch": "main",
+        "pushed_at": "2026-10-04T19:02:01Z",
+        "updated_at": "2026-10-04T19:13:53Z",
+        "license": {
+          "key": "other",
+          "name": "Other",
+          "spdx_id": "NOASSERTION",
+          "url": null,
+          "node_id": "MDc6TGljZW5zZTA="
+        },
+        "topics": [
+          "agent-skills",
+          "agentic-code",
+          "agentic-coding",
+          "ai-workflow-optimization",
+          "ai-workflows",
+          "anthropic",
+          "anthropic-claude",
+          "awesome",
+          "awesome-claude-code",
+          "awesome-list",
+          "awesome-lists",
+          "awesome-resources",
+          "claude",
+          "claude-code",
+          "coding-agent",
+          "coding-agents",
+          "coding-assistant",
+          "coding-assistants",
+          "llm"
+        ],
+        "homepage": "",
+        "owner": {
+          "login": "hesreallyhim",
+          "id": 172150522,
+          "node_id": "U_kgDOCkLO-g",
+          "avatar_url": "https://avatars.githubusercontent.com/u/172150522?v=4",
+          "gravatar_id": "",
+          "url": "https://api.github.com/users/hesreallyhim",
+          "html_url": "https://github.com/hesreallyhim",
+          "followers_url": "https://api.github.com/users/hesreallyhim/followers",
+          "following_url": "https://api.github.com/users/hesreallyhim/following{/other_user}",
+          "gists_url": "https://api.github.com/users/hesreallyhim/gists{/gist_id}",
+          "starred_url": "https://api.github.com/users/hesreallyhim/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/hesreallyhim/subscriptions",
+          "organizations_url": "https://api.github.com/users/hesreallyhim/orgs",
+          "repos_url": "https://api.github.com/users/hesreallyhim/repos",
+          "events_url": "https://api.github.com/users/hesreallyhim/events{/privacy}",
+          "received_events_url": "https://api.github.com/users/hesreallyhim/received_events",
+          "type": "User",
+          "user_view_type": "public",
+          "site_admin": false
+        }
+      },
+      "head_commit": {
+        "url": "https://api.github.com/repos/hesreallyhim/awesome-claude-code/commits/main",
+        "server_date": "Sun, 04 Oct 2026 19:25:07 GMT",
+        "sha": "356d3fb5a2ed46395627fa17d3dc184cdebedf34",
+        "commit_date": "2026-10-04T19:02:00Z",
+        "html_url": "https://github.com/hesreallyhim/awesome-claude-code/commit/356d3fb5a2ed46395627fa17d3dc184cdebedf34"
+      },
+      "readme_inspection": {
+        "pinned_raw_url": "https://raw.githubusercontent.com/hesreallyhim/awesome-claude-code/356d3fb5a2ed46395627fa17d3dc184cdebedf34/README.md",
+        "length_characters": 196154,
+        "headers": [
+          "## The Claude Code Ticker - A Sample of Claude Code Projects Around GitHub",
+          "## Recently Added",
+          "# Table of Contents",
+          "## Start Here",
+          "## From Anthropic",
+          "## Documentation, Knowledge & Learning",
+          "### Obsidian",
+          "## Open Source Software",
+          "## Research & Scientific Inquiry",
+          "## Providers, Runtime & Integration Infrastructure",
+          "## Remote Control, Notifications & Voice I/O",
+          "## Alternative Clients",
+          "## Status Lines",
+          "## Design & UI/UX",
+          "## Writing & Prose Quality",
+          "## Creative Media",
+          "## Infrastructure & DevOps",
+          "## Security",
+          "## Agent Orchestration",
+          "### Ralph Wiggum",
+          "### Dynamic Workflows",
+          "## Skills",
+          "## Memory & Context Persistence",
+          "## Observability & Monitoring"
+        ]
+      }
+    },
+    {
+      "requested_repository": "wshobson/agents",
+      "metadata_request": {
+        "url": "https://api.github.com/repos/wshobson/agents",
+        "server_date": "Sun, 04 Oct 2026 19:25:07 GMT",
+        "rate_limit_remaining": "37"
+      },
+      "repository": {
+        "full_name": "wshobson/agents",
+        "html_url": "https://github.com/wshobson/agents",
+        "description": "Multi-harness agentic plugin marketplace for Claude Code, Codex, Cursor, OpenCode, GitHub Copilot, Google Antigravity, and Pi",
+        "stargazers_count": 40193,
+        "forks_count": 4285,
+        "subscribers_count": 315,
+        "archived": false,
+        "disabled": false,
+        "default_branch": "main",
+        "pushed_at": "2026-10-04T14:52:06Z",
+        "updated_at": "2026-10-04T19:04:01Z",
+        "license": {
+          "key": "mit",
+          "name": "MIT License",
+          "spdx_id": "MIT",
+          "url": "https://api.github.com/licenses/mit",
+          "node_id": "MDc6TGljZW5zZTEz"
+        },
+        "topics": [
+          "agent-skills",
+          "agentic-ai",
+          "ai-agents",
+          "anthropic",
+          "antigravity",
+          "claude",
+          "claude-code",
+          "claude-code-marketplace",
+          "claude-code-plugin",
+          "claude-skills",
+          "codex",
+          "coding-agents",
+          "cursor",
+          "cursor-rules",
+          "github-copilot",
+          "mcp",
+          "multi-agent",
+          "opencode",
+          "pi-coding-agent",
+          "subagents"
+        ],
+        "homepage": "https://sethhobson.com",
+        "owner": {
+          "login": "wshobson",
+          "id": 553618,
+          "node_id": "MDQ6VXNlcjU1MzYxOA==",
+          "avatar_url": "https://avatars.githubusercontent.com/u/553618?v=4",
+          "gravatar_id": "",
+          "url": "https://api.github.com/users/wshobson",
+          "html_url": "https://github.com/wshobson",
+          "followers_url": "https://api.github.com/users/wshobson/followers",
+          "following_url": "https://api.github.com/users/wshobson/following{/other_user}",
+          "gists_url": "https://api.github.com/users/wshobson/gists{/gist_id}",
+          "starred_url": "https://api.github.com/users/wshobson/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/wshobson/subscriptions",
+          "organizations_url": "https://api.github.com/users/wshobson/orgs",
+          "repos_url": "https://api.github.com/users/wshobson/repos",
+          "events_url": "https://api.github.com/users/wshobson/events{/privacy}",
+          "received_events_url": "https://api.github.com/users/wshobson/received_events",
+          "type": "User",
+          "user_view_type": "public",
+          "site_admin": false
+        }
+      },
+      "head_commit": {
+        "url": "https://api.github.com/repos/wshobson/agents/commits/main",
+        "server_date": "Sun, 04 Oct 2026 19:25:07 GMT",
+        "sha": "83e95a4893fab062a539c49fde5a4c2db26da577",
+        "commit_date": "2026-10-04T13:27:36Z",
+        "html_url": "https://github.com/wshobson/agents/commit/83e95a4893fab062a539c49fde5a4c2db26da577"
+      },
+      "readme_inspection": {
+        "pinned_raw_url": "https://raw.githubusercontent.com/wshobson/agents/83e95a4893fab062a539c49fde5a4c2db26da577/README.md",
+        "length_characters": 9662,
+        "headers": [
+          "# Plugins, agents, and skills for AI coding tools",
+          "## Multi-harness support",
+          "## Quick start",
+          "### Claude Code",
+          "### Codex CLI",
+          "### Cursor",
+          "### Skills only",
+          "### Install from a clone",
+          "## What's inside",
+          "## How it works",
+          "## Quality evaluation",
+          "## Documentation map",
+          "## External memory integration",
+          "## License",
+          "## Star history"
+        ]
+      }
+    },
+    {
+      "requested_repository": "shanraisshan/claude-code-best-practice",
+      "metadata_request": {
+        "url": "https://api.github.com/repos/shanraisshan/claude-code-best-practice",
+        "server_date": "Sun, 04 Oct 2026 19:25:07 GMT",
+        "rate_limit_remaining": "36"
+      },
+      "repository": {
+        "full_name": "shanraisshan/claude-code-best-practice",
+        "html_url": "https://github.com/shanraisshan/claude-code-best-practice",
+        "description": "from vibe coding to agentic engineering - practice makes claude perfect",
+        "stargazers_count": 67081,
+        "forks_count": 6705,
+        "subscribers_count": 501,
+        "archived": false,
+        "disabled": false,
+        "default_branch": "main",
+        "pushed_at": "2026-10-04T06:45:46Z",
+        "updated_at": "2026-10-04T18:37:42Z",
+        "license": {
+          "key": "mit",
+          "name": "MIT License",
+          "spdx_id": "MIT",
+          "url": "https://api.github.com/licenses/mit",
+          "node_id": "MDc6TGljZW5zZTEz"
+        },
+        "topics": [
+          "agentic-ai",
+          "agentic-coding",
+          "agentic-engineering",
+          "agentic-workflow",
+          "ai",
+          "ai-agents",
+          "anthropic",
+          "best-practices",
+          "boris",
+          "claude",
+          "claude-ai",
+          "claude-code",
+          "claude-code-agents",
+          "claude-code-best-practices",
+          "claude-code-commands",
+          "claude-code-skills",
+          "context-engineering",
+          "pakistan",
+          "pakistani-developer",
+          "vibe-coding"
+        ],
+        "homepage": "https://linkedin.com/in/shanraisshan",
+        "owner": {
+          "login": "shanraisshan",
+          "id": 11731897,
+          "node_id": "MDQ6VXNlcjExNzMxODk3",
+          "avatar_url": "https://avatars.githubusercontent.com/u/11731897?v=4",
+          "gravatar_id": "",
+          "url": "https://api.github.com/users/shanraisshan",
+          "html_url": "https://github.com/shanraisshan",
+          "followers_url": "https://api.github.com/users/shanraisshan/followers",
+          "following_url": "https://api.github.com/users/shanraisshan/following{/other_user}",
+          "gists_url": "https://api.github.com/users/shanraisshan/gists{/gist_id}",
+          "starred_url": "https://api.github.com/users/shanraisshan/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/shanraisshan/subscriptions",
+          "organizations_url": "https://api.github.com/users/shanraisshan/orgs",
+          "repos_url": "https://api.github.com/users/shanraisshan/repos",
+          "events_url": "https://api.github.com/users/shanraisshan/events{/privacy}",
+          "received_events_url": "https://api.github.com/users/shanraisshan/received_events",
+          "type": "User",
+          "user_view_type": "public",
+          "site_admin": false
+        }
+      },
+      "head_commit": {
+        "url": "https://api.github.com/repos/shanraisshan/claude-code-best-practice/commits/main",
+        "server_date": "Sun, 04 Oct 2026 19:25:07 GMT",
+        "sha": "85e2a67396a907ca22997eb212d03a509643af55",
+        "commit_date": "2026-10-04T06:45:41Z",
+        "html_url": "https://github.com/shanraisshan/claude-code-best-practice/commit/85e2a67396a907ca22997eb212d03a509643af55"
+      },
+      "readme_inspection": {
+        "pinned_raw_url": "https://raw.githubusercontent.com/shanraisshan/claude-code-best-practice/85e2a67396a907ca22997eb212d03a509643af55/README.md",
+        "length_characters": 73888,
+        "headers": [
+          "# claude-code-best-practice",
+          "## \ud83e\udde0 CONCEPTS",
+          "### \ud83d\udd25 Hot",
+          "## <a href=\"orchestration-workflow/orchestration-workflow.md\"><img src=\"!/tags/orchestration-workflow-hd.svg\" alt=\"Orchestration Workflow\"></a>",
+          "## \u2699\ufe0f DEVELOPMENT WORKFLOWS",
+          "### Others",
+          "## \ud83d\udd00 CROSS-MODEL WORKFLOWS",
+          "## \ud83e\uddf0 SKILL COLLECTIONS",
+          "## \ud83e\udd16 AGENT COLLECTIONS",
+          "## \ud83d\udca1 TIPS AND TRICKS (83)",
+          "## \ud83c\udfac VIDEOS / PODCASTS",
+          "## \ud83d\udd14 SUBSCRIBE",
+          "## \u2620\ufe0f STARTUPS / BUSINESSES",
+          "### \ud83e\udd14 [Does code matter?](https://github.com/shanraisshan/agentic-engineering)",
+          "## REPORTS",
+          "## <img src=\"!/tags/how-to-use-hd.svg\" alt=\"How to Use\">",
+          "## Star History",
+          "## Other Repos",
+          "## Developed by",
+          "## Extras",
+          "## <img src=\"!/tags/sponsor-heart.svg\" width=\"22\" height=\"22\" align=\"center\"> Sponsor My Work"
+        ]
+      }
+    },
+    {
+      "requested_repository": "sickn33/antigravity-awesome-skills",
+      "metadata_request": {
+        "url": "https://api.github.com/repositories/1134426800",
+        "server_date": "Sun, 04 Oct 2026 19:25:07 GMT",
+        "rate_limit_remaining": "30"
+      },
+      "repository": {
+        "full_name": "sickn33/agentic-awesome-skills",
+        "html_url": "https://github.com/sickn33/agentic-awesome-skills",
+        "description": "AAS Core is the local, agent-first control plane for complete catalog discovery, agent-owned selection, stack validation, and planning, backed by 2,400+ agentic skills. Includes CLI, local MCP, catalog, plugins, and Workbench.",
+        "stargazers_count": 47249,
+        "forks_count": 6883,
+        "subscribers_count": 324,
+        "archived": false,
+        "disabled": false,
+        "default_branch": "main",
+        "pushed_at": "2026-10-04T07:18:29Z",
+        "updated_at": "2026-10-04T18:57:37Z",
+        "license": {
+          "key": "mit",
+          "name": "MIT License",
+          "spdx_id": "MIT",
+          "url": "https://api.github.com/licenses/mit",
+          "node_id": "MDc6TGljZW5zZTEz"
+        },
+        "topics": [
+          "agent-skills",
+          "agentic-skills",
+          "ai-agent-skills",
+          "ai-agents",
+          "ai-coding",
+          "ai-workflows",
+          "antigravity",
+          "antigravity-skills",
+          "claude-code",
+          "claude-code-skills",
+          "codex-cli",
+          "codex-skills",
+          "cursor",
+          "cursor-skills",
+          "developer-tools",
+          "gemini-cli",
+          "gemini-skills",
+          "kiro",
+          "mcp",
+          "skill-library"
+        ],
+        "homepage": "https://aaskills.tech/",
+        "owner": {
+          "login": "sickn33",
+          "id": 184072420,
+          "node_id": "U_kgDOCvi45A",
+          "avatar_url": "https://avatars.githubusercontent.com/u/184072420?v=4",
+          "gravatar_id": "",
+          "url": "https://api.github.com/users/sickn33",
+          "html_url": "https://github.com/sickn33",
+          "followers_url": "https://api.github.com/users/sickn33/followers",
+          "following_url": "https://api.github.com/users/sickn33/following{/other_user}",
+          "gists_url": "https://api.github.com/users/sickn33/gists{/gist_id}",
+          "starred_url": "https://api.github.com/users/sickn33/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/sickn33/subscriptions",
+          "organizations_url": "https://api.github.com/users/sickn33/orgs",
+          "repos_url": "https://api.github.com/users/sickn33/repos",
+          "events_url": "https://api.github.com/users/sickn33/events{/privacy}",
+          "received_events_url": "https://api.github.com/users/sickn33/received_events",
+          "type": "User",
+          "user_view_type": "public",
+          "site_admin": false
+        }
+      },
+      "head_commit": {
+        "url": "https://api.github.com/repos/sickn33/agentic-awesome-skills/commits/main",
+        "server_date": "Sun, 04 Oct 2026 19:25:08 GMT",
+        "sha": "8bff3af5d2173c90b9ba41a3fe4bcb91bcb64305",
+        "commit_date": "2026-10-04T07:12:41Z",
+        "html_url": "https://github.com/sickn33/agentic-awesome-skills/commit/8bff3af5d2173c90b9ba41a3fe4bcb91bcb64305"
+      },
+      "readme_inspection": {
+        "pinned_raw_url": "https://raw.githubusercontent.com/sickn33/agentic-awesome-skills/8bff3af5d2173c90b9ba41a3fe4bcb91bcb64305/README.md",
+        "length_characters": 101063,
+        "headers": [
+          "# AAS Core \u2014 Agentic Awesome Skills",
+          "## Table of Contents",
+          "## Watch the Introduction",
+          "## Support the Project",
+          "## AAS Core: Agent-First Preview",
+          "## Installation",
+          "### From selection to use",
+          "### Install selected skills directly",
+          "## Choose Your Tool",
+          "## Recommended Specialized Plugins",
+          "## Bundles & Workflows",
+          "## Browse 2,640+ Skills",
+          "## Troubleshooting",
+          "## Stable Skills Manifest v1",
+          "## Contributing",
+          "## Community",
+          "## Credits & Sources",
+          "### Official Sources",
+          "### Community Contributors",
+          "### Inspirations",
+          "### Additional Sources",
+          "## Top Contributors",
+          "### Most Commits",
+          "### Most Skills Added"
+        ]
+      }
+    },
+    {
+      "requested_repository": "anomalyco/opencode",
+      "metadata_request": {
+        "url": "https://api.github.com/repos/anomalyco/opencode",
+        "server_date": "Sun, 04 Oct 2026 19:25:07 GMT",
+        "rate_limit_remaining": "31"
+      },
+      "repository": {
+        "full_name": "anomalyco/opencode",
+        "html_url": "https://github.com/anomalyco/opencode",
+        "description": "The open source coding agent.",
+        "stargazers_count": 211737,
+        "forks_count": 28150,
+        "subscribers_count": 817,
+        "archived": false,
+        "disabled": false,
+        "default_branch": "dev",
+        "pushed_at": "2026-10-04T19:19:45Z",
+        "updated_at": "2026-10-04T19:22:40Z",
+        "license": {
+          "key": "mit",
+          "name": "MIT License",
+          "spdx_id": "MIT",
+          "url": "https://api.github.com/licenses/mit",
+          "node_id": "MDc6TGljZW5zZTEz"
+        },
+        "topics": [],
+        "homepage": "https://opencode.ai",
+        "owner": {
+          "login": "anomalyco",
+          "id": 66570915,
+          "node_id": "MDEyOk9yZ2FuaXphdGlvbjY2NTcwOTE1",
+          "avatar_url": "https://avatars.githubusercontent.com/u/66570915?v=4",
+          "gravatar_id": "",
+          "url": "https://api.github.com/users/anomalyco",
+          "html_url": "https://github.com/anomalyco",
+          "followers_url": "https://api.github.com/users/anomalyco/followers",
+          "following_url": "https://api.github.com/users/anomalyco/following{/other_user}",
+          "gists_url": "https://api.github.com/users/anomalyco/gists{/gist_id}",
+          "starred_url": "https://api.github.com/users/anomalyco/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/anomalyco/subscriptions",
+          "organizations_url": "https://api.github.com/users/anomalyco/orgs",
+          "repos_url": "https://api.github.com/users/anomalyco/repos",
+          "events_url": "https://api.github.com/users/anomalyco/events{/privacy}",
+          "received_events_url": "https://api.github.com/users/anomalyco/received_events",
+          "type": "Organization",
+          "user_view_type": "public",
+          "site_admin": false
+        }
+      },
+      "head_commit": {
+        "url": "https://api.github.com/repos/anomalyco/opencode/commits/dev",
+        "server_date": "Sun, 04 Oct 2026 19:25:08 GMT",
+        "sha": "907b3bc518fa48e90e8ec24dd327d13eee71c36c",
+        "commit_date": "2026-10-03T04:55:40Z",
+        "html_url": "https://github.com/anomalyco/opencode/commit/907b3bc518fa48e90e8ec24dd327d13eee71c36c"
+      },
+      "readme_inspection": {
+        "pinned_raw_url": "https://raw.githubusercontent.com/anomalyco/opencode/907b3bc518fa48e90e8ec24dd327d13eee71c36c/README.md",
+        "length_characters": 5317,
+        "headers": [
+          "### Installation",
+          "# YOLO",
+          "# Package managers",
+          "### Desktop App (BETA)",
+          "# macOS (Homebrew)",
+          "# Windows (Scoop)",
+          "# Examples",
+          "### Agents",
+          "### Documentation",
+          "### Contributing",
+          "### Building on OpenCode"
+        ]
+      }
+    },
+    {
+      "requested_repository": "code-yeongyu/oh-my-openagent",
+      "metadata_request": {
+        "url": "https://api.github.com/repos/code-yeongyu/oh-my-openagent",
+        "server_date": "Sun, 04 Oct 2026 19:25:07 GMT",
+        "rate_limit_remaining": "29"
+      },
+      "repository": {
+        "full_name": "code-yeongyu/oh-my-openagent",
+        "html_url": "https://github.com/code-yeongyu/oh-my-openagent",
+        "description": "OmO: Just type \"mass ulw\" keyword with your prompt. Now you are the master of graph engineering.",
+        "stargazers_count": 69794,
+        "forks_count": 5746,
+        "subscribers_count": 237,
+        "archived": false,
+        "disabled": false,
+        "default_branch": "dev",
+        "pushed_at": "2026-10-04T19:13:11Z",
+        "updated_at": "2026-10-04T19:14:57Z",
+        "license": {
+          "key": "other",
+          "name": "Other",
+          "spdx_id": "NOASSERTION",
+          "url": null,
+          "node_id": "MDc6TGljZW5zZTA="
+        },
+        "topics": [
+          "ai",
+          "ai-agents",
+          "anthropic",
+          "chatgpt",
+          "claude",
+          "claude-skills",
+          "codex",
+          "cursor",
+          "gemini",
+          "ide",
+          "openai",
+          "opencode",
+          "orchestration",
+          "tui",
+          "typescript"
+        ],
+        "homepage": "https://omo.dev",
+        "owner": {
+          "login": "code-yeongyu",
+          "id": 11153873,
+          "node_id": "MDQ6VXNlcjExMTUzODcz",
+          "avatar_url": "https://avatars.githubusercontent.com/u/11153873?v=4",
+          "gravatar_id": "",
+          "url": "https://api.github.com/users/code-yeongyu",
+          "html_url": "https://github.com/code-yeongyu",
+          "followers_url": "https://api.github.com/users/code-yeongyu/followers",
+          "following_url": "https://api.github.com/users/code-yeongyu/following{/other_user}",
+          "gists_url": "https://api.github.com/users/code-yeongyu/gists{/gist_id}",
+          "starred_url": "https://api.github.com/users/code-yeongyu/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/code-yeongyu/subscriptions",
+          "organizations_url": "https://api.github.com/users/code-yeongyu/orgs",
+          "repos_url": "https://api.github.com/users/code-yeongyu/repos",
+          "events_url": "https://api.github.com/users/code-yeongyu/events{/privacy}",
+          "received_events_url": "https://api.github.com/users/code-yeongyu/received_events",
+          "type": "User",
+          "user_view_type": "public",
+          "site_admin": false
+        }
+      },
+      "head_commit": {
+        "url": "https://api.github.com/repos/code-yeongyu/oh-my-openagent/commits/dev",
+        "server_date": "Sun, 04 Oct 2026 19:25:08 GMT",
+        "sha": "b7a702362ec21ba79c353c4783848ea1d589c5c4",
+        "commit_date": "2026-10-04T18:28:04Z",
+        "html_url": "https://github.com/code-yeongyu/oh-my-openagent/commit/b7a702362ec21ba79c353c4783848ea1d589c5c4"
+      },
+      "readme_inspection": {
+        "pinned_raw_url": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/b7a702362ec21ba79c353c4783848ea1d589c5c4/README.md",
+        "length_characters": 9588,
+        "headers": [
+          "# OmO",
+          "## Install",
+          "## Why OmO",
+          "## Configuration",
+          "## Docs",
+          "## Reviews",
+          "## Author's Note",
+          "## Loved by professionals at"
+        ]
+      }
+    },
+    {
+      "requested_repository": "yashasavi-jaiswal/claude-code-pro",
+      "error": "HTTP Error 404: Not Found",
+      "url": "https://api.github.com/repos/yashasavi-jaiswal/claude-code-pro"
+    },
+    {
+      "requested_repository": "forrestchang/andrej-karpathy-skills",
+      "metadata_request": {
+        "url": "https://api.github.com/repositories/1142983825",
+        "server_date": "Sun, 04 Oct 2026 19:25:08 GMT",
+        "rate_limit_remaining": "23"
+      },
+      "repository": {
+        "full_name": "multica-ai/andrej-karpathy-skills",
+        "html_url": "https://github.com/multica-ai/andrej-karpathy-skills",
+        "description": "A single CLAUDE.md file to improve Claude Code behavior, derived from Andrej Karpathy's observations on LLM coding pitfalls.",
+        "stargazers_count": 216848,
+        "forks_count": 21838,
+        "subscribers_count": 1262,
+        "archived": false,
+        "disabled": false,
+        "default_branch": "main",
+        "pushed_at": "2026-04-20T10:05:04Z",
+        "updated_at": "2026-10-04T19:20:54Z",
+        "license": null,
+        "topics": [],
+        "homepage": "",
+        "owner": {
+          "login": "multica-ai",
+          "id": 254743058,
+          "node_id": "O_kgDODy8SEg",
+          "avatar_url": "https://avatars.githubusercontent.com/u/254743058?v=4",
+          "gravatar_id": "",
+          "url": "https://api.github.com/users/multica-ai",
+          "html_url": "https://github.com/multica-ai",
+          "followers_url": "https://api.github.com/users/multica-ai/followers",
+          "following_url": "https://api.github.com/users/multica-ai/following{/other_user}",
+          "gists_url": "https://api.github.com/users/multica-ai/gists{/gist_id}",
+          "starred_url": "https://api.github.com/users/multica-ai/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/multica-ai/subscriptions",
+          "organizations_url": "https://api.github.com/users/multica-ai/orgs",
+          "repos_url": "https://api.github.com/users/multica-ai/repos",
+          "events_url": "https://api.github.com/users/multica-ai/events{/privacy}",
+          "received_events_url": "https://api.github.com/users/multica-ai/received_events",
+          "type": "Organization",
+          "user_view_type": "public",
+          "site_admin": false
+        }
+      },
+      "head_commit": {
+        "url": "https://api.github.com/repos/multica-ai/andrej-karpathy-skills/commits/main",
+        "server_date": "Sun, 04 Oct 2026 19:25:08 GMT",
+        "sha": "2c606141936f1eeef17fa3043a72095b4765b9c2",
+        "commit_date": "2026-04-20T10:05:04Z",
+        "html_url": "https://github.com/multica-ai/andrej-karpathy-skills/commit/2c606141936f1eeef17fa3043a72095b4765b9c2"
+      },
+      "readme_inspection": {
+        "pinned_raw_url": "https://raw.githubusercontent.com/multica-ai/andrej-karpathy-skills/2c606141936f1eeef17fa3043a72095b4765b9c2/README.md",
+        "length_characters": 6162,
+        "headers": [
+          "# Karpathy-Inspired Claude Code Guidelines",
+          "## The Problems",
+          "## The Solution",
+          "## The Four Principles in Detail",
+          "### 1. Think Before Coding",
+          "### 2. Simplicity First",
+          "### 3. Surgical Changes",
+          "### 4. Goal-Driven Execution",
+          "## Install",
+          "## Using with Cursor",
+          "## Key Insight",
+          "## How to Know It's Working",
+          "## Customization",
+          "## Project-Specific Guidelines",
+          "## Tradeoff Note",
+          "## License"
+        ]
+      }
+    },
+    {
+      "requested_repository": "gsd-build/gsd-2",
+      "metadata_request": {
+        "url": "https://api.github.com/repos/gsd-build/gsd-2",
+        "server_date": "Sun, 04 Oct 2026 19:26:56 GMT"
+      },
+      "repository": {
+        "full_name": "gsd-build/gsd-2",
+        "html_url": "https://github.com/gsd-build/gsd-2",
+        "description": "A powerful meta-prompting, context engineering and spec-driven development system that enables agents to work for long periods of time autonomously without losing track of the big picture",
+        "stargazers_count": 7778,
+        "forks_count": 759,
+        "subscribers_count": 31,
+        "archived": true,
+        "disabled": false,
+        "default_branch": "main",
+        "pushed_at": "2026-05-22T23:08:59Z",
+        "updated_at": "2026-10-04T16:52:59Z",
+        "license": {
+          "key": "mit",
+          "name": "MIT License",
+          "spdx_id": "MIT",
+          "url": "https://api.github.com/licenses/mit",
+          "node_id": "MDc6TGljZW5zZTEz"
+        },
+        "topics": [
+          "context-engineering",
+          "meta-prompting",
+          "spec-driven-development"
+        ],
+        "homepage": "",
+        "owner": {
+          "login": "gsd-build",
+          "id": 260490621,
+          "node_id": "O_kgDOD4bFfQ",
+          "avatar_url": "https://avatars.githubusercontent.com/u/260490621?v=4",
+          "gravatar_id": "",
+          "url": "https://api.github.com/users/gsd-build",
+          "html_url": "https://github.com/gsd-build",
+          "followers_url": "https://api.github.com/users/gsd-build/followers",
+          "following_url": "https://api.github.com/users/gsd-build/following{/other_user}",
+          "gists_url": "https://api.github.com/users/gsd-build/gists{/gist_id}",
+          "starred_url": "https://api.github.com/users/gsd-build/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/gsd-build/subscriptions",
+          "organizations_url": "https://api.github.com/users/gsd-build/orgs",
+          "repos_url": "https://api.github.com/users/gsd-build/repos",
+          "events_url": "https://api.github.com/users/gsd-build/events{/privacy}",
+          "received_events_url": "https://api.github.com/users/gsd-build/received_events",
+          "type": "Organization",
+          "user_view_type": "public",
+          "site_admin": false
+        }
+      },
+      "head_commit": {
+        "sha": "33c00aaffa56e5d394bccce1c8df59fb842e84c5",
+        "commit_date": "2026-05-22T23:08:55Z",
+        "html_url": "https://github.com/gsd-build/gsd-2/commit/33c00aaffa56e5d394bccce1c8df59fb842e84c5"
+      },
+      "readme_inspection": {
+        "pinned_raw_url": "https://raw.githubusercontent.com/gsd-build/gsd-2/33c00aaffa56e5d394bccce1c8df59fb842e84c5/README.md",
+        "length_characters": 425
+      }
+    },
+    {
+      "requested_repository": "gsd-open/get-shit-done-redux",
+      "metadata_request": {
+        "url": "https://api.github.com/repos/gsd-open/get-shit-done-redux",
+        "server_date": "Sun, 04 Oct 2026 19:26:57 GMT"
+      },
+      "repository": {
+        "full_name": "gsd-open/get-shit-done-redux",
+        "html_url": "https://github.com/gsd-open/get-shit-done-redux",
+        "description": "Getting Shit Done, the Aftermath",
+        "stargazers_count": 0,
+        "forks_count": 0,
+        "subscribers_count": 0,
+        "archived": false,
+        "disabled": false,
+        "default_branch": "main",
+        "pushed_at": "2026-05-24T19:42:52Z",
+        "updated_at": "2026-05-24T20:06:49Z",
+        "license": {
+          "key": "mit",
+          "name": "MIT License",
+          "spdx_id": "MIT",
+          "url": "https://api.github.com/licenses/mit",
+          "node_id": "MDc6TGljZW5zZTEz"
+        },
+        "topics": [],
+        "homepage": "https://github.com/gsd-redux/get-shit-done-redux/discussions/109",
+        "owner": {
+          "login": "gsd-open",
+          "id": 287520531,
+          "node_id": "U_kgDOESM3Ew",
+          "avatar_url": "https://avatars.githubusercontent.com/u/287520531?v=4",
+          "gravatar_id": "",
+          "url": "https://api.github.com/users/gsd-open",
+          "html_url": "https://github.com/gsd-open",
+          "followers_url": "https://api.github.com/users/gsd-open/followers",
+          "following_url": "https://api.github.com/users/gsd-open/following{/other_user}",
+          "gists_url": "https://api.github.com/users/gsd-open/gists{/gist_id}",
+          "starred_url": "https://api.github.com/users/gsd-open/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/gsd-open/subscriptions",
+          "organizations_url": "https://api.github.com/users/gsd-open/orgs",
+          "repos_url": "https://api.github.com/users/gsd-open/repos",
+          "events_url": "https://api.github.com/users/gsd-open/events{/privacy}",
+          "received_events_url": "https://api.github.com/users/gsd-open/received_events",
+          "type": "User",
+          "user_view_type": "public",
+          "site_admin": false
+        }
+      },
+      "head_commit": {
+        "sha": "2d14eb8873af498e9bac6fdbdc926453825045c3",
+        "commit_date": "2026-05-24T19:22:36Z",
+        "html_url": "https://github.com/gsd-open/get-shit-done-redux/commit/2d14eb8873af498e9bac6fdbdc926453825045c3"
+      },
+      "readme_inspection": {
+        "pinned_raw_url": "https://raw.githubusercontent.com/gsd-open/get-shit-done-redux/2d14eb8873af498e9bac6fdbdc926453825045c3/README.md",
+        "length_characters": 14121
+      }
+    },
+    {
+      "requested_repository": "Fission-AI/OpenSpec",
+      "metadata_request": {
+        "url": "https://api.github.com/repos/Fission-AI/OpenSpec",
+        "server_date": "Sun, 04 Oct 2026 19:27:13 GMT"
+      },
+      "repository": {
+        "full_name": "Fission-AI/OpenSpec",
+        "html_url": "https://github.com/Fission-AI/OpenSpec",
+        "description": "Spec-driven development (SDD) for AI coding assistants.",
+        "stargazers_count": 71043,
+        "forks_count": 4870,
+        "subscribers_count": 287,
+        "archived": false,
+        "disabled": false,
+        "default_branch": "main",
+        "pushed_at": "2026-10-02T17:44:49Z",
+        "updated_at": "2026-10-04T18:54:36Z",
+        "license": {
+          "key": "mit",
+          "name": "MIT License",
+          "spdx_id": "MIT",
+          "url": "https://api.github.com/licenses/mit",
+          "node_id": "MDc6TGljZW5zZTEz"
+        },
+        "topics": [
+          "ai",
+          "context-engineering",
+          "engineering",
+          "planning",
+          "prd",
+          "sdd",
+          "sdlc",
+          "spec",
+          "spec-driven-development",
+          "specification"
+        ],
+        "homepage": "https://openspec.dev/",
+        "owner": {
+          "login": "Fission-AI",
+          "id": 203414896,
+          "node_id": "O_kgDODB_dcA",
+          "avatar_url": "https://avatars.githubusercontent.com/u/203414896?v=4",
+          "gravatar_id": "",
+          "url": "https://api.github.com/users/Fission-AI",
+          "html_url": "https://github.com/Fission-AI",
+          "followers_url": "https://api.github.com/users/Fission-AI/followers",
+          "following_url": "https://api.github.com/users/Fission-AI/following{/other_user}",
+          "gists_url": "https://api.github.com/users/Fission-AI/gists{/gist_id}",
+          "starred_url": "https://api.github.com/users/Fission-AI/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/Fission-AI/subscriptions",
+          "organizations_url": "https://api.github.com/users/Fission-AI/orgs",
+          "repos_url": "https://api.github.com/users/Fission-AI/repos",
+          "events_url": "https://api.github.com/users/Fission-AI/events{/privacy}",
+          "received_events_url": "https://api.github.com/users/Fission-AI/received_events",
+          "type": "Organization",
+          "user_view_type": "public",
+          "site_admin": false
+        }
+      },
+      "head_commit": {
+        "sha": "2500d6da971336167548b53731a35b2127df35ac",
+        "commit_date": "2026-10-02T17:34:46Z",
+        "html_url": "https://github.com/Fission-AI/OpenSpec/commit/2500d6da971336167548b53731a35b2127df35ac"
+      },
+      "readme_inspection": {
+        "pinned_raw_url": "https://raw.githubusercontent.com/Fission-AI/OpenSpec/2500d6da971336167548b53731a35b2127df35ac/README.md",
+        "length_characters": 11693
+      }
+    },
+    {
+      "requested_repository": "bmad-code-org/BMAD-METHOD",
+      "metadata_request": {
+        "url": "https://api.github.com/repos/bmad-code-org/BMAD-METHOD",
+        "server_date": "Sun, 04 Oct 2026 19:27:15 GMT"
+      },
+      "repository": {
+        "full_name": "bmad-code-org/BMAD-METHOD",
+        "html_url": "https://github.com/bmad-code-org/BMAD-METHOD",
+        "description": "Breakthrough Method for Agile Ai Driven Development",
+        "stargazers_count": 53784,
+        "forks_count": 6054,
+        "subscribers_count": 418,
+        "archived": false,
+        "disabled": false,
+        "default_branch": "main",
+        "pushed_at": "2026-10-04T19:15:05Z",
+        "updated_at": "2026-10-04T19:17:24Z",
+        "license": {
+          "key": "other",
+          "name": "Other",
+          "spdx_id": "NOASSERTION",
+          "url": null,
+          "node_id": "MDc6TGljZW5zZTA="
+        },
+        "topics": [
+          "agile",
+          "ai",
+          "context-engineering",
+          "sdlc",
+          "spec-driven-development"
+        ],
+        "homepage": "",
+        "owner": {
+          "login": "bmad-code-org",
+          "id": 224091849,
+          "node_id": "O_kgDODVteyQ",
+          "avatar_url": "https://avatars.githubusercontent.com/u/224091849?v=4",
+          "gravatar_id": "",
+          "url": "https://api.github.com/users/bmad-code-org",
+          "html_url": "https://github.com/bmad-code-org",
+          "followers_url": "https://api.github.com/users/bmad-code-org/followers",
+          "following_url": "https://api.github.com/users/bmad-code-org/following{/other_user}",
+          "gists_url": "https://api.github.com/users/bmad-code-org/gists{/gist_id}",
+          "starred_url": "https://api.github.com/users/bmad-code-org/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/bmad-code-org/subscriptions",
+          "organizations_url": "https://api.github.com/users/bmad-code-org/orgs",
+          "repos_url": "https://api.github.com/users/bmad-code-org/repos",
+          "events_url": "https://api.github.com/users/bmad-code-org/events{/privacy}",
+          "received_events_url": "https://api.github.com/users/bmad-code-org/received_events",
+          "type": "Organization",
+          "user_view_type": "public",
+          "site_admin": false
+        }
+      },
+      "head_commit": {
+        "sha": "8f2c13dd0e0073cad84168a679e5c553b2fb30b6",
+        "commit_date": "2026-10-04T18:52:59Z",
+        "html_url": "https://github.com/bmad-code-org/BMAD-METHOD/commit/8f2c13dd0e0073cad84168a679e5c553b2fb30b6"
+      },
+      "readme_inspection": {
+        "pinned_raw_url": "https://raw.githubusercontent.com/bmad-code-org/BMAD-METHOD/8f2c13dd0e0073cad84168a679e5c553b2fb30b6/README.md",
+        "length_characters": 6824
+      }
+    },
+    {
+      "requested_repository": "open-gsd/get-shit-done-redux",
+      "metadata_request": {
+        "url": "https://api.github.com/repos/open-gsd/get-shit-done-redux",
+        "server_date": "Sun, 04 Oct 2026 19:28:05 GMT"
+      },
+      "repository": {
+        "full_name": "open-gsd/gsd-core",
+        "html_url": "https://github.com/open-gsd/gsd-core",
+        "description": "Git. Ship. Done - Core",
+        "stargazers_count": 10169,
+        "forks_count": 729,
+        "subscribers_count": 42,
+        "archived": false,
+        "disabled": false,
+        "default_branch": "next",
+        "pushed_at": "2026-10-04T19:18:50Z",
+        "updated_at": "2026-10-04T19:12:17Z",
+        "license": {
+          "key": "mit",
+          "name": "MIT License",
+          "spdx_id": "MIT",
+          "url": "https://api.github.com/licenses/mit",
+          "node_id": "MDc6TGljZW5zZTEz"
+        },
+        "topics": [
+          "claude-code",
+          "context-engineering",
+          "meta-prompting",
+          "spec-driven-development"
+        ],
+        "homepage": "https://opengsd.net",
+        "owner": {
+          "login": "open-gsd",
+          "id": 286935422,
+          "node_id": "O_kgDOERpJfg",
+          "avatar_url": "https://avatars.githubusercontent.com/u/286935422?v=4",
+          "gravatar_id": "",
+          "url": "https://api.github.com/users/open-gsd",
+          "html_url": "https://github.com/open-gsd",
+          "followers_url": "https://api.github.com/users/open-gsd/followers",
+          "following_url": "https://api.github.com/users/open-gsd/following{/other_user}",
+          "gists_url": "https://api.github.com/users/open-gsd/gists{/gist_id}",
+          "starred_url": "https://api.github.com/users/open-gsd/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/open-gsd/subscriptions",
+          "organizations_url": "https://api.github.com/users/open-gsd/orgs",
+          "repos_url": "https://api.github.com/users/open-gsd/repos",
+          "events_url": "https://api.github.com/users/open-gsd/events{/privacy}",
+          "received_events_url": "https://api.github.com/users/open-gsd/received_events",
+          "type": "Organization",
+          "user_view_type": "public",
+          "site_admin": false
+        }
+      },
+      "head_commit": {
+        "sha": "196688b210edf99b568ec32a5ff34ef2df417742",
+        "commit_date": "2026-10-04T18:23:29Z",
+        "html_url": "https://github.com/open-gsd/gsd-core/commit/196688b210edf99b568ec32a5ff34ef2df417742"
+      }
+    },
+    {
+      "requested_repository": "open-gsd/gsd-pi",
+      "metadata_request": {
+        "url": "https://api.github.com/repos/open-gsd/gsd-pi",
+        "server_date": "Sun, 04 Oct 2026 19:28:06 GMT"
+      },
+      "repository": {
+        "full_name": "open-gsd/gsd-pi",
+        "html_url": "https://github.com/open-gsd/gsd-pi",
+        "description": "A powerful meta-prompting, context engineering and spec-driven development system that enables agents to work for long periods of time autonomously without losing track of the big picture",
+        "stargazers_count": 1291,
+        "forks_count": 108,
+        "subscribers_count": 12,
+        "archived": false,
+        "disabled": false,
+        "default_branch": "main",
+        "pushed_at": "2026-10-04T19:27:41Z",
+        "updated_at": "2026-10-04T19:27:44Z",
+        "license": {
+          "key": "mit",
+          "name": "MIT License",
+          "spdx_id": "MIT",
+          "url": "https://api.github.com/licenses/mit",
+          "node_id": "MDc6TGljZW5zZTEz"
+        },
+        "topics": [
+          "context-engineering",
+          "meta-prompting",
+          "spec-driven-development"
+        ],
+        "homepage": "https://www.opengsd.net",
+        "owner": {
+          "login": "open-gsd",
+          "id": 286935422,
+          "node_id": "O_kgDOERpJfg",
+          "avatar_url": "https://avatars.githubusercontent.com/u/286935422?v=4",
+          "gravatar_id": "",
+          "url": "https://api.github.com/users/open-gsd",
+          "html_url": "https://github.com/open-gsd",
+          "followers_url": "https://api.github.com/users/open-gsd/followers",
+          "following_url": "https://api.github.com/users/open-gsd/following{/other_user}",
+          "gists_url": "https://api.github.com/users/open-gsd/gists{/gist_id}",
+          "starred_url": "https://api.github.com/users/open-gsd/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/open-gsd/subscriptions",
+          "organizations_url": "https://api.github.com/users/open-gsd/orgs",
+          "repos_url": "https://api.github.com/users/open-gsd/repos",
+          "events_url": "https://api.github.com/users/open-gsd/events{/privacy}",
+          "received_events_url": "https://api.github.com/users/open-gsd/received_events",
+          "type": "Organization",
+          "user_view_type": "public",
+          "site_admin": false
+        }
+      },
+      "head_commit": {
+        "sha": "e792f532c3628898b126df708f215535307e6ec0",
+        "commit_date": "2026-10-04T19:27:39Z",
+        "html_url": "https://github.com/open-gsd/gsd-pi/commit/e792f532c3628898b126df708f215535307e6ec0"
+      }
+    }
+  ],
+  "snapshot_completed_at_utc": "2026-10-04T19:28:07.343388+00:00"
+}
