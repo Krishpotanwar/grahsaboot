@@ -181,6 +181,25 @@ describe('summarizeAoi', () => {
     expect(codes(summarizeAoi(polygon([NAGPUR_SQUARE, hole])))).toEqual(['out_of_range'])
     expect(codes(summarizeAoi(polygon([])))).toEqual(['out_of_range'])
   })
+  it('rejects collinear and single-point rings as too_small', () => {
+    const collinear: LonLat[] = [
+      [79, 21],
+      [79.01, 21],
+      [79.02, 21],
+      [79, 21],
+    ]
+    const point: LonLat[] = [
+      [79, 21],
+      [79, 21],
+      [79, 21],
+      [79, 21],
+    ]
+    for (const ring of [collinear, point]) {
+      const r = summarizeAoi(site(ring))
+      expect(r.ok).toBe(false)
+      expect(codes(r)).toContain('too_small')
+    }
+  })
 })
 
 describe('coarsenBbox', () => {

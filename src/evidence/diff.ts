@@ -5,6 +5,7 @@ export function brightnessDiff(
   invalid?: Uint8Array,
   rgb: [number, number, number] = [228, 132, 68],
 ): Uint8ClampedArray {
+  if (a.length !== b.length) throw new Error('SIZE_MISMATCH')
   const out = new Uint8ClampedArray(a.length)
   for (let i = 0, p = 0; p < a.length; i++, p += 4) {
     if (a[p + 3] === 0 || b[p + 3] === 0 || (invalid && invalid[i])) continue

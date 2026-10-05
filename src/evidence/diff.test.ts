@@ -18,4 +18,7 @@ describe('brightnessDiff', () => {
     expect(brightnessDiff(a, b, Uint8Array.from([1, 0]))[3]).toBe(0)
     expect(brightnessDiff(a, b)[7]).toBe(0)
   })
+  it('rejects frames of different size', () => {
+    expect(() => brightnessDiff(px(0, 0, 0, 255, 0, 0, 0, 255), px(0, 0, 0, 255))).toThrow('SIZE_MISMATCH')
+  })
 })

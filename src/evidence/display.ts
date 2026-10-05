@@ -92,6 +92,7 @@ export function reprojectToGrid(
   grid: DisplayGrid,
   mode: 'bilinear' | 'nearest',
 ): Uint8ClampedArray {
+  if (src.data.length < src.width * src.height * src.samples) throw new Error('SHORT_RASTER')
   const out = new Uint8ClampedArray(grid.width * grid.height * 4)
   const map = sourceCoordMapper(grid, src)
   const { data, width: W, height: H, samples: S } = src

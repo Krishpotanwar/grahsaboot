@@ -21,6 +21,7 @@ export type IssueCode =
   | 'too_many_vertices'
   | 'self_intersects'
   | 'too_large'
+  | 'too_small'
   | 'too_wide'
   | 'too_short'
   | 'too_long'
@@ -143,6 +144,7 @@ export function summarizeAoi(input: AoiInput): AoiResult {
     const utm = ring.map((p) => toUtm(epsg, p))
     if (selfIntersects(utm)) issues.push({ code: 'self_intersects' })
     const areaKm2 = shoelaceKm2(utm)
+    if (areaKm2 < L.minAreaKm2) issues.push({ code: 'too_small', value: areaKm2, limit: L.minAreaKm2 })
     const extentKm = maxPairwiseKm(ring)
     if (areaKm2 > L.maxAreaKm2) issues.push({ code: 'too_large', value: areaKm2, limit: L.maxAreaKm2 })
     if (extentKm > L.maxExtentKm) issues.push({ code: 'too_wide', value: extentKm, limit: L.maxExtentKm })

@@ -1,5 +1,5 @@
 export const LIMITS = {
-  site: { maxAreaKm2: 9, maxExtentKm: 4.25, maxVertices: 200 },
+  site: { minAreaKm2: 0.001, maxAreaKm2: 9, maxExtentKm: 4.25, maxVertices: 200 },
   road: {
     minLengthKm: 0.2,
     maxLengthKm: 10,

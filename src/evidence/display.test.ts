@@ -99,4 +99,23 @@ describe('reprojectToGrid', () => {
     )
     expect(out.every((v, i) => i % 4 !== 3 || v === 0)).toBe(true)
   })
+  it('rejects a raster shorter than width x height x samples', () => {
+    const g = makeDisplayGrid(BBOX, 64)
+    expect(() =>
+      reprojectToGrid(
+        {
+          data: new Uint8Array(W * H * 3 - 1),
+          width: W,
+          height: H,
+          samples: 3,
+          win: WIN,
+          lvl: LVL,
+          epsg: 32644,
+          nodataZero: true,
+        },
+        g,
+        'bilinear',
+      ),
+    ).toThrow('SHORT_RASTER')
+  })
 })
