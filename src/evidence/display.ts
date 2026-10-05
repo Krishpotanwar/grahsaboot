@@ -8,8 +8,9 @@ export function makeDisplayGrid(
 ): DisplayGrid {
   const [x0, y0] = toMercator([bbox[0], bbox[1]])
   const [x1, y1] = toMercator([bbox[2], bbox[3]])
-  const padX = (x1 - x0) * padFrac
-  const padY = (y1 - y0) * padFrac
+  // At least 100 m (EPSG:3857 metres) per axis, so thin outlines keep context.
+  const padX = Math.max((x1 - x0) * padFrac, 100)
+  const padY = Math.max((y1 - y0) * padFrac, 100)
   const spanX = x1 - x0 + 2 * padX
   const spanY = y1 - y0 + 2 * padY
   const scale = Math.max(spanX, spanY) / maxSide

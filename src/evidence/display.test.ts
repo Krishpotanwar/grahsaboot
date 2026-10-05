@@ -24,6 +24,11 @@ describe('makeDisplayGrid', () => {
     expect(g.cornersLonLat[0][0]).toBeLessThan(BBOX[0])
     expect(g.cornersLonLat[2][1]).toBeLessThan(BBOX[1])
   })
+  it('pads thin outlines by at least 100 m so they keep context', () => {
+    const g = makeDisplayGrid([79, 21, 79.00001, 21.0108], 512)
+    expect(g.width).toBeGreaterThanOrEqual(40)
+    expect(g.height).toBeGreaterThanOrEqual(40)
+  })
 })
 
 describe('sourceCoordMapper', () => {
