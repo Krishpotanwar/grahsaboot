@@ -128,6 +128,59 @@ describe('summarizeAoi', () => {
     const r = summarizeAoi(site(syd))
     expect(r.ok && r.summary.areaKm2).toBeGreaterThan(1)
   })
+  it('rejects a site that crosses the antimeridian but accepts one beside it', () => {
+    const fiji: LonLat[] = [
+      [179.995, -16.8],
+      [-179.995, -16.8],
+      [-179.995, -16.79],
+      [179.995, -16.79],
+      [179.995, -16.8],
+    ]
+    expect(codes(summarizeAoi(site(fiji)))).toEqual(['out_of_range'])
+    const east: LonLat[] = [
+      [179.99, -16.8],
+      [179.999, -16.8],
+      [179.999, -16.79],
+      [179.99, -16.79],
+      [179.99, -16.8],
+    ]
+    expect(summarizeAoi(site(east)).ok).toBe(true)
+  })
+  it('rejects a road that crosses the antimeridian but accepts one beside it', () => {
+    expect(
+      codes(
+        summarizeAoi(
+          road([
+            [179.99, -16.8],
+            [-179.99, -16.8],
+          ]),
+        ),
+      ),
+    ).toEqual(['out_of_range'])
+    expect(
+      summarizeAoi(
+        road([
+          [179.97, -16.8],
+          [179.99, -16.8],
+        ]),
+      ).ok,
+    ).toBe(true)
+  })
+  it('rejects polygons with holes and polygons without an outer ring', () => {
+    const hole: LonLat[] = [
+      [79.085, 21.142],
+      [79.087, 21.142],
+      [79.087, 21.144],
+      [79.085, 21.144],
+      [79.085, 21.142],
+    ]
+    const polygon = (coordinates: LonLat[][]): AoiInput => ({
+      kind: 'site',
+      geometry: { type: 'Polygon', coordinates },
+    })
+    expect(codes(summarizeAoi(polygon([NAGPUR_SQUARE, hole])))).toEqual(['out_of_range'])
+    expect(codes(summarizeAoi(polygon([])))).toEqual(['out_of_range'])
+  })
 })
 
 describe('coarsenBbox', () => {

@@ -66,6 +66,10 @@ export function coarsenBbox(b: Bbox, step = 0.1): Bbox {
 const inRange = ([lon, lat]: LonLat) =>
   Number.isFinite(lon) && Number.isFinite(lat) && lon >= -180 && lon <= 180 && lat >= -90 && lat <= 90
 
+// Vertices more than 180° of longitude apart wrap round the globe, so UTM, area and bbox would be wrong.
+const crossesAntimeridian = (pts: LonLat[]) =>
+  pts.some((p, i) => i > 0 && Math.abs(p[0] - pts[i - 1]![0]) > 180)
+
 function maxPairwiseKm(points: LonLat[]): number {
   let m = 0
   for (let i = 0; i < points.length; i++)
@@ -118,9 +122,12 @@ function shoelaceKm2(ring: XY[]): number {
 export function summarizeAoi(input: AoiInput): AoiResult {
   const issues: Issue[] = []
   if (input.kind === 'site') {
+    // One outer ring only: holes would pass through unvalidated and unmeasured, so reject them.
+    if (input.geometry.coordinates.length !== 1) return { ok: false, issues: [{ code: 'out_of_range' }] }
     const ring = input.geometry.coordinates[0] ?? []
     const L = LIMITS.site
-    if (!ring.every(inRange)) return { ok: false, issues: [{ code: 'out_of_range' }] }
+    if (!ring.every(inRange) || crossesAntimeridian(ring))
+      return { ok: false, issues: [{ code: 'out_of_range' }] }
     const first = ring[0],
       last = ring[ring.length - 1]
     if (!first || !last || first[0] !== last[0] || first[1] !== last[1]) issues.push({ code: 'not_closed' })
@@ -155,7 +162,8 @@ export function summarizeAoi(input: AoiInput): AoiResult {
   }
   const line = input.geometry.coordinates
   const L = LIMITS.road
-  if (!line.every(inRange)) return { ok: false, issues: [{ code: 'out_of_range' }] }
+  if (!line.every(inRange) || crossesAntimeridian(line))
+    return { ok: false, issues: [{ code: 'out_of_range' }] }
   if (line.length < 2) issues.push({ code: 'too_few_points', value: line.length, limit: 2 })
   if (line.length > L.maxVertices)
     issues.push({ code: 'too_many_vertices', value: line.length, limit: L.maxVertices })
