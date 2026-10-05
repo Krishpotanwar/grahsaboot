@@ -1,6 +1,6 @@
 # GrahSaboot design spec (R3)
 
-Date: 2026-10-05. Status: **approved design (D13); spec awaiting user review**. Supersedes `docs/geoverify/ARCHITECTURE_V2.md` (R2), `TRD.md` and `DESIGN.md` wherever they differ. Research basis: `docs/geoverify/research/2026-10-05-r3-*.md` (five verified reports, two rounds of cross-examination). Working name GeoVerify is retired.
+Date: 2026-10-05. Status: **approved design (D13) and spec (D14)**. Implementation plan: `docs/superpowers/plans/2026-10-05-grahsaboot-plan.md` (phases A–D, every code block validated in a scratch build). Supersedes `docs/geoverify/ARCHITECTURE_V2.md` (R2), `TRD.md` and `DESIGN.md` wherever they differ. Research basis: `docs/geoverify/research/2026-10-05-r3-*.md` (five verified reports, two rounds of cross-examination). Working name GeoVerify is retired.
 
 **GrahSaboot** = *grah* (planet/orbit, root of *upgrah*, satellite) + *saboot* (proof). Tagline: "Satellite proof for any place."
 
@@ -79,9 +79,9 @@ Out (later, each with a trigger in §13): automatic change detection/hotspots (A
 ### 4.1 Components and responsibilities
 | Unit | Does | Depends on |
 |---|---|---|
-| `src/geo/` | Coordinate parsing, geometry validation, road corridor + 2 km sections (turf), coarsened bbox | turf modules |
+| `src/geo/` | Coordinate parsing (with a swapped-order hint), outline validation measured in UTM, coarsened bbox | `src/evidence` (proj4) |
 | `src/stac/` | Earth Search search with paging cap, item parsing/validation, per-date item selection, Planetary Computer fallback | fetch |
-| `src/evidence/` (pure TS, runtime-neutral) | `frame-v1` window maths + SHA-256, `scl-v1` quality stats + labels, `display-v1` reprojection, `diff-v1` | proj4, WebCrypto |
+| `src/evidence/` (pure TS, runtime-neutral) | `frame-v1` window maths + SHA-256, AOI rasterisation (even-odd sites, flat-capped road corridors), road parts every 2 km (`partsOf`), `scl-v1` quality stats + labels, `display-v1` reprojection, `diff-v1` | proj4, WebCrypto |
 | `src/workers/imagery.worker.ts` | geotiff I/O, calls `src/evidence`, IndexedDB window cache | geotiff, evidence |
 | `src/sats/` + `sats.worker.ts` | OMM → satrec, positions 1 Hz, tracks/swaths 30 s, next-pass estimate | satellite.js |
 | `src/map/` | MapLibre setup, basemap switching (theme/zoom), terrain, buildings, satellites layers, evidence image sources, tier handling | maplibre-gl |
@@ -96,7 +96,7 @@ Out (later, each with a trigger in §13): automatic change detection/hotspots (A
 ### 4.2 Why this shape (ponytail)
 - No imagery server, no queue, no provider keys, no image storage: the public COGs are the store; the server keeps manifests only.
 - One server function (`verify`) because evidence integrity needs one place the client cannot fake.
-- PostGIS does geometry once, authoritatively (validation, areas, road sections). The client uses turf only for previews.
+- Outline rules run twice with the same limits: the browser measures in UTM for instant feedback, and PostGIS re-checks on the spheroid (0.5 % tolerance) as the authority. Road sections are never stored: browser and `verify` both cut them with the shared `partsOf`, so they agree by construction. No turf.
 - Explicitly not built: Redis/queues/workers, Sentinel Hub, image CDN, R2, router library, global state library, form library, i18n framework, ML.
 
 ## 5. Evidence pipeline
@@ -121,7 +121,7 @@ Out (later, each with a trigger in §13): automatic change detection/hotspots (A
   | `CLEAR` | valid ≥ 0.95 |
   | `PARTIAL` | 0.05 < valid < 0.95 |
   | `OBSCURED` | valid ≤ 0.05 |
-  | `NOT_COVERED` | footprint does not contain the AOI and no-data ≥ 0.5 |
+  | `NOT_COVERED` | no-data share ≥ 0.5 (outline area outside the scene counts as no-data), or the outline is entirely outside the scene |
 
   Raw class shares are always shown next to the label.
 - Statistics never use overview levels. Roads get per-section stats from the same window.
@@ -142,25 +142,29 @@ Out (later, each with a trigger in §13): automatic change detection/hotspots (A
 ```ts
 type VerifyRequest = {
   investigation_id: string;                       // must be owned by caller
-  item: { collection: 'sentinel-2-l2a' | 'planetary-computer:sentinel-2-l2a'; id: string };
+  item: { collection: 'sentinel-2-l2a' | 'pc:sentinel-2-l2a'; id: string };   // id matches ^[A-Za-z0-9_.-]{1,100}$
   frames: Array<{ asset: 'visual' | 'scl'; level: 0 | 1; window: [number, number, number, number]; sha256: string }>; // 1..4
 };
 type VerifyResponse = {
   frames: Array<{
-    asset: 'visual' | 'scl'; status: 'verified' | 'mismatch';
+    asset: 'visual' | 'scl'; level: 0 | 1; status: 'verified' | 'mismatch';
     server_sha256: string; frame_id: string; verified_at: string;
-    quality?: { policy: 'scl-v1'; counts: number[]; valid_fraction: number; label: string; sections?: Array<{ idx: number; valid_fraction: number; label: string }> };
+    quality: null | {                              // SCL frames only
+      policy: 'scl-v1'; label: string; counts: number[]; total: number;
+      validFraction: number; uncertainFraction: number; nodataFraction: number;
+      parts: Array<{ idx: number; fromM: number; toM: number; label: string; validFraction: number /* …same fields */ }>;
+    };
   }>;
 };
 ```
 Steps:
 1. Validate body shape.
 2. Load the investigation through the user's JWT (RLS = ownership).
-3. Rate limit: ≤ 600 frames per user per 24 h, else `429`.
+3. Rate limit: ≤ 600 frame checks per user per 24 h, else `429`. Checks are counted from the audit log, so re-checking the same frames counts too.
 4. Fetch the STAC item by id server-side; check its date is inside the investigation range and its footprint intersects the AOI.
 5. Per frame: HEAD the asset (record ETag, Last-Modified, `x-amz-checksum-crc64nvme` if present; record STAC `file:checksum` if present); check window bounds and coverage; read; hash; compare.
-6. For SCL frames, compute the **authoritative** `scl-v1` stats for the site or each road section. Section geometry comes from the DB (PostGIS).
-7. Insert `frames` rows (service role) in one transaction.
+6. For SCL frames, compute the **authoritative** `scl-v1` stats for the site or each road section. Sections come from the shared `partsOf`, the same code the browser runs.
+7. Upsert `frames` rows (service role) on (investigation, item, asset, level), refreshing `verified_at`, so saving again is idempotent.
 8. Return.
 
 Errors: `400` shape, `401`, `404` investigation or item, `422` window/date/coverage, `429`, `502` upstream (retryable by the client with backoff, max 3). A `mismatch` is stored, never hidden. CPU budget is 2 s per call: ≤ 4 frames per call, client batches per date (TCI L0/L1 + SCL).
@@ -170,13 +174,13 @@ Every frame records: `collection, item_id, acquired_at, processing_baseline, ass
 
 ## 6. Roads
 - Input: LineString (≤ 200 vertices, 0.2–10 km), full corridor width 5–200 m (default 30 m, must be confirmed; the helper text explains why).
-- PostGIS builds the corridor (`ST_Buffer(geography, width/2, 'endcap=flat join=round')`) and sections every 2 km along the line (`ST_LineSubstring`). Sections are stored with chainage (`0.0–2.0 km`). The client previews them with turf; the server is authoritative.
+- The corridor is every point within width/2 of the centre line, with flat end caps (`rasterizeAoi` in `src/evidence/`). `partsOf` cuts the line every 2 km and labels each part with chainage (`0.0–2.0 km`). Browser and `verify` run the same code; nothing about sections is stored. PostGIS checks length and vertex count.
 - The section × date grid: rows are sections with chainage, columns are actual acquisition dates; cells are glyph + word (CLEAR/PARTIAL/OBSCURED/NOT COVERED), tap/keyboard to open that section-date. There is no whole-road percentage and no "km completed".
 
 ## 7. Frontend
 
 ### 7.1 Stack (versions verified on npm 2026-10-05)
-react / react-dom 19.3.0 · vite 8.3.2 · @vitejs/plugin-react 6.1.1 · typescript 7.0.2 (fallback 6.0.3, probe P7) · tailwindcss + @tailwindcss/vite 4.3.3 · @base-ui/react 1.8.0 (used directly; no shadcn generator) · motion 14.0.0 · @phosphor-icons/react 2.1.10 · @fontsource-variable/geist + geist-mono 5.3.0 · maplibre-gl 6.12.0 · terra-draw 1.36.0 + terra-draw-maplibre-gl-adapter 1.4.1 · geotiff 3.0.5 · proj4 2.22.0 · satellite.js 7.1.0 · @turf/* 7.4.0 (modular: area, length, kinks, buffer, line-chunk, boolean-valid) · @supabase/supabase-js 2.117.2. Dev: vitest 5.0.3, @playwright/test 1.63.0, wrangler 4.147.0, supabase CLI 2.119.0, deno 2.9.6 (npm), @electric-sql/pglite 0.5.8 + pglite-postgis 0.2.8, prettier.
+react / react-dom 19.3.0 · vite 8.3.2 · @vitejs/plugin-react 6.1.1 · typescript 7.0.2 (fallback 6.0.3, probe P7) · tailwindcss + @tailwindcss/vite 4.3.3 · @base-ui/react 1.8.0 (used directly; no shadcn generator) · motion 14.0.0 · @phosphor-icons/react 2.1.10 · @fontsource-variable/geist + geist-mono 5.3.0 · maplibre-gl 6.12.0 · terra-draw 1.36.0 + terra-draw-maplibre-gl-adapter 1.4.1 · geotiff 3.0.5 · proj4 2.22.0 · satellite.js 7.1.0 · @supabase/supabase-js 2.117.2 (lazy-loaded with the account menu, outside the entry bundle). No turf: geometry is a few hundred lines of tested TypeScript in `src/evidence/` and `src/geo/`. Dev: vitest 5.0.3, @playwright/test 1.63.0 + @axe-core/playwright 4.13.0, wrangler 4.147.0, supabase CLI 2.119.0, deno 2.9.6 (npm), @electric-sql/pglite 0.5.8 + pglite-postgis 0.2.8, tsx 4.23.15 (runs `.ts` scripts; the VM's Node 22 has no TypeScript support), @types/geojson, prettier.
 
 Routing is about 30 lines of `history.pushState` over 6 routes: `/`, `/new`, `/i/:id`, `/i/:id/report`, `/privacy`, `/limits`. Local investigations use `/i/local-:uuid`. State is React state plus URL plus IndexedDB. There is no global store.
 
@@ -215,7 +219,7 @@ Routing is about 30 lines of `history.pushState` over 6 routes: `/`, `/new`, `/i
 - Tier T0/T1: text list only.
 
 ### 7.4 Screens
-1. **Globe (/)** is asymmetric. Left column: wordmark, one-line promise, search/coordinates field, "Start an investigation", worked example link. Right two-thirds: globe. Floating satellite panel bottom-right. Mobile: globe on top (55 dvh), content in a bottom sheet.
+1. **Globe (/)** is asymmetric. Left column: wordmark, one-line promise, search/coordinates field, "Start an investigation", worked example link (Navi Mumbai airport site, 2 km square, Dec 2017 – Dec 2025), and "My investigations" when signed in. Right two-thirds: globe. Floating satellite panel bottom-right. Mobile: globe on top (55 dvh), content in a bottom sheet. Wherever page content floats over the map, its empty areas pass pointer input through to the globe; only the panels take clicks.
 2. **New investigation (/new)** has 4 steps (Place → Outline → Dates → Review). Mobile shows one question per screen; desktop shows a left panel with the map right. The review screen shows area/length/sections, date range, expected data use (MB estimate), limits and what is stored if saved.
 3. **Workbench (/i/:id)**: header (name, before ↔ after dates, Save/Verify state, Report). Left: evidence viewer (Swipe | Side by side | Difference) with caption rows. Right: timeline scrubber (one tick per acquisition, glyph-coded), road section × date grid, notes, claim. Mobile: viewer full width, scrubber under it, grid/notes in a bottom sheet.
 4. **Report (/i/:id/report)**:
@@ -230,6 +234,8 @@ Routing is about 30 lines of `history.pushState` over 6 routes: `/`, `/new`, `/i
    9. Attribution.
 
    Actions: Download HTML, Download provenance JSON, Print/Save as PDF.
+
+   The report badge has three states: not saved (unverified), every pinned photo verified (with the date of the latest check), or saved but partly verified. The pinned-dates table has a "Server check" column. A verified mark counts only when the server's hash equals the hash of the pixels shown. Opening the report before a before/after pair exists shows a short explanation and a link back, never an empty report.
 5. **Privacy (/privacy)** and **Limits (/limits)** are plain-language pages, linked from every footer.
 
 Every async surface has designed loading (skeleton matching layout), empty, partial, error, rate-limited and offline states. There are no generic spinners.
@@ -327,7 +333,7 @@ Budgets (targets verified in probe P5 and the final perf task):
 - Every image has alt text (date, satellite, clear %). Text sizes are rem-based. Respects reduced motion/transparency/contrast.
 
 ### 7.8 Copy rules
-Plain words in the main flow: "photo date", "clear view", "gap", "outline", "section". Technical names (SCL, L2A, baseline, UTM, hash) live in a "Details" disclosure and the provenance JSON. Every number has a "what this means" line; every limit links to `/limits`. English only in v1; all strings live in `src/ui/copy.ts`.
+Plain words in the main flow: "photo date", "clear view", "gap", "outline", "section". Technical names (SCL, L2A, baseline, UTM, hash) live in a "Details" disclosure and the provenance JSON. Every number has a "what this means" line; every limit links to `/limits`. English only in v1. All strings live in `src/ui/copy*.ts`: `copy.ts` (shell), `copy-flow.ts` (investigation flow and report) and `copy-account.ts` (sign-in, saving, consent, deletion). A test scans every copy file for the banned verdict words.
 
 ## 8. Backend (Supabase, Mumbai `ap-south-1`)
 
@@ -340,17 +346,15 @@ investigations(
   kind text not null check (kind in ('site','road')),
   geom extensions.geography not null,          -- Polygon (site) | LineString (road), SRID 4326
   road_width_m int check ((kind='road') = (road_width_m is not null) and (road_width_m is null or road_width_m between 5 and 200)),
-  date_from date not null, date_to date not null check (date_to >= date_from),
-  claim_text text check (char_length(claim_text) <= 2000), claim_date date,
-  frozen_at timestamptz,                        -- set on first frame; geom/kind/width immutable afterwards
+  date_from date not null, date_to date not null check (date_to > date_from),
+  before_date date, after_date date check (before_date < after_date),
+  pinned date[] not null default '{}' check (cardinality(pinned) <= 24),
+  claim_text text check (char_length(claim_text) <= 2000), claim_date date, claim_criterion text check (char_length(claim_criterion) <= 500),
+  frozen_at timestamptz,                        -- set on first frame; geom/kind/width/dates immutable afterwards
   created_at timestamptz not null default now(), updated_at timestamptz not null default now())
 
-sections(investigation_id uuid references investigations on delete cascade, idx smallint,
-  from_m int, to_m int, geom extensions.geography not null, primary key (investigation_id, idx))
-  -- generated by trigger: site = 1 section (the polygon); road = 2 km pieces buffered to the width
-
 frames(id uuid pk default gen_random_uuid(), investigation_id uuid not null references investigations on delete cascade,
-  owner uuid not null, acquired_at timestamptz not null, collection text not null, item_id text not null,
+  owner uuid not null, acquired_at timestamptz not null, frame_date date not null, collection text not null, item_id text not null,
   processing_baseline text, asset text not null check (asset in ('visual','scl')), level smallint not null check (level in (0,1)),
   win int4[] not null check (array_length(win,1)=4), crs text not null, transform float8[] not null, href text not null,
   source_identity jsonb not null, recipe text not null, client_sha256 text not null, server_sha256 text not null,
@@ -371,7 +375,6 @@ audit_log(id bigint generated always as identity pk, actor uuid, action text not
 ### 8.2 Rules in the database
 - **RLS:**
   - `investigations`, `annotations`: owner-only select/insert/update/delete.
-  - `sections`: owner select via join; writes by trigger only.
   - `frames`: owner **select only**; inserts only by the `verify` function (service role); no update/delete except cascade.
   - `audit_log`: no client access.
 - **Geometry checks (trigger, PostGIS):**
@@ -383,20 +386,20 @@ audit_log(id bigint generated always as identity pk, actor uuid, action text not
   - ≤ 50 investigations per user.
   - ≤ 200 annotations per investigation.
   - ≤ 24 pinned dates per investigation. Each pinned date stores SCL (level 0) + TCI (level 1); the before and after dates also store TCI level 0. That is ≤ 50 frames.
-- **Audit:** AFTER triggers on insert/update/delete of `investigations`, `frames`, `annotations` write `audit_log(actor = auth.uid() or 'service', action, entity, id)`.
-- **Account deletion:** RPC `delete_my_account()` (security definer) deletes `auth.users` row for `auth.uid()`; cascades remove data; audit keeps IDs.
+- **Audit:** AFTER triggers on insert/update/delete of `investigations`, `frames`, `annotations` write `audit_log(actor = auth.uid(), or the row owner for service-role writes, action, entity, id)`. Consent is logged as `consent:v1`.
+- **Account deletion:** Edge Function `delete-account` (user JWT) logs `delete_account` and deletes the user through the Auth admin API; foreign-key cascades remove every row; audit keeps IDs.
 - **Purge (pg_cron, daily 02:30 IST):** delete investigations of users with `last_sign_in_at < now() - interval '12 months'`; delete `audit_log` older than 365 days.
 
 ### 8.3 Auth
-Google OAuth only (scopes `openid email profile`; no sensitive scopes → no Google app verification needed). The consent screen shows the Supabase project domain until a custom domain exists. No email/password, no magic links (default SMTP is team-only). The publishable key goes to the browser; the service key is only in the Edge function environment.
+Google OAuth only (scopes `openid email profile`; no sensitive scopes → no Google app verification needed). The consent screen shows the Supabase project domain until a custom domain exists. No email/password, no magic links (default SMTP is team-only). Exception: the **dev** project enables email/password with confirmation off, for one automated smoke-test user. The publishable key goes to the browser; the service key is only in the Edge function environment.
 
 ### 8.4 Cloudflare Worker
-Workers static assets (`not_found_handling: single-page-application`) with `run_worker_first: ["/api/*"]` so static requests stay free and unlimited. Routes: `GET /api/tle` (above). A `scheduled()` daily keep-alive `GET` to the Supabase REST health endpoint prevents free-tier pausing.
+Workers static assets (`not_found_handling: single-page-application`) with `run_worker_first: ["/api/*"]` so static requests stay free and unlimited. Routes: `GET /api/tle` (above). A `scheduled()` daily keep-alive calls the `keep_alive()` RPC with the publishable key, which prevents free-tier pausing.
 
 ## 9. Privacy, security, licences
 - **DPDP Act 2023 / Rules 2025** (core duties from 2027-05-13; we comply from launch):
   - Plain notice at first save: data held (Google email/name, outlines, dates, notes, claim), purposes, retention, third parties, deletion route, grievance contact.
-  - 18+ gate in terms. Own 1-year audit log with IDs only. Delete account anytime.
+  - 18+ confirmation in the consent dialog at first save (consent logged with IDs only). Own 1-year audit log with IDs only. Delete account anytime.
   - Purge after 12 months without sign-in. Breach runbook in `docs/ops/`.
 - **Third-party reads disclosed:** STAC searches use a coarsened area; COG range reads reveal an approximate window to AWS; Nominatim sees search text; CelesTrak sees nothing user-specific (edge proxy). The app never sends email/name to any third party.
 - **Security:**
@@ -440,12 +443,12 @@ Other things users are told:
 | Layer | Tool | Covers |
 |---|---|---|
 | Logic | Vitest 5 | coordinate parsing; geometry validation + sections; STAC parsing + per-date selection + paging cap; `frame-v1` window maths + SHA-256 vectors; `scl-v1` counts/labels on synthetic rasters; `display-v1` alignment; `diff-v1`; tier chooser; satellite positions/passes on a frozen TLE + clock; provenance schema; report HTML escaping |
-| DB | Vitest + PGlite + PostGIS + an `auth` shim | RLS isolation between two users, constraints, freeze, limits, audit triggers, section generation, purge function, `delete_my_account` |
-| Function | Deno test (`npx deno test`) | `verify` with recorded STAC JSON + a small tiled GeoTIFF fixture served over a local HTTP server with Range support: verified, mismatch, window out of bounds, date outside range, rate limit, upstream 5xx |
+| DB | Vitest + PGlite + PostGIS + an `auth` shim | RLS isolation between two users, constraints, freeze, limits (including re-checks at the frame cap), audit triggers (every frame check), consent, keep-alive, purge function, cascade on user deletion |
+| Function | Deno test (`npx deno test`) | `verify` as a pure handler with injected dependencies and fixture GeoTIFFs: verified, mismatch, foreign investigation (404), window out of bounds, date outside range, rate limit, upstream 5xx, malformed or path-like input, host allowlist |
 | E2E | Playwright 1.63 (Chromium, Firefox, WebKit) | site journey, road journey, swipe keyboard, report export, theme toggle, lite mode, all with STAC/COG/TLE/Supabase routes intercepted by fixtures; plus one opt-in live smoke test (`LIVE=1`) against real Earth Search/AWS |
 | Determinism | Playwright + Deno | same window → same SHA-256 in Chromium, Firefox, WebKit, Deno (probe P2 becomes a permanent test) |
 
-`npm run check` = typecheck + vitest + deno test + playwright. Every task in the plan ends green.
+`npm run check` = evidence sync + typecheck + Vitest (logic and DB) + build + entry-bundle budget (150 KB gzip). `npm run e2e` runs Playwright; `npx deno test` runs the function tests; CI runs all three. Every task in the plan ends green.
 
 ## 12. Environments, deploy, cost
 - **Repo:** `Idea lab laa/` becomes git repo **grahsaboot** (app at root; planning history stays in `docs/geoverify/`). Agents commit; the user pushes.
@@ -500,7 +503,7 @@ Other things users are told:
 Prepare six contacts (three site/civil engineers, three road/monitoring people) and book three 20-minute sessions after the first deploy. Task: "Find out whether new road surface appeared at this place between these dates." Measure time to first comparison and confusions between "no data" and "no change". Ask what decision the report would change. Nothing is sent by agents.
 
 ## 16. Open items needing the user
-1. Create the three free accounts when the plan reaches Gate G0 (the plan gives exact steps).
+1. Create the free accounts at the plan's human gates: Cloudflare at G1 (before task C11), and Supabase dev + prod plus the Google OAuth client at G0 (needed from task D4). `docs/ops/accounts.md` (task D0) gives the exact steps.
 2. Optional domain purchase (first paid item).
 3. Manual IP India trademark search for "GrahSaboot" (classes 9, 35, 42) before any spend.
 4. Grievance contact name/email for the privacy notice.
