@@ -11,8 +11,19 @@ export function levelFromTransform(
   width: number,
   height: number,
 ): LevelInfo {
-  const [a, , c, , e, f] = transform
-  if (a === undefined || c === undefined || e === undefined || f === undefined || a <= 0 || e >= 0)
+  const [a, b, c, d, e, f] = transform
+  if (
+    a === undefined ||
+    c === undefined ||
+    e === undefined ||
+    f === undefined ||
+    b !== 0 ||
+    d !== 0 ||
+    a <= 0 ||
+    e >= 0 ||
+    !(width > 0) ||
+    !(height > 0)
+  )
     throw new Error('BAD_TRANSFORM')
   return {
     level,
@@ -74,13 +85,14 @@ export function windowSize(w: Window): { width: number; height: number } {
   return { width: w[2] - w[0], height: w[3] - w[1] }
 }
 
-/** Server-side check of a client-declared window: inside the level, not oversized, and covering the AOI within `tol` px. */
+/** Server-side check of a client-declared window: whole pixels, inside the level, not oversized, and covering the AOI within `tol` px. */
 export function windowCovers(win: Window, points: XY[], lvl: LevelInfo, tol = 2): boolean {
   const need = aoiPixelWindow(points, lvl, 0)
   if (!need) return false
   const n = need.clamped
   const { width, height } = windowSize(win)
   return (
+    win.every(Number.isInteger) &&
     win[0] >= 0 &&
     win[1] >= 0 &&
     win[2] <= lvl.width &&

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { aoiPixelWindow, aoiPointsUtm, levelFromTransform, sha256Hex, windowCovers } from './frame.ts'
-import type { XY } from './types.ts'
+import type { LonLat, XY } from './types.ts'
 
 // UTM 44N ring of the Nagpur ±0.005° square (proj4 2.22.0, 2026-10-05)
 const RING_UTM: XY[] = [
@@ -25,6 +25,16 @@ describe('levelFromTransform', () => {
       resY: 10,
     })
     expect(levelFromTransform(REAL, [10980, 10980], 1, 5490, 5490).resX).toBe(20)
+  })
+  it('rejects rotated transforms and empty levels', () => {
+    expect(() => levelFromTransform([10, 1, 300000, 0, -10, 2341000], [256, 256], 0, 256, 256)).toThrow(
+      'BAD_TRANSFORM',
+    )
+    expect(() => levelFromTransform([10, 0, 300000, 1, -10, 2341000], [256, 256], 0, 256, 256)).toThrow(
+      'BAD_TRANSFORM',
+    )
+    expect(() => levelFromTransform(FIXTURE, [256, 256], 0, 0, 256)).toThrow('BAD_TRANSFORM')
+    expect(() => levelFromTransform(FIXTURE, [256, 256], 0, 256, 0)).toThrow('BAD_TRANSFORM')
   })
 })
 
@@ -64,6 +74,9 @@ describe('windowCovers', () => {
     expect(windowCovers([97, 94, 208, 211], RING_UTM, lvl)).toBe(false)
     expect(windowCovers([92, 94, 300, 211], RING_UTM, lvl)).toBe(false)
   })
+  it('rejects fractional windows (frame-v1 needs integer windows)', () => {
+    expect(windowCovers([92.5, 94, 203, 211], RING_UTM, lvl)).toBe(false)
+  })
 })
 
 describe('aoiPointsUtm', () => {
@@ -82,6 +95,20 @@ describe('aoiPointsUtm', () => {
     const xs = pts.map((p) => p[0])
     expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(30)
     expect(pts).toHaveLength(8)
+  })
+  it('projects into the scene zone across a zone boundary', () => {
+    // lon 77.9 is UTM zone 43 territory; a 44Q scene (EPSG 32644, x from 99960) still covers it
+    const ring: LonLat[] = [
+      [77.895, 21.1408],
+      [77.905, 21.1408],
+      [77.905, 21.1508],
+      [77.895, 21.1508],
+      [77.895, 21.1408],
+    ]
+    const lvl = levelFromTransform([10, 0, 99960, 0, -10, 2400000], [10980, 10980], 0, 10980, 10980)
+    const w = aoiPixelWindow(aoiPointsUtm({ kind: 'site', rings: [ring] }, 32644), lvl)
+    expect(w).not.toBeNull()
+    expect([...w!.full, ...w!.clamped].every(Number.isFinite)).toBe(true)
   })
 })
 
