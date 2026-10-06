@@ -6,14 +6,12 @@ import type { LonLat } from '../evidence/types.ts'
 export interface SatPosition {
   norad: number
   name: string
-  short: string
   lon: number
   lat: number
 }
 export interface PassSummary {
   norad: number
   name: string
-  family: 'sentinel-2' | 'landsat'
   times: Array<{ time: number; distanceKm: number }>
 }
 

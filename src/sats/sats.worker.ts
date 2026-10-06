@@ -23,7 +23,7 @@ ctx.onmessage = (e: MessageEvent) => {
     const t = new Date(msg.t)
     const sats = recs.flatMap(({ def, rec }) => {
       const p = subPoint(rec, t)
-      return p ? [{ norad: def.norad, name: def.name, short: def.short, lon: p.lon, lat: p.lat }] : []
+      return p ? [{ norad: def.norad, name: def.name, lon: p.lon, lat: p.lat }] : []
     })
     let tracks: FeatureCollection | undefined
     let swaths: FeatureCollection | undefined
@@ -53,7 +53,6 @@ ctx.onmessage = (e: MessageEvent) => {
   const passes = recs.map(({ def, rec }) => ({
     norad: def.norad,
     name: def.name,
-    family: def.family,
     times: nextPasses(rec, msg.target, def.swathKm / 2, from).map((p) => ({
       time: p.time.getTime(),
       distanceKm: p.distanceKm,

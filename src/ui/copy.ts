@@ -67,13 +67,6 @@ export const copy = {
     noPass: 'No pass in the next 10 days',
     position: (lat: number, lon: number) =>
       `${Math.abs(lat).toFixed(1)}°${lat >= 0 ? 'N' : 'S'} ${Math.abs(lon).toFixed(1)}°${lon >= 0 ? 'E' : 'W'}`,
-    status: {
-      40697: 'Extended operations',
-      42063: 'Operational',
-      60989: 'Operational',
-      39084: 'Operational',
-      49260: 'Operational',
-    } as Record<number, string>,
   },
   quality: {
     CLEAR: { word: 'Clear', help: 'At least 95% of your outline is visible in this photo.' },
