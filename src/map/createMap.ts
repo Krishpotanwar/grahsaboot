@@ -90,6 +90,9 @@ export function applyBaseLayers(map: MlMap, tier: Tier, theme: Theme) {
       },
     })
   }
+  // The Blue Marble hides the basemap labels inside the globe, but one near the horizon pokes out past its edge, where no raster can cover it: labels start at z5, half way through the fade.
+  for (const l of map.getStyle().layers)
+    if (l.type === 'symbol') map.setLayerZoomRange(l.id, Math.max(l.minzoom ?? 0, 5), l.maxzoom ?? 24)
   if (tier >= 3) {
     if (!map.getSource('gs-terrain'))
       map.addSource('gs-terrain', {

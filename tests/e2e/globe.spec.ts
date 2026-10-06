@@ -107,6 +107,21 @@ test('the map controls are 44 px touch targets on a touch screen', async ({ page
   expect(button.y + button.height).toBeLessThanOrEqual(map.y + map.height)
 })
 
+// A landscape phone's map band is ~135 px tall: 44 px controls would not fit it and zoom-in would end up off the screen, the one-finger alternative to pinching.
+test('the zoom buttons stay on screen on a landscape phone', async ({ page, isMobile }) => {
+  test.skip(!isMobile, 'a coarse pointer is only emulated by the mobile project')
+  await page.setViewportSize({ width: 844, height: 360 })
+  await page.goto('/?tier=2')
+  test.skip(!(await hasWebgl2(page)), 'no WebGL2 in this engine')
+  await styleReady(page)
+  const map = (await page.locator('.maplibregl-map').boundingBox())!
+  for (const sel of ['zoom-in', 'zoom-out', 'compass']) {
+    const b = (await page.locator(`.maplibregl-ctrl-${sel}`).boundingBox())!
+    expect(b.y, sel).toBeGreaterThanOrEqual(map.y)
+    expect(b.y + b.height, sel).toBeLessThanOrEqual(map.y + map.height)
+  }
+})
+
 // On a tablet the panel sits in the map's bottom-right corner, right where the (now larger) zoom, compass and attribution controls are.
 test('the satellites panel clears the map controls on a tablet', async ({ page, isMobile }) => {
   test.skip(!isMobile, 'a coarse pointer is only emulated by the mobile project')
@@ -146,6 +161,12 @@ test('the Blue Marble draws over the basemap labels and under the satellite laye
   const want = ['bg', 'labels', 'gs-gibs', 'gs-sat-swath', 'gs-sat-track']
   await page.waitForFunction(() => !!(window as any).__gs?.map?.getLayer('gs-sat-track'))
   expect(await order()).toEqual(want)
+  // A label near the horizon pokes out past the globe's edge, where no raster can cover it, so basemap labels only start at z5.
+  const labelsFrom = () =>
+    page.evaluate(
+      () => (window as any).__gs.map.getStyle().layers.find((l: any) => l.id === 'labels').minzoom as number,
+    )
+  expect(await labelsFrom()).toBe(5)
   await page.getByRole('button', { name: copy.nav.themeToggle }).click()
   await page.waitForFunction(
     () =>
@@ -154,6 +175,7 @@ test('the Blue Marble draws over the basemap labels and under the satellite laye
       ] === '#FFFFFF' && !!(window as any).__gs.map.getLayer('gs-sat-track'),
   )
   expect(await order()).toEqual(want)
+  expect(await labelsFrom()).toBe(5)
 })
 
 // Ruled start zoom: the globe fills ~88% of the stage's short side. The map is created before the first layout is set, so this also pins the hidden stage sharing the globe's box (phones).

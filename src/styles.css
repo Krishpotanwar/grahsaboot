@@ -143,10 +143,10 @@
   visibility: hidden;
   pointer-events: none;
 }
-/* hidden shares the globe's box: the map is often created before the first layout is set, and its start zoom is sized from that box. */
+/* hidden shares the globe's box: the map is often created before the first layout is set, and its start zoom is sized from that box. The band is 55% of the screen but never under 256 px (a landscape phone would give the controls ~135 px); GlobeScreen's top margin uses the same 320 px. */
 .map-stage[data-layout='globe'],
 .map-stage[data-layout='hidden'] {
-  bottom: 45dvh;
+  bottom: min(45dvh, calc(100dvh - 320px));
 }
 /* Screen-space shade from the approved mockup. Dark theme only; pointer-events: none keeps the map interactive. */
 .map-stage[data-layout='globe']::after {
@@ -185,8 +185,8 @@
     display: none;
   }
 }
-/* Touch targets are 44 px (project rule); MapLibre draws its buttons at 29 and 24 px. Its stylesheet loads after this one (it comes with the lazy map chunk), so the .maplibregl-map prefix is what makes these win. */
-@media (pointer: coarse) {
+/* Touch targets are 44 px (project rule); MapLibre draws its buttons at 29 and 24 px. Its stylesheet loads after this one (it comes with the lazy map chunk), so the .maplibregl-map prefix is what makes these win. Not on a landscape phone: its map band is only 256 px tall, and 44 px controls plus the attribution would not fit. */
+@media (pointer: coarse) and (min-height: 600px) {
   .maplibregl-map .maplibregl-ctrl-group button,
   .maplibregl-map .maplibregl-ctrl-attrib-button {
     width: 44px;

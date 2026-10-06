@@ -126,7 +126,7 @@ export default function GlobeScreen() {
       className={`grid min-h-[calc(100dvh-64px)] ${tier > 0 ? 'lg:grid-cols-[38%_1fr]' : 'lg:mx-auto lg:max-w-[40rem]'}`}
     >
       <section
-        className={`pointer-events-auto relative z-10 flex flex-col gap-6 bg-bg p-6 pb-10 lg:mt-0 lg:justify-center lg:p-12 ${tier > 0 ? 'mt-[calc(55dvh-64px)] justify-end' : ''}`}
+        className={`pointer-events-auto relative z-10 flex flex-col gap-6 bg-bg p-6 pb-10 lg:mt-0 lg:justify-center lg:p-12 ${tier > 0 ? 'mt-[calc(max(55dvh,320px)_-_64px)] justify-end' : ''}`}
       >
         <h1 className="max-w-[18ch] text-[clamp(2.25rem,5vw,3.75rem)] font-bold leading-none tracking-[-0.04em]">
           {copy.app.promise}
