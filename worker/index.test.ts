@@ -30,6 +30,16 @@ describe('worker entry', () => {
     expect(res.status).toBe(200)
     expect(store.size).toBe(1)
   })
+  it('keeps the 2 h window when caches.default does nothing (workers.dev)', async () => {
+    vi.stubGlobal('caches', { default: { match: async () => undefined, put: async () => {} } })
+    const up = vi.fn(async () => new Response(JSON.stringify(SATS)))
+    vi.stubGlobal('fetch', up)
+    for (let i = 0; i < 2; i++) {
+      const res = await worker.fetch(new Request('https://noop.example/api/tle'), { ASSETS })
+      expect(res.status).toBe(200)
+    }
+    expect(up).toHaveBeenCalledOnce()
+  })
   it('hands every other path to the assets binding', async () => {
     const res = await worker.fetch(new Request('https://app.example/new'), { ASSETS })
     expect(await res.text()).toBe('<!doctype html>')
