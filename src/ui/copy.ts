@@ -32,6 +32,11 @@ export const copy = {
       'Satellite photos show what is visible from above. They are not proof of contracts, payments or quality.',
   },
   notFound: { title: 'Page not found', body: 'That address does not exist.', home: 'Go to the globe' },
+  // ponytail: prototype stand-in for the Phase C workbench routes; delete when /new, /i/:id and reports exist.
+  soon: {
+    title: 'Investigations are not in this prototype yet',
+    body: 'This prototype has the live globe, place search and satellite passes. Drawing an outline, comparing dated photos and making a report come in the next version.',
+  },
   map: {
     label: 'Map. Use the search box to move it.',
     staticNotice:

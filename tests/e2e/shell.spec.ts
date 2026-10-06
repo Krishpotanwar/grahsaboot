@@ -24,7 +24,14 @@ test('unknown routes render not found', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible()
 })
 
-for (const path of ['/limits', '/privacy', '/dev/kit']) {
+test('workbench routes say they are not in the prototype yet', async ({ page }) => {
+  await page.goto('/new?example=nagpur')
+  await expect(page.getByRole('heading', { name: 'Investigations are not in this prototype yet' })).toBeVisible()
+  await page.getByRole('link', { name: 'Go to the globe' }).click()
+  await expect(page).toHaveURL(/\/$/)
+})
+
+for (const path of ['/limits', '/privacy', '/dev/kit', '/new']) {
   test(`${path} passes axe in both themes`, async ({ page }) => {
     await page.goto(path)
     // Lazy screens render after the load event; axe must not run on the Suspense fallback.

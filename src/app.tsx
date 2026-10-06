@@ -20,6 +20,10 @@ export function screenFor(r: Route): ReactNode {
       return <TextPage page={copy.pages.privacy} />
     case 'limits':
       return <TextPage page={copy.pages.limits} />
+    case 'new':
+    case 'investigation':
+    case 'report':
+      return <NotFound text={copy.soon} />
     case 'kit':
       return config.testMode ? <KitScreen /> : <NotFound />
     default:
