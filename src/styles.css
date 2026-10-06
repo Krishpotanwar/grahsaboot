@@ -185,6 +185,26 @@
     display: none;
   }
 }
+/* Touch targets are 44 px (project rule); MapLibre draws its buttons at 29 and 24 px. Its stylesheet loads after this one (it comes with the lazy map chunk), so the .maplibregl-map prefix is what makes these win. */
+@media (pointer: coarse) {
+  .maplibregl-map .maplibregl-ctrl-group button,
+  .maplibregl-map .maplibregl-ctrl-attrib-button {
+    width: 44px;
+    height: 44px;
+  }
+  /* The attribution button hangs off the right of a box sized for a 24 px button (the lower part would fall outside the map and be clipped), and its 24 px icon is a tiled background. */
+  .maplibregl-map .maplibregl-ctrl-attrib.maplibregl-compact {
+    min-height: 40px;
+    padding-right: 44px;
+  }
+  .maplibregl-map .maplibregl-ctrl-attrib.maplibregl-compact-show {
+    padding-right: 48px;
+  }
+  .maplibregl-map .maplibregl-ctrl-attrib-button {
+    background-repeat: no-repeat;
+    background-position: center;
+  }
+}
 /* The canvas fills MapLibre's overflow: hidden box, so the global focus ring (2 px outside the edge) would be clipped away: draw it inside. */
 .maplibregl-canvas:focus-visible {
   outline-offset: -2px;

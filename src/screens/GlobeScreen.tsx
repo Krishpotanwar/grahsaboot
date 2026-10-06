@@ -163,8 +163,12 @@ export default function GlobeScreen() {
       </section>
       {tier > 0 && (
         <div className="relative hidden lg:block">
-          {/* right-14 / bottom-14 keep the panel off MapLibre's zoom buttons and attribution (bottom right of the map). */}
-          {desktop && <div className="pointer-events-auto absolute bottom-14 right-14 z-20">{panel}</div>}
+          {/* right-14 / bottom-14 keep the panel off MapLibre's zoom buttons and attribution (bottom right of the map); a touch screen has 44 px controls, so it clears them by more. */}
+          {desktop && (
+            <div className="pointer-events-auto absolute bottom-14 right-14 z-20 pointer-coarse:bottom-24 pointer-coarse:right-18">
+              {panel}
+            </div>
+          )}
         </div>
       )}
     </div>

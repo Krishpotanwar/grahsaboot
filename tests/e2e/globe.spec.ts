@@ -89,6 +89,42 @@ test('the place chip stays on screen on a narrow phone', async ({ page }) => {
   expect((await chip.boundingBox())!.x).toBeGreaterThanOrEqual(0)
 })
 
+// Project rule: touch targets are at least 44 px. MapLibre draws its own zoom, compass and attribution buttons at 29 and 24 px.
+test('the map controls are 44 px touch targets on a touch screen', async ({ page, isMobile }) => {
+  test.skip(!isMobile, 'a coarse pointer is only emulated by the mobile project')
+  await page.goto('/?tier=2')
+  test.skip(!(await hasWebgl2(page)), 'no WebGL2 in this engine')
+  await styleReady(page)
+  for (const sel of ['zoom-in', 'zoom-out', 'compass', 'attrib-button']) {
+    const box = (await page.locator(`.maplibregl-ctrl-${sel}`).boundingBox())!
+    expect(box.width, sel).toBeGreaterThanOrEqual(44)
+    expect(box.height, sel).toBeGreaterThanOrEqual(44)
+  }
+  // Collapsed, as after the first drag, the attribution button must still sit inside the map, or its lower part is clipped and cannot be tapped.
+  await page.evaluate(() => (window as any).__gs.map.fire('drag'))
+  const button = (await page.locator('.maplibregl-ctrl-attrib-button').boundingBox())!
+  const map = (await page.locator('.maplibregl-map').boundingBox())!
+  expect(button.y + button.height).toBeLessThanOrEqual(map.y + map.height)
+})
+
+// On a tablet the panel sits in the map's bottom-right corner, right where the (now larger) zoom, compass and attribution controls are.
+test('the satellites panel clears the map controls on a tablet', async ({ page, isMobile }) => {
+  test.skip(!isMobile, 'a coarse pointer is only emulated by the mobile project')
+  await page.setViewportSize({ width: 1024, height: 768 })
+  await page.goto('/?tier=2')
+  test.skip(!(await hasWebgl2(page)), 'no WebGL2 in this engine')
+  await styleReady(page)
+  const panel = page.getByRole('region', { name: copy.sats.title })
+  await expect(panel.getByText('Sentinel-2A')).toBeVisible()
+  const p = (await panel.boundingBox())!
+  for (const sel of ['.maplibregl-ctrl-group', '.maplibregl-ctrl-attrib']) {
+    const c = (await page.locator(sel).boundingBox())!
+    const apart =
+      p.x + p.width <= c.x || c.x + c.width <= p.x || p.y + p.height <= c.y || c.y + c.height <= p.y
+    expect(apart, sel).toBe(true)
+  }
+})
+
 // The terrain tiles' licence asks for credit, but only a tier-3 map uses them.
 test('terrain attribution shows at tier 3 and not at tier 2', async ({ page }) => {
   await page.goto('/?tier=2')
