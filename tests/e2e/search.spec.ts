@@ -11,6 +11,8 @@ test('search Nagpur, pick it, and start an investigation there', async ({ page }
     'href',
     '/new?lat=21.145800&lon=79.088200&name=Nagpur',
   )
+  // WCAG 2.4.3: the clicked result unmounts, so focus must land somewhere sensible instead of on <body>.
+  await expect(page.getByLabel(copy.search.label)).toBeFocused()
 })
 
 test('swapped Indian coordinates get a hint, a one-tap fix and a use-as-typed escape', async ({ page }) => {
@@ -23,6 +25,7 @@ test('swapped Indian coordinates get a hint, a one-tap fix and a use-as-typed es
     'href',
     `/new?lat=21.145800&lon=79.088200&name=${encodeURIComponent(copy.search.coordsResult(21.1458, 79.0882))}`,
   )
+  await expect(page.getByLabel(copy.search.label)).toBeFocused()
   // A real Arctic point must stay usable: the same input, taken exactly as typed.
   await page.getByRole('button', { name: copy.search.submit }).click()
   await page.getByRole('button', { name: copy.search.useAsTyped }).click()
@@ -30,6 +33,26 @@ test('swapped Indian coordinates get a hint, a one-tap fix and a use-as-typed es
     'href',
     `/new?lat=79.088200&lon=21.145800&name=${encodeURIComponent(copy.search.coordsResult(79.0882, 21.1458))}`,
   )
+})
+
+// WCAG 2.4.3: a disabled button would drop focus to <body>; the busy Search button stays focusable, and a second press does nothing.
+test('the Search button keeps keyboard focus while a search runs', async ({ page }) => {
+  let calls = 0
+  await page.route('**/nominatim/search*', async (route) => {
+    calls++
+    await new Promise((r) => setTimeout(r, 700))
+    await route.continue()
+  })
+  await page.goto('/?tier=0')
+  await page.getByLabel(copy.search.label).fill('Nagpur')
+  const search = page.getByRole('button', { name: copy.search.submit })
+  await search.focus()
+  await page.keyboard.press('Enter')
+  await expect(search).toHaveAttribute('aria-disabled', 'true')
+  await expect(search).toBeFocused()
+  await page.keyboard.press('Enter')
+  await expect(page.getByRole('button', { name: 'Nagpur, Maharashtra, India' })).toBeVisible()
+  expect(calls).toBe(1)
 })
 
 test('unknown places say so plainly', async ({ page }) => {

@@ -23,14 +23,18 @@ export function SearchBox({ onSelect }: { onSelect(place: Place): void }) {
   const [q, setQ] = useState('')
   const [state, setState] = useState<State>({ kind: 'idle' })
   const ac = useRef<AbortController | null>(null)
+  const input = useRef<HTMLInputElement>(null)
 
   const pick = (p: Place) => {
     setState({ kind: 'idle' })
     onSelect(p)
+    // The result or fix button that was just pressed unmounts; without this focus falls to <body> (WCAG 2.4.3).
+    input.current?.focus()
   }
 
   async function submit(e: FormEvent) {
     e.preventDefault()
+    if (state.kind === 'busy') return
     const c = parseCoordinates(q)
     if (c)
       return c.swappedHint ? setState({ kind: 'swapped', lat: c.lat, lon: c.lon }) : pick(point(c.lat, c.lon))
@@ -53,6 +57,7 @@ export function SearchBox({ onSelect }: { onSelect(place: Place): void }) {
         {/* The button is laid over the input's right edge; pr-24 keeps typed text clear of it. 16 px text: iOS Safari zooms the page on focus below that. */}
         <div className="relative">
           <input
+            ref={input}
             id={id}
             value={q}
             onChange={(e) => setQ(e.target.value)}
@@ -61,11 +66,12 @@ export function SearchBox({ onSelect }: { onSelect(place: Place): void }) {
             inputMode="search"
             className="h-[52px] w-full text-ellipsis rounded-[6px] border border-control bg-bg pl-4 pr-24 font-mono text-base text-fg placeholder:text-fg-2 focus:border-accent"
           />
+          {/* aria-disabled, not disabled: a disabled button that has focus drops it to <body>. submit() ignores the press while busy. */}
           <Button
             type="submit"
             variant="primary"
-            disabled={state.kind === 'busy'}
-            className="absolute right-1 top-1"
+            aria-disabled={state.kind === 'busy'}
+            className="absolute right-1 top-1 aria-disabled:opacity-40"
           >
             {copy.search.submit}
           </Button>
