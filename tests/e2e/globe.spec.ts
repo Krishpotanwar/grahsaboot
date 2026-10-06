@@ -118,6 +118,15 @@ test('coming back to the globe from a place does not spin the zoomed-in map', as
   expect(await lng()).toBeCloseTo(before, 6)
 })
 
+// WCAG 2.4.3: the skip link is the first Tab stop, ahead of the map canvas and its controls (axe cannot see this).
+test('the first Tab stop is the skip link, not the map', async ({ page }) => {
+  await page.goto('/?tier=2')
+  test.skip(!(await hasWebgl2(page)), 'no WebGL2 in this engine')
+  await styleReady(page)
+  await page.keyboard.press('Tab')
+  await expect(page.getByRole('link', { name: copy.common.skip })).toBeFocused()
+})
+
 // The map outlives the globe screen, so the pick must too: the pin, the next pass and "start here" come back with it.
 test('the picked place is still there after a trip to another page', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' })

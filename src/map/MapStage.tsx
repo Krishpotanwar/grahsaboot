@@ -130,6 +130,8 @@ export function MapStageProvider({ children }: { children: ReactNode }) {
   )
   return (
     <Ctx.Provider value={value}>
+      {/* Children first: the skip link must be the first Tab stop, ahead of the map canvas and its controls. Painting is unchanged (the stage is fixed at z-index 0; the shell sits at z 10 and up). */}
+      {children}
       <div
         className="map-stage"
         data-layout={tier === 0 ? 'hidden' : layout}
@@ -139,7 +141,6 @@ export function MapStageProvider({ children }: { children: ReactNode }) {
         {/* MapLibre's CSS sets position: relative on its container, so it gets this full-size child, never the fixed stage. */}
         <div ref={container} className="h-full w-full" />
       </div>
-      {children}
     </Ctx.Provider>
   )
 }
