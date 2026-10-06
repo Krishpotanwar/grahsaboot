@@ -17,6 +17,11 @@ describe('copy', () => {
   it('never uses verdict words (spec §2.2)', () => {
     for (const re of BANNED) expect(re.test(SOURCE), String(re)).toBe(false)
   })
+  it('tells visitors which tile hosts see their IP address and the area they view', () => {
+    const text = copy.pages.privacy.items.join(' ')
+    for (const host of ['OpenFreeMap', 'NASA GIBS', 'AWS']) expect(text, host).toContain(host)
+    expect(text).toContain('IP address')
+  })
   it('has a word and help line for every quality label', () => {
     for (const l of ['CLEAR', 'PARTIAL', 'OBSCURED', 'NOT_COVERED'] as const) {
       expect(copy.quality[l].word.length).toBeGreaterThan(2)

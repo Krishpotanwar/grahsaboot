@@ -79,6 +79,7 @@ export const copy = {
     osm: '© OpenStreetMap contributors',
     openfreemap: 'OpenFreeMap',
     gibs: 'NASA GIBS Blue Marble',
+    terrain: 'Terrain: Mapzen Joerd / AWS Terrain Tiles',
     sentinel: (year: number) => `Contains modified Copernicus Sentinel data ${year}`,
   },
   pages: {
@@ -102,6 +103,7 @@ export const copy = {
       items: [
         'You can explore and investigate without an account. Unsaved work stays in this browser.',
         'Place searches are sent to OpenStreetMap Nominatim.',
+        'Map tiles come from OpenFreeMap, NASA GIBS and AWS; those requests reveal your IP address and the area you are viewing.',
         'Satellite photos are read directly from public Sentinel-2 files on Amazon Web Services. Those requests reveal an approximate area, never your name or email.',
         'Satellite positions come through our server from CelesTrak; nothing about you is sent.',
         'If you sign in to save, we store your Google name and email, your outlines, dates, notes and claims, and a log of actions with IDs only.',

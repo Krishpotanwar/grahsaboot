@@ -74,6 +74,18 @@ test('theme toggle swaps the map style', async ({ page }) => {
   await page.waitForFunction(() => !!(window as any).__gs.map.getLayer('gs-gibs'))
 })
 
+// The terrain tiles' licence asks for credit, but only a tier-3 map uses them.
+test('terrain attribution shows at tier 3 and not at tier 2', async ({ page }) => {
+  await page.goto('/?tier=2')
+  test.skip(!(await hasWebgl2(page)), 'no WebGL2 in this engine')
+  await styleReady(page)
+  await expect(page.locator('.maplibregl-ctrl-attrib')).toContainText('OpenStreetMap')
+  await expect(page.locator('.maplibregl-ctrl-attrib')).not.toContainText(copy.attribution.terrain)
+  await page.goto('/?tier=3')
+  await styleReady(page)
+  await expect(page.locator('.maplibregl-ctrl-attrib')).toContainText(copy.attribution.terrain)
+})
+
 // The Blue Marble covers the basemap labels (the approved mockup has none) until it fades out; the satellite layers stay above it, also after a style reload.
 test('the Blue Marble draws over the basemap labels and under the satellite layers', async ({ page }) => {
   await page.goto('/?tier=2')

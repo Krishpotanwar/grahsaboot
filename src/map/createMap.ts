@@ -40,7 +40,12 @@ export function createMap(
   map.addControl(
     new AttributionControl({
       compact: true,
-      customAttribution: [copy.attribution.osm, copy.attribution.openfreemap, copy.attribution.gibs],
+      customAttribution: [
+        copy.attribution.osm,
+        copy.attribution.openfreemap,
+        copy.attribution.gibs,
+        ...(opts.tier >= 3 ? [copy.attribution.terrain] : []),
+      ],
     }),
     'bottom-right',
   )
