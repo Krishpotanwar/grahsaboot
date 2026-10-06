@@ -71,4 +71,39 @@ describe('parseItem', () => {
     evil.assets.visual.href = 'https://evil.example.com/TCI.tif'
     expect(parseItem(evil, 'sentinel-2-l2a')).toBeNull()
   })
+  it('drops footprints without a usable ring (one bad item must not break selection)', () => {
+    const geo = (g: unknown) => parseItem({ ...REAL, geometry: g }, 'sentinel-2-l2a')
+    expect(geo({ type: 'Polygon', coordinates: [] })).toBeNull()
+    expect(geo({ type: 'Polygon', coordinates: [null] })).toBeNull()
+    expect(
+      geo({
+        type: 'Polygon',
+        coordinates: [
+          [
+            [1, 2],
+            [3, 4],
+          ],
+        ],
+      }),
+    ).toBeNull()
+    expect(
+      geo({
+        type: 'Polygon',
+        coordinates: [
+          [
+            [null, 1],
+            [1, 2],
+            [3, 4],
+          ],
+        ],
+      }),
+    ).toBeNull()
+    const ring = [
+      [78, 20.6],
+      [79, 20.6],
+      [79, 21],
+      [78, 20.6],
+    ]
+    expect(geo({ type: 'MultiPolygon', coordinates: [[], [ring]] })?.footprint).toEqual([ring])
+  })
 })

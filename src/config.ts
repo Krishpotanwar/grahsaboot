@@ -32,16 +32,13 @@ export const config = {
 const ASSET_HOSTS = [
   'sentinel-cogs.s3.us-west-2.amazonaws.com',
   'e84-earth-search-sentinel-data.s3.us-west-2.amazonaws.com',
+  'sentinel2l2a01.blob.core.windows.net',
 ]
 
 export function isAllowedAssetUrl(href: string): boolean {
   try {
     const u = new URL(href)
-    if (
-      u.protocol === 'https:' &&
-      (ASSET_HOSTS.includes(u.hostname) || u.hostname.endsWith('.blob.core.windows.net'))
-    )
-      return true
+    if (u.protocol === 'https:' && ASSET_HOSTS.includes(u.hostname)) return true
     return (
       config.testMode && u.protocol === 'http:' && (u.hostname === '127.0.0.1' || u.hostname === 'localhost')
     )

@@ -1,5 +1,5 @@
 import { config } from '../config.ts'
-import type { Bbox } from '../geo/aoi.ts'
+import { coarsenBbox, type Bbox } from '../geo/aoi.ts'
 import { parseItem } from './parse.ts'
 import type { Collection, S2Item, SearchResult } from './types.ts'
 
@@ -36,7 +36,13 @@ const FIELDS = [
   'assets.scl',
 ]
 const BACKOFF = [500, 1500]
-const isAbort = (e: unknown) => (e as { name?: string })?.name === 'AbortError'
+const TIMEOUT_MS = 20_000
+/** A stalled network ends in a retry or the fallback (TimeoutError), never a hung spinner; a caller abort stays an abort. */
+export const withTimeout = (s?: AbortSignal) =>
+  s ? AbortSignal.any([s, AbortSignal.timeout(TIMEOUT_MS)]) : AbortSignal.timeout(TIMEOUT_MS)
+const isAbort = (e: unknown, s?: AbortSignal) =>
+  !!s?.aborted || (e as { name?: string })?.name === 'AbortError'
+const fatal = (e: unknown) => e instanceof StacError && e.status < 500 && e.status !== 429
 
 interface Req {
   url: string
@@ -58,15 +64,16 @@ async function fetchJson(req: Req, a: SearchArgs): Promise<Json> {
         method: req.method,
         headers: req.method === 'POST' ? { 'content-type': 'application/json' } : undefined,
         body: req.method === 'POST' ? JSON.stringify(req.body) : undefined,
-        signal: a.signal,
+        signal: withTimeout(a.signal),
       })
       if (res.ok) return (await res.json()) as Json
       last = new StacError(res.status)
-      if (res.status !== 429 && res.status < 500) throw last
+      if (fatal(last)) throw last
     } catch (e) {
-      if (isAbort(e) || (e instanceof StacError && e.status < 500 && e.status !== 429)) throw e
+      if (isAbort(e, a.signal) || fatal(e)) throw e
       last = e
     }
+    a.signal?.throwIfAborted()
     if (attempt < 2) await sleep(BACKOFF[attempt]!)
   }
   throw last
@@ -80,7 +87,7 @@ async function searchEndpoint(
 ): Promise<SearchResult> {
   const body = {
     collections: ['sentinel-2-l2a'],
-    bbox: a.bbox,
+    bbox: coarsenBbox(a.bbox), // privacy: the exact outline never leaves the browser
     datetime: `${a.from}T00:00:00Z/${a.to}T23:59:59Z`,
     limit: 100,
     sortby: [{ field: 'properties.datetime', direction: 'asc' }],
@@ -96,7 +103,7 @@ async function searchEndpoint(
     }
     const next = (json.links ?? []).find((l) => l.rel === 'next' && l.href)
     if (!next) return { items, limited: false, source: collection }
-    if (pages >= (a.maxPages ?? 10)) return { items, limited: true, source: collection }
+    if (pages >= Math.min(a.maxPages ?? 10, 10)) return { items, limited: true, source: collection }
     req =
       next.method === 'POST'
         ? {
@@ -112,7 +119,7 @@ export async function searchSentinel2(a: SearchArgs): Promise<SearchResult> {
   try {
     return await searchEndpoint(config.stacUrl, 'sentinel-2-l2a', a, true)
   } catch (e) {
-    if (isAbort(e)) throw e
+    if (isAbort(e, a.signal) || fatal(e)) throw e
     return await searchEndpoint(config.pcStacUrl, 'pc:sentinel-2-l2a', a, false)
   }
 }

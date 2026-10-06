@@ -18,12 +18,22 @@ function asset(raw: unknown, props: Obj): AssetRef | null {
   return { href, transform: transform.slice(0, 6), shape: [shape[0]!, shape[1]!] }
 }
 
+const isRing = (r: unknown): r is LonLat[] =>
+  Array.isArray(r) &&
+  r.length >= 3 &&
+  r.every((p) => Array.isArray(p) && p.length >= 2 && Number.isFinite(p[0]) && Number.isFinite(p[1]))
+
+/** Outer rings only; malformed ones are dropped so one bad item cannot break point-in-ring selection. */
 function rings(geom: unknown): LonLat[][] | null {
-  if (!isObj(geom)) return null
-  if (geom.type === 'Polygon' && Array.isArray(geom.coordinates)) return [geom.coordinates[0] as LonLat[]]
-  if (geom.type === 'MultiPolygon' && Array.isArray(geom.coordinates))
-    return (geom.coordinates as LonLat[][][]).map((p) => p[0]!)
-  return null
+  if (!isObj(geom) || !Array.isArray(geom.coordinates)) return null
+  const outer =
+    geom.type === 'Polygon'
+      ? [geom.coordinates[0]]
+      : geom.type === 'MultiPolygon'
+        ? geom.coordinates.map((p) => (Array.isArray(p) ? p[0] : null))
+        : []
+  const ok = outer.filter(isRing)
+  return ok.length ? ok : null
 }
 
 export function parseItem(raw: unknown, collection: Collection): S2Item | null {
