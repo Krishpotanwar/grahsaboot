@@ -83,8 +83,10 @@ You need Node 22 or newer.
 
 ```bash
 npm ci
-npm run dev          # http://localhost:5173, with a local /api/tle that calls CelesTrak
+npm run dev          # http://localhost:5173
 ```
+
+`npm run dev` has no Worker, so satellite positions come from the bundled `public/tle-snapshot.json` and nothing calls CelesTrak. For the real `/api/tle` route, run `npm run build && npx wrangler dev`. `npm run preview` has no Worker either.
 
 No environment variables are needed. Every service URL has a public default in `src/config.ts`, and you can override any of them with a `VITE_*` variable such as `VITE_NOMINATIM_URL` or `VITE_TLE_URL`.
 
@@ -96,23 +98,28 @@ No environment variables are needed. Every service URL has a public default in `
 | `npm run check` | Type check, unit tests and build, all together |
 | `npm run e2e` | Playwright tests against fixture data. Pick browsers with `E2E_BROWSERS=chromium,firefox`. |
 | `npm run e2e:live` | Playwright tests against the real services |
+| `npm run deploy` | Runs `npm run check`, then `wrangler deploy` |
+| `npm run tle:snapshot` | Refreshes `public/tle-snapshot.json` from CelesTrak. At most once every 2 hours. |
 
 ## Deploy
 
 The app is hosted on **Cloudflare Workers**, on the free plan. It is not on Vercel. The Worker is named `grahsaboot`, and you can find it in the Cloudflare dashboard under Workers & Pages.
 
 ```bash
-npm run build          # always a fresh production build: npm run e2e leaves a test build in dist/
-npx wrangler deploy    # uploads dist/ and the worker in worker/
+npm run deploy         # runs npm run check (type check, unit tests, production build), then wrangler deploy
 ```
 
-Pushing to GitHub does not deploy anything; you deploy by running `wrangler`.
+`npm run e2e` leaves a test build in `dist/`. `npm run deploy` rebuilds it as part of the check, so the test build never ships.
 
-Refresh the bundled orbit snapshot now and then. Run it at most once every 2 hours, as CelesTrak asks:
+Pushing to GitHub does not deploy anything; you deploy by running `npm run deploy`.
+
+Refresh the bundled orbit snapshot now and then:
 
 ```bash
-node -e "fetch('https://celestrak.org/NORAD/elements/gp.php?GROUP=resource&FORMAT=json',{headers:{'user-agent':'GrahSaboot/1.0'}}).then(r=>r.json()).then(a=>require('fs').writeFileSync('public/tle-snapshot.json',JSON.stringify(a.filter(o=>[40697,42063,60989,39084,49260].includes(o.NORAD_CAT_ID)))))"
+npm run tle:snapshot   # rewrites public/tle-snapshot.json with the five satellites
 ```
+
+Run it at most once every 2 hours: CelesTrak answers a repeat with 403, which is why it is not part of `npm run deploy`.
 
 ## Project layout
 
