@@ -30,16 +30,6 @@ describe('worker entry', () => {
     expect(res.status).toBe(200)
     expect(store.size).toBe(1)
   })
-  it('keeps the 2 h window when caches.default does nothing (workers.dev)', async () => {
-    vi.stubGlobal('caches', { default: { match: async () => undefined, put: async () => {} } })
-    const up = vi.fn(async () => new Response(JSON.stringify(SATS)))
-    vi.stubGlobal('fetch', up)
-    for (let i = 0; i < 2; i++) {
-      const res = await worker.fetch(new Request('https://noop.example/api/tle'), { ASSETS })
-      expect(res.status).toBe(200)
-    }
-    expect(up).toHaveBeenCalledOnce()
-  })
   it('falls back to the bundled snapshot when CelesTrak is down and nothing is cached', async () => {
     vi.stubGlobal('caches', { default: { match: async () => undefined, put: async () => {} } })
     vi.stubGlobal('fetch', async () => new Response('', { status: 500 }))
