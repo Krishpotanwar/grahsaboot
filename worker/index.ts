@@ -23,7 +23,7 @@ export default {
       })
       if (res.status !== 503) return res
       // ponytail: CelesTrak can be slow or down; with nothing cached, serve the snapshot shipped with the build
-      // (public/tle-snapshot.json, orbits drift a few km a day). Refresh it on each deploy.
+      // (public/tle-snapshot.json, orbits drift a few km a day). Refresh it with `npm run tle:snapshot`.
       const snap = await env.ASSETS.fetch(new Request(new URL('/tle-snapshot.json', req.url)))
       return snap.ok
         ? new Response(snap.body, {
