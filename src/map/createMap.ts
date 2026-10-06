@@ -32,7 +32,7 @@ export function createMap(
     container,
     style: styleUrl(opts.getTheme()),
     ...(opts.camera ?? start),
-    maxPitch: 70,
+    maxPitch: opts.tier <= 1 ? 0 : 70, // T1 is a flat map (spec §7.6); a fly-to asks for 50-55 and is clamped
     attributionControl: false,
     pixelRatio: opts.tier <= 1 ? 1 : undefined,
     canvasContextAttributes: { antialias: opts.tier >= 3, failIfMajorPerformanceCaveat: false },

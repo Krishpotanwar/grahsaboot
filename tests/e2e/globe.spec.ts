@@ -151,6 +151,19 @@ test('the first Tab stop is the skip link, not the map', async ({ page }) => {
   await expect(page.getByRole('link', { name: copy.common.skip })).toBeFocused()
 })
 
+// Spec §7.6: tier 1 is a flat map, so the fly-to's 50-55 degree tilt must not apply to it.
+test('tier 1 stays flat when it flies to a place', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.goto('/?tier=1')
+  test.skip(!(await hasWebgl2(page)), 'no WebGL2 in this engine')
+  await styleReady(page)
+  await expect(page.locator('canvas.maplibregl-canvas')).toBeVisible() // maxPitch 0 must not make createMap throw (that drops to tier 0)
+  await page.getByLabel(copy.search.label).fill('21.1458, 79.0882')
+  await page.getByRole('button', { name: copy.search.submit }).click()
+  await page.waitForFunction(() => (window as any).__gs.map.getZoom() > 12)
+  expect(await page.evaluate(() => (window as any).__gs.map.getPitch())).toBe(0)
+})
+
 // WCAG 2.4.7: the canvas fills the map box and MapLibre clips overflow, so a ring drawn outside it never shows. It must be drawn inside.
 test('the keyboard focus ring on the map is visible', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' })
