@@ -1,0 +1,45 @@
+import { readFileSync } from 'node:fs'
+import { describe, expect, it } from 'vitest'
+import { copy, issueMessage } from './copy.ts'
+
+const SOURCE = readFileSync(new URL('./copy.ts', import.meta.url), 'utf8')
+const BANNED = [
+  /\bconstructed\b/i,
+  /\bcomplete(d)?\b/i,
+  /\bverified project\b/i,
+  /\bfraud\b/i,
+  /\babandon(ed)?\b/i,
+  /%\s*complete/i,
+  /\bconfidence\b/i,
+]
+
+describe('copy', () => {
+  it('never uses verdict words (spec §2.2)', () => {
+    for (const re of BANNED) expect(re.test(SOURCE), String(re)).toBe(false)
+  })
+  it('has a word and help line for every quality label', () => {
+    for (const l of ['CLEAR', 'PARTIAL', 'OBSCURED', 'NOT_COVERED'] as const) {
+      expect(copy.quality[l].word.length).toBeGreaterThan(2)
+      expect(copy.quality[l].help.length).toBeGreaterThan(10)
+    }
+  })
+  it('explains every AOI issue in plain words', () => {
+    expect(issueMessage({ code: 'too_large', value: 12.345, limit: 9 })).toBe(
+      'This outline covers 12.3 km². The limit is 9 km².',
+    )
+    expect(issueMessage({ code: 'bad_width' })).toContain('5 to 200 metres')
+    for (const code of [
+      'not_closed',
+      'too_few_points',
+      'too_many_vertices',
+      'self_intersects',
+      'too_small',
+      'too_wide',
+      'too_short',
+      'too_long',
+      'out_of_range',
+    ] as const) {
+      expect(issueMessage({ code, value: 1, limit: 2 }).length).toBeGreaterThan(10)
+    }
+  })
+})
