@@ -37,9 +37,15 @@ const FIELDS = [
 ]
 const BACKOFF = [500, 1500]
 const TIMEOUT_MS = 20_000
-/** A stalled network ends in a retry or the fallback (TimeoutError), never a hung spinner; a caller abort stays an abort. */
-export const withTimeout = (s?: AbortSignal) =>
-  s ? AbortSignal.any([s, AbortSignal.timeout(TIMEOUT_MS)]) : AbortSignal.timeout(TIMEOUT_MS)
+/**
+ * A stalled network ends in a retry or the fallback (TimeoutError), never a hung spinner; a caller abort stays an abort.
+ * Without AbortSignal.any (Safari < 17.4) the caller's signal goes through untimed, else the timeout alone.
+ */
+export function withTimeout(s?: AbortSignal): AbortSignal | undefined {
+  if (s && typeof AbortSignal.any !== 'function') return s
+  const t = typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(TIMEOUT_MS) : undefined
+  return s && t ? AbortSignal.any([s, t]) : (s ?? t)
+}
 const isAbort = (e: unknown, s?: AbortSignal) =>
   !!s?.aborted || (e as { name?: string })?.name === 'AbortError'
 const fatal = (e: unknown) => e instanceof StacError && e.status < 500 && e.status !== 429

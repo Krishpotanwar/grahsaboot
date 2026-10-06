@@ -20,11 +20,11 @@ export async function signPcHref(
 }
 
 /** Planetary Computer assets need a short-lived SAS token; Earth Search assets are public. Provenance keeps the unsigned href. */
-export async function resolveItemHrefs(item: S2Item): Promise<S2Item> {
+export async function resolveItemHrefs(item: S2Item, signal?: AbortSignal): Promise<S2Item> {
   if (item.collection !== 'pc:sentinel-2-l2a') return item
   return {
     ...item,
-    visual: { ...item.visual, href: await signPcHref(item.visual.href) },
-    scl: { ...item.scl, href: await signPcHref(item.scl.href) },
+    visual: { ...item.visual, href: await signPcHref(item.visual.href, undefined, signal) },
+    scl: { ...item.scl, href: await signPcHref(item.scl.href, undefined, signal) },
   }
 }

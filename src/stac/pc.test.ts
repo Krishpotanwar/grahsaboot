@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { S2Item } from './types.ts'
 
 // pc.ts keeps the SAS token in module state, so every test loads a fresh copy.
 const load = () => {
@@ -11,7 +12,28 @@ const sas = (expiry?: string) =>
     .mockImplementation(
       async () => new Response(JSON.stringify({ token: 'se=1&sig=abc', 'msft:expiry': expiry })),
     )
-afterEach(() => vi.useRealTimers())
+afterEach(() => {
+  vi.useRealTimers()
+  vi.unstubAllGlobals()
+})
+const asset = (href: string) => ({
+  href,
+  transform: [10, 0, 0, 0, -10, 0],
+  shape: [1, 1] as [number, number],
+})
+const mk = (collection: S2Item['collection']): S2Item => ({
+  id: 'i',
+  collection,
+  datetime: '2025-01-01T00:00:00Z',
+  date: '2025-01-01',
+  epsg: 32644,
+  cloudCover: null,
+  baseline: null,
+  nodataPct: null,
+  footprint: [],
+  visual: asset('https://x.test/v.tif'),
+  scl: asset('https://x.test/s.tif'),
+})
 
 describe('signPcHref', () => {
   it('fetches the SAS token once and joins it with ? or &', async () => {
@@ -45,5 +67,25 @@ describe('signPcHref', () => {
     expect(s.aborted).toBe(false)
     ac.abort()
     expect(s.aborted).toBe(true)
+  })
+})
+
+describe('resolveItemHrefs', () => {
+  it('signs Planetary Computer assets with one token and the caller signal; Earth Search items pass through', async () => {
+    const { resolveItemHrefs } = await load()
+    const f = sas()
+    vi.stubGlobal('fetch', f)
+    const ac = new AbortController()
+    const pc = mk('pc:sentinel-2-l2a')
+    const r = await resolveItemHrefs(pc, ac.signal)
+    expect(r.visual.href).toBe('https://x.test/v.tif?se=1&sig=abc')
+    expect(r.scl.href).toBe('https://x.test/s.tif?se=1&sig=abc')
+    expect(pc.visual.href).toBe('https://x.test/v.tif') // provenance keeps the unsigned href
+    expect(f).toHaveBeenCalledTimes(1)
+    const s = f.mock.calls[0]![1].signal as AbortSignal
+    ac.abort()
+    expect(s.aborted).toBe(true)
+    const es = mk('sentinel-2-l2a')
+    expect(await resolveItemHrefs(es)).toBe(es)
   })
 })

@@ -57,6 +57,17 @@ const stall = (init: RequestInit) =>
     else s.addEventListener('abort', () => reject(s.reason), { once: true })
   })
 
+// Run fn as on an older browser: the named static AbortSignal methods do not exist.
+async function without(names: ('any' | 'timeout')[], fn: () => Promise<void>) {
+  const saved = names.map((n) => [n, Object.getOwnPropertyDescriptor(AbortSignal, n)!] as const)
+  for (const n of names) Reflect.deleteProperty(AbortSignal, n)
+  try {
+    await fn()
+  } finally {
+    for (const [n, d] of saved) Object.defineProperty(AbortSignal, n, d)
+  }
+}
+
 describe('searchSentinel2', () => {
   it('follows POST next links with their body', async () => {
     const fetchImpl = vi
@@ -204,5 +215,26 @@ describe('searchSentinel2', () => {
     const r = await searchSentinel2({ ...args, fetchImpl, maxPages: 50 })
     expect(fetchImpl).toHaveBeenCalledTimes(10)
     expect(r.limited).toBe(true)
+  })
+  it('still searches without AbortSignal.any (Safari < 17.4): caller signal alone, else the timeout alone', async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockImplementation(async () => json({ features: [item('A', '2025-01-01')], links: [] }))
+    const sent = () => fetchImpl.mock.calls.at(-1)![1].signal
+    const ac = new AbortController()
+    await without(['any'], async () => {
+      expect((await searchSentinel2({ ...args, fetchImpl, signal: ac.signal })).items).toHaveLength(1)
+      expect(sent()).toBe(ac.signal)
+      expect((await searchSentinel2({ ...args, fetchImpl })).items).toHaveLength(1)
+      expect(sent()).toBeInstanceOf(AbortSignal)
+    })
+    await without(['any', 'timeout'], async () => {
+      expect((await searchSentinel2({ ...args, fetchImpl, signal: ac.signal })).items).toHaveLength(1)
+      expect(sent()).toBe(ac.signal)
+      expect((await searchSentinel2({ ...args, fetchImpl })).items).toHaveLength(1)
+      expect(sent()).toBeUndefined()
+    })
+    expect(typeof AbortSignal.any).toBe('function') // restored
+    expect(typeof AbortSignal.timeout).toBe('function')
   })
 })
