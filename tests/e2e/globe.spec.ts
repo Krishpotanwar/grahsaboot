@@ -83,3 +83,16 @@ test('switch to full rebuilds the map at tier 3 and stays there', async ({ page 
   await page.waitForFunction(() => !!(window as any).__gs.map.getStyle()?.sources['gs-terrain'])
   await expect(page.getByText(copy.map.staticNotice)).toHaveCount(0)
 })
+
+// Pins a real failure: a fixed zoom-3 stop meant the globe never turned on large screens, where the start zoom already exceeds 3.
+test('the globe auto-rotates on a large screen', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'a 2200 px wide emulated phone (DPR 2.6) would need a ~12 MP canvas')
+  await page.setViewportSize({ width: 2200, height: 1300 })
+  await page.goto('/?tier=2')
+  test.skip(!(await hasWebgl2(page)), 'no WebGL2 in this engine')
+  await styleReady(page)
+  expect(await page.evaluate(() => (window as any).__gs.map.getZoom())).toBeGreaterThan(3)
+  const lng = () => page.evaluate(() => (window as any).__gs.map.getCenter().lng as number)
+  const start = await lng()
+  await expect.poll(lng, { timeout: 15_000 }).not.toBe(start)
+})

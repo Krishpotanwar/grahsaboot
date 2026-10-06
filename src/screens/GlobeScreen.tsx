@@ -1,15 +1,23 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from '../lib/router.tsx'
+import { flyToPlace, placeToQuery } from '../map/camera.ts'
 import { useMapLayout, useMapStage } from '../map/MapStage.tsx'
+import type { Place } from '../search/nominatim.ts'
 import { copy } from '../ui/copy.ts'
 import { Button } from '../ui/kit.tsx'
+import { SearchBox } from '../ui/SearchBox.tsx'
+
+const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches
 
 export default function GlobeScreen() {
   useMapLayout('globe')
   const { map, tier, setTierOverride } = useMapStage()
+  const [place, setPlace] = useState<Place | null>(null)
 
+  // Slow auto-rotation on the landing globe: stops on interaction, once any camera move is under way (setCenter would cancel a fly-to), after 30 s, once zoomed 1.4 levels past its start, or under reduced motion.
   useEffect(() => {
-    if (!map || tier < 2 || matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    if (!map || tier < 2 || reducedMotion()) return
+    const z0 = map.getZoom()
     let raf = 0
     let stopped = false
     let last = performance.now()
@@ -20,7 +28,7 @@ export default function GlobeScreen() {
     }
     const tick = (now: number) => {
       if (stopped) return
-      if (now - started > 30_000 || map.getZoom() > 3) return stop()
+      if (now - started > 30_000 || map.getZoom() > z0 + 1.4 || map.isMoving()) return stop()
       const c = map.getCenter()
       map.setCenter([c.lng + ((now - last) / 1000) * 2, c.lat])
       last = now
@@ -38,18 +46,26 @@ export default function GlobeScreen() {
     }
   }, [map, tier])
 
+  const select = (p: Place) => {
+    setPlace(p)
+    if (map) flyToPlace(map, p, reducedMotion())
+  }
+
   return (
     <div className="grid min-h-[calc(100dvh-64px)] lg:grid-cols-[38%_1fr]">
-      <section className="pointer-events-auto relative z-10 mt-[calc(55dvh-64px)] flex flex-col justify-end gap-6 bg-bg p-6 pb-10 lg:mt-0 lg:justify-center lg:p-12">
+      <section
+        className={`pointer-events-auto relative z-10 flex flex-col gap-6 bg-bg p-6 pb-10 lg:mt-0 lg:justify-center lg:p-12 ${tier > 0 ? 'mt-[calc(55dvh-64px)] justify-end' : ''}`}
+      >
         <h1 className="max-w-[18ch] text-[clamp(2.25rem,5vw,3.75rem)] font-bold leading-none tracking-[-0.04em]">
           {copy.app.promise}
         </h1>
+        <SearchBox onSelect={select} />
         <div className="flex flex-wrap gap-3">
           <Link
-            to="/new"
+            to={place ? placeToQuery(place) : '/new'}
             className="inline-flex h-11 items-center rounded-[6px] bg-fg px-4 font-medium text-bg"
           >
-            {copy.nav.newInvestigation}
+            {place ? copy.nav.startHere : copy.nav.newInvestigation}
           </Link>
           <Link
             to="/new?example=nagpur"
