@@ -1,0 +1,85 @@
+import { expect, test, type Page } from '@playwright/test'
+import { copy } from '../../src/ui/copy.ts'
+
+const hasWebgl2 = (page: Page) => page.evaluate(() => !!document.createElement('canvas').getContext('webgl2'))
+const styleReady = (page: Page) => page.waitForFunction(() => (window as any).__gs?.map?.isStyleLoaded())
+
+test('globe renders at tier 2 with attribution', async ({ page }) => {
+  await page.goto('/?tier=2')
+  test.skip(!(await hasWebgl2(page)), 'no WebGL2 in this engine')
+  await expect(page.locator('canvas.maplibregl-canvas')).toBeVisible()
+  await styleReady(page)
+  expect(await page.evaluate(() => (window as any).__gs.map.getProjection().type)).toBe('globe')
+  await expect(page.locator('.maplibregl-ctrl-attrib')).toContainText('OpenStreetMap')
+})
+
+// Pins two real failures: MapLibre's CSS collapsing the fixed stage to 0 px, and page layers swallowing map input.
+test('the globe fills its area, receives pointer input and zooms with the wheel', async ({ page }) => {
+  await page.goto('/?tier=2')
+  test.skip(!(await hasWebgl2(page)), 'no WebGL2 in this engine')
+  await styleReady(page)
+  const box = (await page.locator('.map-stage canvas').boundingBox())!
+  expect(box.height).toBeGreaterThan(300)
+  const cx = box.x + box.width / 2
+  const cy = box.y + box.height / 2
+  expect(await page.evaluate(([x, y]) => document.elementFromPoint(x!, y!)?.tagName, [cx, cy])).toBe('CANVAS')
+  const z0 = await page.evaluate(() => (window as any).__gs.map.getZoom())
+  await page.mouse.move(cx, cy)
+  await page.mouse.wheel(0, -600)
+  await expect.poll(() => page.evaluate(() => (window as any).__gs.map.getZoom())).toBeGreaterThan(z0 + 0.2)
+})
+
+test('tier 0 shows a plain notice and no map, but the main actions still work', async ({ page }) => {
+  await page.goto('/?tier=0')
+  await expect(page.getByText(copy.map.staticNotice)).toBeVisible()
+  await expect(page.locator('canvas.maplibregl-canvas')).toHaveCount(0)
+  await expect(page.getByRole('link', { name: copy.nav.newInvestigation }).first()).toBeVisible()
+})
+
+test('reduced motion disables auto-rotation', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.goto('/?tier=2')
+  test.skip(!(await hasWebgl2(page)), 'no WebGL2 in this engine')
+  await styleReady(page)
+  const a = await page.evaluate(() => (window as any).__gs.map.getCenter().lng)
+  await page.waitForTimeout(1500)
+  const b = await page.evaluate(() => (window as any).__gs.map.getCenter().lng)
+  expect(Math.abs(b - a)).toBeLessThan(0.01)
+})
+
+test('theme toggle swaps the map style', async ({ page }) => {
+  await page.goto('/?tier=2')
+  test.skip(!(await hasWebgl2(page)), 'no WebGL2 in this engine')
+  await styleReady(page)
+  await page.getByRole('button', { name: copy.nav.themeToggle }).click()
+  await page.waitForFunction(
+    () =>
+      (window as any).__gs.map.getStyle().layers.find((l: any) => l.id === 'bg')?.paint?.[
+        'background-color'
+      ] === '#FFFFFF',
+  )
+  await page.waitForFunction(() => !!(window as any).__gs.map.getLayer('gs-gibs'))
+})
+
+// Ruled start zoom: the globe fills ~88% of the stage's short side. The map is created before the first layout is set, so this also pins the hidden stage sharing the globe's box (phones).
+test('the globe starts sized to the stage', async ({ page }) => {
+  await page.goto('/?tier=2')
+  test.skip(!(await hasWebgl2(page)), 'no WebGL2 in this engine')
+  await styleReady(page)
+  const { zoom, w, h } = await page.evaluate(() => {
+    const m = (window as any).__gs.map
+    const c = m.getContainer()
+    return { zoom: m.getZoom(), w: c.clientWidth, h: c.clientHeight }
+  })
+  expect(zoom).toBeCloseTo(Math.log2((0.44 * Math.min(w, h) * 2 * Math.PI) / 512) + 0.36, 2)
+})
+
+// Pins a real failure: map.remove() fires webglcontextlost, which used to downgrade the tier again and cascade to tier 0.
+test('switch to full rebuilds the map at tier 3 and stays there', async ({ page }) => {
+  await page.goto('/?tier=2')
+  test.skip(!(await hasWebgl2(page)), 'no WebGL2 in this engine')
+  await styleReady(page)
+  await page.getByRole('button', { name: copy.map.switchFull }).click()
+  await page.waitForFunction(() => !!(window as any).__gs.map.getStyle()?.sources['gs-terrain'])
+  await expect(page.getByText(copy.map.staticNotice)).toHaveCount(0)
+})

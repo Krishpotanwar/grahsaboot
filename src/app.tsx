@@ -1,6 +1,7 @@
 import { lazy, Suspense, type ReactNode } from 'react'
 import { config } from './config.ts'
 import { useRoute, type Route } from './lib/router.tsx'
+import { MapStageProvider } from './map/MapStage.tsx'
 import { copy } from './ui/copy.ts'
 import { Skeleton } from './ui/kit.tsx'
 import { Shell } from './ui/Shell.tsx'
@@ -30,9 +31,11 @@ export function App() {
   const route = useRoute()
   return (
     <ToastProvider>
-      <Shell route={route}>
-        <Suspense fallback={<Skeleton className="m-6 h-40" />}>{screenFor(route)}</Suspense>
-      </Shell>
+      <MapStageProvider>
+        <Shell route={route}>
+          <Suspense fallback={<Skeleton className="m-6 h-40" />}>{screenFor(route)}</Suspense>
+        </Shell>
+      </MapStageProvider>
     </ToastProvider>
   )
 }

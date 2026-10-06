@@ -132,3 +132,56 @@
     display: none !important;
   }
 }
+
+.map-stage {
+  position: fixed;
+  z-index: 0;
+  inset: 64px 0 0 0;
+  background: var(--gs-bg);
+}
+.map-stage[data-layout='hidden'] {
+  visibility: hidden;
+  pointer-events: none;
+}
+/* hidden shares the globe's box: the map is often created before the first layout is set, and its start zoom is sized from that box. */
+.map-stage[data-layout='globe'],
+.map-stage[data-layout='hidden'] {
+  bottom: 45dvh;
+}
+/* Screen-space shade from the approved mockup. Dark theme only; pointer-events: none keeps the map interactive. */
+.map-stage[data-layout='globe']::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at 40% 36%, transparent 28%, rgb(9 9 11 / 0.38) 66%);
+}
+[data-theme='light'] .map-stage[data-layout='globe']::after {
+  background: none;
+}
+.map-stage[data-layout='side'] {
+  bottom: 50dvh;
+}
+.map-stage[data-layout='mini'] {
+  inset: auto 16px 16px auto;
+  width: min(360px, calc(100vw - 32px));
+  height: 240px;
+  border: 1px solid var(--gs-line);
+  border-radius: 12px;
+  overflow: hidden;
+  z-index: 25;
+}
+@media (min-width: 1024px) {
+  .map-stage[data-layout='globe'],
+  .map-stage[data-layout='hidden'] {
+    inset: 64px 0 0 38%;
+  }
+  .map-stage[data-layout='side'] {
+    inset: 64px 0 0 45%;
+  }
+}
+@media print {
+  .map-stage {
+    display: none;
+  }
+}
