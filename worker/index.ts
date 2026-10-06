@@ -4,10 +4,18 @@ interface Env {
   ASSETS: { fetch(req: Request): Promise<Response> }
 }
 
+const error = (status: number, code: string, headers: Record<string, string> = {}) =>
+  new Response(JSON.stringify({ error: code }), {
+    status,
+    headers: { 'content-type': 'application/json', ...headers },
+  })
+
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url)
     if (url.pathname === '/api/tle') {
+      if (req.method !== 'GET' && req.method !== 'HEAD')
+        return error(405, 'METHOD_NOT_ALLOWED', { allow: 'GET, HEAD' })
       // workerd throws "Illegal invocation" if fetch is called as deps.fetch(), so hand over a wrapper.
       const res = await handleTle(req, {
         fetch: (input, init) => fetch(input, init),
@@ -28,6 +36,7 @@ export default {
           })
         : res
     }
+    if (url.pathname.startsWith('/api/')) return error(404, 'NOT_FOUND')
     return env.ASSETS.fetch(req)
   },
 }

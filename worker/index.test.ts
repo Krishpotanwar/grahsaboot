@@ -39,6 +39,31 @@ describe('worker entry', () => {
     expect(res.headers.get('x-gs-stale')).toBe('1')
     expect(await res.json()).toEqual(SATS)
   })
+  it('answers unknown /api paths with a JSON 404, not the app shell', async () => {
+    for (const path of ['/api/anything', '/api/', '/api/tle/x']) {
+      const res = await worker.fetch(new Request(`https://app.example${path}`), { ASSETS })
+      expect(res.status, path).toBe(404)
+      expect(res.headers.get('content-type')).toContain('application/json')
+      expect(await res.json()).toEqual({ error: 'NOT_FOUND' })
+    }
+    expect(ASSETS.fetch).not.toHaveBeenCalled()
+  })
+  it('allows only GET and HEAD on /api/tle', async () => {
+    vi.stubGlobal('caches', { default: { match: async () => undefined, put: async () => {} } })
+    const up = vi.fn(async () => new Response(JSON.stringify(SATS)))
+    vi.stubGlobal('fetch', up)
+    for (const method of ['POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']) {
+      const res = await worker.fetch(new Request('https://app.example/api/tle', { method }), { ASSETS })
+      expect(res.status, method).toBe(405)
+      expect(res.headers.get('allow')).toBe('GET, HEAD')
+      expect(await res.json()).toEqual({ error: 'METHOD_NOT_ALLOWED' })
+    }
+    expect(up).not.toHaveBeenCalled()
+    for (const method of ['GET', 'HEAD']) {
+      const res = await worker.fetch(new Request('https://app.example/api/tle', { method }), { ASSETS })
+      expect(res.status, method).toBe(200)
+    }
+  })
   it('hands every other path to the assets binding', async () => {
     const res = await worker.fetch(new Request('https://app.example/new'), { ASSETS })
     expect(await res.text()).toBe('<!doctype html>')
