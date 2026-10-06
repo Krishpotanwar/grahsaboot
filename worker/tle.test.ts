@@ -27,6 +27,7 @@ describe('handleTle', () => {
     // Privacy contract: the one upstream call carries this User-Agent and nothing else.
     expect(fetchImpl).toHaveBeenCalledExactlyOnceWith(UPSTREAM, {
       headers: { 'user-agent': 'GrahSaboot/1.0' },
+      signal: expect.any(AbortSignal),
     })
   })
   it('still returns fresh data when the cache write fails', async () => {
