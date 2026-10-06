@@ -10,7 +10,15 @@ const VARIANTS: Record<Variant, string> = {
   danger: 'border border-bad text-bad hover:bg-panel',
 }
 
-type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; size?: 'md' | 'sm' }
+// sm stays 32 px tall; its ::after grows the hit area to 46-48 px (-inset-1.5 gives 42 px next to a 1 px border). icon exists so IconButton never gets px-4 (Tailwind emits px-4 after px-0).
+type Size = 'md' | 'sm' | 'icon'
+const SIZES: Record<Size, string> = {
+  md: 'h-11 px-4 text-[0.9375rem]',
+  sm: 'relative h-8 px-3 text-sm after:absolute after:-inset-2',
+  icon: 'h-11 w-11',
+}
+
+type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; size?: Size }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
   { variant = 'secondary', size = 'md', className = '', type = 'button', ...rest },
@@ -20,7 +28,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
     <button
       ref={ref}
       type={type}
-      className={`inline-flex select-none items-center justify-center gap-2 rounded-[6px] font-medium transition-transform duration-100 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40 ${size === 'md' ? 'h-11 px-4 text-[0.9375rem]' : 'h-8 px-3 text-sm'} ${VARIANTS[variant]} ${className}`}
+      className={`inline-flex select-none items-center justify-center gap-2 rounded-[6px] font-medium transition-transform duration-100 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40 ${SIZES[size]} ${VARIANTS[variant]} ${className}`}
       {...rest}
     />
   )
@@ -28,13 +36,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
 
 export function IconButton({ label, className = '', ...rest }: ButtonProps & { label: string }) {
   return (
-    <Button
-      variant="ghost"
-      aria-label={label}
-      title={label}
-      className={`w-11 px-0! ${className}`}
-      {...rest}
-    />
+    <Button variant="ghost" size="icon" aria-label={label} title={label} className={className} {...rest} />
   )
 }
 

@@ -82,28 +82,31 @@
   }
 }
 
-.num {
-  font-variant-numeric: tabular-nums;
-}
-.glass {
-  background: var(--gs-glass);
-  border: 1px solid rgb(255 255 255 / 0.1);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06);
-  border-radius: 12px;
-}
-[data-theme='light'] .glass {
-  border-color: rgb(0 0 0 / 0.08);
-}
-.glass[data-blur='on'] {
-  backdrop-filter: blur(12px);
-}
-
-@media (prefers-reduced-transparency: reduce) {
+/* Component classes live in the components layer so Tailwind utilities (rounded-*, border-*) can override them. */
+@layer components {
+  .num {
+    font-variant-numeric: tabular-nums;
+  }
   .glass {
-    background: var(--gs-panel);
-    backdrop-filter: none !important;
+    background: var(--gs-glass);
+    border: 1px solid rgb(255 255 255 / 0.1);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06);
+    border-radius: 12px;
+  }
+  [data-theme='light'] .glass {
+    border-color: rgb(0 0 0 / 0.08);
+  }
+  .glass[data-blur='on'] {
+    backdrop-filter: blur(12px);
+  }
+  @media (prefers-reduced-transparency: reduce) {
+    .glass {
+      background: var(--gs-panel);
+      backdrop-filter: none !important;
+    }
   }
 }
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

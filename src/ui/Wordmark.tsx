@@ -7,7 +7,7 @@ export function Wordmark() {
   const cut = useId()
   return (
     <span role="img" aria-label={copy.app.name} className="flex items-center gap-3 text-fg">
-      <svg width="28" height="28" viewBox="0 0 48 48" fill="none" aria-hidden>
+      <svg width="30" height="30" viewBox="0 0 48 48" fill="none" aria-hidden>
         <defs>
           <mask id={cut} maskUnits="userSpaceOnUse" x="0" y="0" width="48" height="48">
             <rect width="48" height="48" fill="#fff" />
