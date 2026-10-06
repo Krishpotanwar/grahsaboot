@@ -27,7 +27,7 @@ export default function GlobeScreen() {
   const [place, setPlace] = useState<Place | null>(null)
   const [hot, setHot] = useState<number | null>(null)
   // Positions run at every tier (T0 and T1 show the text list); only the map layers need T2+.
-  const { sats, status, tracks, swaths, passes } = useSatellites(true)
+  const { sats, status, stale, tracks, swaths, passes } = useSatellites(true)
   const markers = useRef(new Map<number, Marker>())
   const latest = useRef({ tracks, swaths, hot })
   latest.current = { tracks, swaths, hot }
@@ -106,7 +106,16 @@ export default function GlobeScreen() {
     setPlace(p)
     if (map) flyToPlace(map, p, reducedMotion())
   }
-  const panel = <SatellitesPanel sats={sats} status={status} place={place} passes={passes} onHot={setHot} />
+  const panel = (
+    <SatellitesPanel
+      sats={sats}
+      status={status}
+      staleEpoch={stale}
+      place={place}
+      passes={passes}
+      onHot={setHot}
+    />
+  )
 
   return (
     <div className="grid min-h-[calc(100dvh-64px)] lg:grid-cols-[38%_1fr]">

@@ -15,6 +15,18 @@ const RAD = Math.PI / 180
 
 export const toSatrec = (o: Omm): SatRec => json2satrec(o)
 
+/** Past this age the orbit data no longer earns a LIVE badge: positions drift and passes shift. */
+const STALE_MS = 3 * 86_400_000
+
+/** The newest EPOCH (ms) when even that is more than 3 days older than `now`, else null. CelesTrak's EPOCH is UTC without a zone suffix, as satellite.js assumes. */
+export function staleEpoch(omm: Array<{ EPOCH?: string }>, now: number): number | null {
+  const epochs = omm
+    .map((o) => Date.parse(o.EPOCH?.endsWith('Z') ? o.EPOCH : `${o.EPOCH}Z`))
+    .filter(Number.isFinite)
+  const newest = Math.max(...epochs)
+  return epochs.length > 0 && newest < now - STALE_MS ? newest : null
+}
+
 export function subPoint(rec: SatRec, t: Date): { lon: number; lat: number; heightKm: number } | null {
   const pv = propagate(rec, t)
   if (!pv) return null

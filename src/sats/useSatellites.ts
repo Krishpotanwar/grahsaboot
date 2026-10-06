@@ -2,6 +2,7 @@ import type { FeatureCollection } from 'geojson'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { config } from '../config.ts'
 import type { LonLat } from '../evidence/types.ts'
+import { staleEpoch } from './orbit.ts'
 
 export interface SatPosition {
   norad: number
@@ -20,6 +21,8 @@ export function useSatellites(enabled: boolean) {
   const [sats, setSats] = useState<SatPosition[]>([])
   const [tracks, setTracks] = useState<FeatureCollection | null>(null)
   const [swaths, setSwaths] = useState<FeatureCollection | null>(null)
+  // Set when the newest orbit is old (the Worker may be serving its bundled snapshot): the panel then says so instead of LIVE.
+  const [stale, setStale] = useState<number | null>(null)
   const worker = useRef<Worker | null>(null)
   const waiting = useRef(new Map<number, (p: PassSummary[]) => void>())
 
@@ -47,6 +50,7 @@ export function useSatellites(enabled: boolean) {
       .then((omm: unknown) => {
         if (cancelled || !Array.isArray(omm) || omm.length === 0) throw new Error('TLE_EMPTY')
         w.postMessage({ op: 'init', omm })
+        setStale(staleEpoch(omm, Date.now()))
         setStatus('ready')
         let n = 0
         const tick = () => {
@@ -78,5 +82,5 @@ export function useSatellites(enabled: boolean) {
     [],
   )
 
-  return { status, sats, tracks, swaths, passes }
+  return { status, stale, sats, tracks, swaths, passes }
 }

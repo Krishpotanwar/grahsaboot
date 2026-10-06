@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { groundTrack, nextPasses, subPoint, swathRing, toSatrec, type Omm } from './orbit.ts'
+import { groundTrack, nextPasses, staleEpoch, subPoint, swathRing, toSatrec, type Omm } from './orbit.ts'
 import { SATELLITES } from './catalog.ts'
 
 const OMM = JSON.parse(
@@ -45,5 +45,28 @@ describe('orbit maths (vectors computed in planning, 2026-10-05)', () => {
   })
   it('knows every catalogued satellite', () => {
     expect(SATELLITES.map((s) => s.norad).sort()).toEqual(OMM.map((o) => Number(o.NORAD_CAT_ID)).sort())
+  })
+})
+
+describe('staleEpoch (when LIVE gives way to "Orbits from ...")', () => {
+  const DAY = 86_400_000
+  const newest = Date.parse('2026-10-04T22:26:18.504960Z')
+  it('reads CelesTrak epochs as UTC and takes the newest', () => {
+    const got = staleEpoch(OMM, newest + 4 * DAY)
+    expect(got).toBe(newest)
+  })
+  it('stays null up to exactly 3 days, then reports the epoch', () => {
+    expect(staleEpoch(OMM, newest + 3 * DAY)).toBeNull()
+    expect(staleEpoch(OMM, newest + 3 * DAY + 1)).toBe(newest)
+  })
+  it('lets one fresh satellite keep the badge live', () => {
+    const mixed = [{ EPOCH: '2026-09-01T00:00:00.000000' }, { EPOCH: '2026-10-04T00:00:00.000000' }]
+    expect(staleEpoch(mixed, Date.parse('2026-10-06T00:00:00Z'))).toBeNull()
+    expect(staleEpoch(mixed, Date.parse('2026-10-08T00:00:00Z'))).toBe(Date.parse('2026-10-04T00:00:00Z'))
+  })
+  it('says nothing when no epoch can be read', () => {
+    const now = Date.parse('2030-01-01T00:00:00Z')
+    expect(staleEpoch([], now)).toBeNull()
+    expect(staleEpoch([{}, { EPOCH: 'garbage' }], now)).toBeNull()
   })
 })

@@ -22,11 +22,22 @@ test('shows an estimated next look after picking a place, with its satellite in 
   await page.getByLabel(copy.search.label).fill('21.1458, 79.0882')
   await page.getByRole('button', { name: copy.search.submit }).click()
   const panel = page.getByRole('region', { name: copy.sats.title })
+  await expect(panel.getByText(copy.sats.live, { exact: true })).toBeVisible() // the fixture orbits are 7 hours old here
   await expect(panel.getByText(/^Next look at/)).toBeVisible()
   await expect(panel.getByText(copy.sats.estimated)).toBeVisible()
   await expect(panel.getByText(/^Sentinel-2A · /)).toBeVisible()
   await expect(panel.getByRole('rowheader', { name: 'Sentinel-2A' })).toHaveCSS('color', ACCENT)
   await expect(panel.getByRole('rowheader', { name: 'Sentinel-2B' })).not.toHaveCSS('color', ACCENT)
+})
+
+// The panel must not claim LIVE for old orbit data (the Worker serves its bundled snapshot when CelesTrak is down).
+test('says when the orbits are old instead of LIVE', async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2026-10-20T00:00:00Z')) // 16 days after the fixture epochs
+  await page.goto('/?tier=0')
+  const panel = page.getByRole('region', { name: copy.sats.title })
+  await expect(panel.getByText(/^Orbits from \d{1,2} [A-Z][a-z]{2}$/)).toBeVisible()
+  await expect(panel.getByText(copy.sats.live, { exact: true })).toHaveCount(0)
+  await expect(panel.getByText('Sentinel-2A')).toBeVisible()
 })
 
 test('stays calm when CelesTrak data is unavailable', async ({ page }) => {

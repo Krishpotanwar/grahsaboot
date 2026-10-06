@@ -60,6 +60,7 @@ export const copy = {
   sats: {
     title: 'Live satellites',
     live: 'Live',
+    orbitsFrom: (date: string) => `Orbits from ${date}`,
     unavailable: 'Satellite positions are unavailable right now. Everything else works.',
     loading: 'Finding satellites',
     nextLook: (place: string) => `Next look at ${place}`,

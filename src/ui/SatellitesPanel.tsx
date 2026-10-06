@@ -14,15 +14,21 @@ const fmt = new Intl.DateTimeFormat('en-IN', {
   timeZoneName: 'short',
 })
 
+// Same locale as above: "6 Oct".
+const day = new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short' })
+
 export function SatellitesPanel({
   sats,
   status,
+  staleEpoch = null,
   place,
   passes,
   onHot,
 }: {
   sats: SatPosition[]
   status: 'loading' | 'ready' | 'unavailable'
+  /** Epoch (ms) of the newest orbit when it is too old to call live; shown as "Orbits from 6 Oct" instead of LIVE. */
+  staleEpoch?: number | null
   place: Place | null
   passes(target: [number, number]): Promise<PassSummary[]>
   /** Told which satellite looks at the place first (NORAD id), or null; the globe draws that track in accent. */
@@ -56,12 +62,17 @@ export function SatellitesPanel({
         <h2 id={id} className="text-[1.0625rem] font-semibold tracking-[-0.01em]">
           {copy.sats.title}
         </h2>
-        {status === 'ready' && (
-          <span className="inline-flex items-center gap-1.5 font-mono text-xs font-medium uppercase tracking-[0.12em] text-ok">
-            <span className="sat-dot" aria-hidden />
-            {copy.sats.live}
-          </span>
-        )}
+        {status === 'ready' &&
+          (staleEpoch === null ? (
+            <span className="inline-flex items-center gap-1.5 font-mono text-xs font-medium uppercase tracking-[0.12em] text-ok">
+              <span className="sat-dot" aria-hidden />
+              {copy.sats.live}
+            </span>
+          ) : (
+            <span className="font-mono text-xs font-medium uppercase tracking-[0.12em] text-fg-2">
+              {copy.sats.orbitsFrom(day.format(staleEpoch))}
+            </span>
+          ))}
       </div>
       {status === 'loading' && <p className="text-fg-2">{copy.sats.loading}</p>}
       {status === 'unavailable' && (
