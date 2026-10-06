@@ -37,7 +37,11 @@ describe('orbit maths (vectors computed in planning, 2026-10-05)', () => {
     expect(s2b[0]!.distanceKm).toBeLessThan(120)
     const s2c = nextPasses(rec(60989), NAGPUR, 145, from)
     expect(s2c[0]!.time.toISOString().slice(0, 13)).toBe('2026-10-14T05')
-    expect(nextPasses(rec(40697), NAGPUR, 145, from)).toEqual([])
+    // 60 s samples sit ~420 km apart along the track; these two passes are missed unless the closest approach is refined.
+    expect(nextPasses(rec(40697), NAGPUR, 145, from)[0]!.time.toISOString().slice(0, 16)).toBe('2026-10-06T05:23')
+    const l8 = nextPasses(rec(39084), NAGPUR, 92.5, from)[0]!
+    expect(l8.time.toISOString().slice(0, 16)).toBe('2026-10-10T05:08')
+    expect(l8.distanceKm).toBeLessThan(10)
   })
   it('knows every catalogued satellite', () => {
     expect(SATELLITES.map((s) => s.norad).sort()).toEqual(OMM.map((o) => Number(o.NORAD_CAT_ID)).sort())

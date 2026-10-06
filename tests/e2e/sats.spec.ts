@@ -3,7 +3,7 @@ import { copy } from '../../src/ui/copy.ts'
 
 test.use({ viewport: { width: 1440, height: 900 } })
 
-// Fixture orbits have epoch 2026-10-04. At this instant Sentinel-2B is the first to look at Nagpur (9 Oct 05:23 UTC) and the map
+// Fixture orbits have epoch 2026-10-04. At this instant Sentinel-2A is the first to look at Nagpur (6 Oct 05:23 UTC) and the map
 // holds three satellites on the near side of the globe (centred on India) and two on the far side.
 const NOW = new Date('2026-10-05T05:40:00Z')
 const ACCENT = 'rgb(228, 132, 68)'
@@ -24,9 +24,9 @@ test('shows an estimated next look after picking a place, with its satellite in 
   const panel = page.getByRole('region', { name: copy.sats.title })
   await expect(panel.getByText(/^Next look at/)).toBeVisible()
   await expect(panel.getByText(copy.sats.estimated)).toBeVisible()
-  await expect(panel.getByText(/^Sentinel-2B · /)).toBeVisible()
-  await expect(panel.getByRole('rowheader', { name: 'Sentinel-2B' })).toHaveCSS('color', ACCENT)
-  await expect(panel.getByRole('rowheader', { name: 'Sentinel-2A' })).not.toHaveCSS('color', ACCENT)
+  await expect(panel.getByText(/^Sentinel-2A · /)).toBeVisible()
+  await expect(panel.getByRole('rowheader', { name: 'Sentinel-2A' })).toHaveCSS('color', ACCENT)
+  await expect(panel.getByRole('rowheader', { name: 'Sentinel-2B' })).not.toHaveCSS('color', ACCENT)
 })
 
 test('stays calm when CelesTrak data is unavailable', async ({ page }) => {
@@ -101,5 +101,5 @@ test('marks satellites, hides the far side, draws the next-pass track in accent 
           .map((f: any) => f.properties.norad),
       ),
     )
-    .toEqual([42063])
+    .toEqual([40697])
 })

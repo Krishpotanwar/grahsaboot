@@ -95,21 +95,28 @@ export function nextPasses(
   stepS = 60,
 ): Array<{ time: Date; distanceKm: number }> {
   const out: Array<{ time: Date; distanceKm: number }> = []
-  let prev: { t: Date; lat: number; lon: number; d: number } | null = null
+  const at = (t: Date) => {
+    const p = subPoint(rec, t)
+    return p && { t, lat: p.lat, lon: p.lon, d: haversineKm(target, [p.lon, p.lat]) }
+  }
+  let prev: ReturnType<typeof at> = null
   let prevPrevD = Infinity
   for (let s = 0; s <= days * 86400; s += stepS) {
-    const t = new Date(from.getTime() + s * 1000)
-    const p = subPoint(rec, t)
-    if (!p) continue
-    const d = haversineKm(target, [p.lon, p.lat])
-    if (prev && prev.d < prevPrevD && prev.d <= d) {
-      const descending = p.lat < prev.lat
-      const solar = (((prev.t.getUTCHours() + prev.t.getUTCMinutes() / 60 + prev.lon / 15) % 24) + 24) % 24
-      if (descending && solar >= 8 && solar <= 14 && prev.d <= halfKm)
-        out.push({ time: prev.t, distanceKm: prev.d })
+    const cur = at(new Date(from.getTime() + s * 1000))
+    if (!cur) continue
+    // Samples sit ~stepS × 7 km apart along the track (wider than a swath), so the nearest one can be up to
+    // stepS × 4 km off the true closest approach: refine any candidate to 1 s before the swath test.
+    if (prev && prev.d < prevPrevD && prev.d <= cur.d && cur.lat < prev.lat && prev.d <= halfKm + stepS * 4) {
+      let best = prev
+      for (let k = -stepS; k <= stepS; k++) {
+        const q = at(new Date(prev.t.getTime() + k * 1000))
+        if (q && q.d < best.d) best = q
+      }
+      const solar = (((best.t.getUTCHours() + best.t.getUTCMinutes() / 60 + best.lon / 15) % 24) + 24) % 24
+      if (solar >= 8 && solar <= 14 && best.d <= halfKm) out.push({ time: best.t, distanceKm: best.d })
     }
     prevPrevD = prev?.d ?? Infinity
-    prev = { t, lat: p.lat, lon: p.lon, d }
+    prev = cur
   }
   return out
 }
