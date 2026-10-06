@@ -10,17 +10,28 @@ setWorkerUrl(workerUrl)
 
 export const styleUrl = (theme: Theme) => (theme === 'dark' ? config.styleDark : config.styleLight)
 
-export function createMap(container: HTMLElement, opts: { tier: Tier; getTheme: () => Theme }): MlMap {
+export interface Camera {
+  center: [number, number]
+  zoom: number
+  bearing: number
+  pitch: number
+}
+
+/** `camera` is where a previous map left off (a tier change or context loss rebuilds the map); without one, the start view. */
+export function createMap(
+  container: HTMLElement,
+  opts: { tier: Tier; getTheme: () => Theme; camera?: Camera | null },
+): MlMap {
   // Globe fills ~88% of the stage's short side (approved mockup 01-landing); 0.5 floor while the container has no size yet.
   const fit = Math.max(
     0.5,
     Math.log2((0.44 * Math.min(container.clientWidth, container.clientHeight) * 2 * Math.PI) / 512) + 0.36,
   )
+  const start = { center: [78.96, 21.5] as [number, number], zoom: opts.tier >= 2 ? fit : 3.6 }
   const map = new MlMap({
     container,
     style: styleUrl(opts.getTheme()),
-    center: [78.96, 21.5],
-    zoom: opts.tier >= 2 ? fit : 3.6,
+    ...(opts.camera ?? start),
     maxPitch: 70,
     attributionControl: false,
     pixelRatio: opts.tier <= 1 ? 1 : undefined,

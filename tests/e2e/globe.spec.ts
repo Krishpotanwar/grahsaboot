@@ -97,6 +97,30 @@ test('switch to full rebuilds the map at tier 3 and stays there', async ({ page 
   await expect(page.getByText(copy.map.staticNotice)).toHaveCount(0)
 })
 
+// A rebuilt map (tier change, WebGL context loss) must come back where the user was, not at the start view.
+test('switch to full keeps the camera where the user flew to', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.goto('/?tier=2')
+  test.skip(!(await hasWebgl2(page)), 'no WebGL2 in this engine')
+  await styleReady(page)
+  await page.getByLabel(copy.search.label).fill('21.1458, 79.0882')
+  await page.getByRole('button', { name: copy.search.submit }).click()
+  await page.waitForFunction(() => (window as any).__gs.map.getZoom() > 12)
+  const view = () =>
+    page.evaluate(() => {
+      const m = (window as any).__gs.map
+      const c = m.getCenter()
+      return { lng: c.lng as number, lat: c.lat as number, zoom: m.getZoom() as number }
+    })
+  const before = await view()
+  await page.getByRole('button', { name: copy.map.switchFull }).click()
+  await page.waitForFunction(() => !!(window as any).__gs.map.getStyle()?.sources['gs-terrain'])
+  const after = await view()
+  expect(Math.abs(after.lng - before.lng)).toBeLessThan(0.01)
+  expect(Math.abs(after.lat - before.lat)).toBeLessThan(0.01)
+  expect(after.zoom).toBeCloseTo(before.zoom, 1)
+})
+
 // Pins a real failure: a fixed zoom-3 stop meant the globe never turned on large screens, where the start zoom already exceeds 3.
 test('coming back to the globe from a place does not spin the zoomed-in map', async ({ page }) => {
   await page.goto('/?tier=2')

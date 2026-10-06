@@ -12,6 +12,7 @@ import {
 import { config } from '../config.ts'
 import { copy } from '../ui/copy.ts'
 import { currentTheme, useTheme } from '../ui/theme.ts'
+import type { Camera } from './createMap.ts'
 import { chooseTier, downgrade, probeFrameMs, readSignals, type Tier } from './tier.ts'
 
 export type Layout = 'globe' | 'side' | 'mini' | 'hidden'
@@ -44,6 +45,8 @@ function overrideTier(): Tier | null {
 export function MapStageProvider({ children }: { children: ReactNode }) {
   const container = useRef<HTMLDivElement>(null)
   const installers = useRef(new Map<string, Installer>())
+  // Where the last map stood, so a rebuilt map (tier change, context loss) resumes there instead of at the start view.
+  const camera = useRef<Camera | null>(null)
   const [tier, setTier] = useState<Tier>(() => overrideTier() ?? chooseTier(readSignals()))
   const [map, setMap] = useState<MlMap | null>(null)
   const [layout, setLayout] = useState<Layout>('hidden')
@@ -57,12 +60,24 @@ export function MapStageProvider({ children }: { children: ReactNode }) {
     import('./createMap.ts').then(({ createMap }) => {
       if (cancelled || !container.current) return
       try {
-        m = createMap(container.current, { tier, getTheme: () => appliedTheme.current })
+        m = createMap(container.current, {
+          tier,
+          getTheme: () => appliedTheme.current,
+          camera: camera.current,
+        })
       } catch {
         setTier(0)
         return
       }
       const map = m
+      map.on('moveend', () => {
+        camera.current = {
+          center: map.getCenter().toArray(),
+          zoom: map.getZoom(),
+          bearing: map.getBearing(),
+          pitch: map.getPitch(),
+        }
+      })
       map.on('style.load', () => {
         for (const i of installers.current.values()) i.install(map)
       })
