@@ -42,7 +42,8 @@ export function levelInfoFor(
   const size = cog.sizes[level]
   if (!size) throw new Error(`NO_LEVEL:${level}`)
   const expectW = asset.shape[1] / 2 ** level
-  if (Math.abs(size.width - expectW) > 1) throw new Error('COG_LAYOUT')
-  if (Math.abs(size.height - asset.shape[0] / 2 ** level) > 1) throw new Error('COG_LAYOUT')
+  // Written as !(x <= 1) so a NaN shape fails instead of comparing false.
+  if (!(Math.abs(size.width - expectW) <= 1)) throw new Error('COG_LAYOUT')
+  if (!(Math.abs(size.height - asset.shape[0] / 2 ** level) <= 1)) throw new Error('COG_LAYOUT')
   return levelFromTransform(asset.transform, asset.shape, level, size.width, size.height)
 }

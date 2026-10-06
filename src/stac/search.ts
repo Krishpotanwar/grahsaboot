@@ -1,5 +1,6 @@
 import { config } from '../config.ts'
 import { coarsenBbox, type Bbox } from '../geo/aoi.ts'
+import { LIMITS } from '../geo/limits.ts'
 import { parseItem } from './parse.ts'
 import type { Collection, S2Item, SearchResult } from './types.ts'
 
@@ -109,7 +110,8 @@ async function searchEndpoint(
     }
     const next = (json.links ?? []).find((l) => l.rel === 'next' && l.href)
     if (!next) return { items, limited: false, source: collection }
-    if (pages >= Math.min(a.maxPages ?? 10, 10)) return { items, limited: true, source: collection }
+    if (pages >= Math.min(a.maxPages ?? LIMITS.stacMaxPages, LIMITS.stacMaxPages))
+      return { items, limited: true, source: collection }
     req =
       next.method === 'POST'
         ? {

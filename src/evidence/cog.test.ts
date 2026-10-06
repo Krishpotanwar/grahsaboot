@@ -43,6 +43,11 @@ describe('cog', () => {
     const cog = await openCogBuffer(toArrayBuffer(makeTci(false)))
     expect(() => levelInfoFor({ transform: TCI_TRANSFORM, shape: [1000, 256] }, cog, 1)).toThrow('COG_LAYOUT')
   })
+  it('rejects a NaN shape: NaN must not slip past the size comparison', async () => {
+    const cog = await openCogBuffer(toArrayBuffer(makeTci(false)))
+    expect(() => levelInfoFor({ transform: TCI_TRANSFORM, shape: [256, NaN] }, cog, 0)).toThrow('COG_LAYOUT')
+    expect(() => levelInfoFor({ transform: TCI_TRANSFORM, shape: [NaN, 256] }, cog, 0)).toThrow('COG_LAYOUT')
+  })
   it('reads identical bytes over HTTP range requests', async () => {
     const local = await openCogBuffer(toArrayBuffer(makeTci(true)))
     const remote = await openCogUrl(`${srv.url}/cog/2025-12-20/TCI.tif`)

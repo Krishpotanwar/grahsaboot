@@ -63,32 +63,38 @@ export function createImageryClient(
     if (dead) return Promise.reject(dead)
     const id = nextId++
     return new Promise<T>((resolve, reject) => {
+      // Every way out drops the timer and the handler: a signal shared across calls must not keep one per request.
+      const settle = () => {
+        clearTimeout(timer)
+        signal?.removeEventListener('abort', onAbort)
+      }
       const stop = (e: Error) => {
         if (!pending.has(id)) return
         pending.delete(id)
-        clearTimeout(timer)
+        settle()
         worker.postMessage({ id: 0, op: 'cancel', target: id })
         reject(e)
       }
+      const onAbort = () => stop(abortError())
       const timer = setTimeout(() => stop(new DOMException('IMAGERY_TIMEOUT', 'TimeoutError')), TIMEOUT_MS)
       pending.set(id, {
         resolve: (v) => {
-          clearTimeout(timer)
+          settle()
           resolve(v as T)
         },
         reject: (e) => {
-          clearTimeout(timer)
+          settle()
           reject(e)
         },
       })
-      signal?.addEventListener('abort', () => stop(abortError()), { once: true })
+      signal?.addEventListener('abort', onAbort, { once: true })
       resolveItemHrefs(req.item, signal)
         .then((item) => {
           if (pending.has(id)) worker.postMessage({ id, op, req: { ...req, item } })
         })
         .catch((e) => {
           pending.delete(id)
-          clearTimeout(timer)
+          settle()
           reject(e)
         })
     })
@@ -97,8 +103,9 @@ export function createImageryClient(
     quality: (req, signal) => call<QualityResult>('quality', req, signal),
     frame: (req, signal) => call<FrameResult>('frame', req, signal),
     dispose: () => {
+      dead = abortError() // before terminate(): a terminated worker never answers, so later calls must fail at once
       worker.terminate()
-      for (const p of pending.values()) p.reject(abortError())
+      for (const p of pending.values()) p.reject(dead)
       pending.clear()
     },
   }

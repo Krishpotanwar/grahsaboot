@@ -92,7 +92,8 @@ async function readCached(
   samples: number[],
   signal?: AbortSignal,
 ) {
-  const key = `${href}|${level}|${win.join(',')}|${samples.join('')}`
+  // No query string: a rotating Planetary Computer SAS token must neither split the cache nor enter IndexedDB.
+  const key = `${href.split('?')[0]}|${level}|${win.join(',')}|${samples.join('')}`
   const hit = await deps.cache?.get(key)
   if (hit) return hit
   const bytes = await cog.read(level, win, samples, signal)
@@ -100,9 +101,10 @@ async function readCached(
   return bytes
 }
 
-const EMPTY_STATS: QualityStats = {
+/** Fresh per call: one shared object (or `counts`) edited by a caller would change every result. */
+const emptyStats = (): QualityStats => ({
   policy: 'scl-v2',
-  counts: new Array(12).fill(0),
+  counts: new Array<number>(12).fill(0),
   total: 0,
   clearFraction: 0,
   validFraction: 0,
@@ -110,7 +112,7 @@ const EMPTY_STATS: QualityStats = {
   obstructedFraction: 0,
   nodataFraction: 0,
   label: 'NOT_COVERED',
-}
+})
 
 export async function runQuality(
   deps: CoreDeps,
@@ -128,8 +130,10 @@ export async function runQuality(
       window: [0, 0, 0, 0],
       level: 0,
       sha256: await sha256Hex(new Uint8Array()),
-      stats: EMPTY_STATS,
-      parts: parts.map((p) => ({ idx: p.idx, fromM: p.fromM, toM: p.toM, stats: EMPTY_STATS })),
+      stats: emptyStats(),
+      parts: parts.map((p) => ({ idx: p.idx, fromM: p.fromM, toM: p.toM, stats: emptyStats() })),
+      // Nothing of the scene is in view: every display pixel is invalid, never "unchanged".
+      invalid: req.grid && new Uint8Array(req.grid.width * req.grid.height).fill(1),
     }
   }
   const bytes = await readCached(deps, cog, req.item.scl.href, 0, wins.clamped, [0], signal)

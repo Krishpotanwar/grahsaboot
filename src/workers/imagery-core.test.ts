@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { clearCogCache, runFrame, runQuality, type CoreDeps } from './imagery-core.ts'
-import { makeDisplayGrid, openCogBuffer, sha256Hex, type Cog } from '../evidence/index.ts'
+import { fromUtm, makeDisplayGrid, openCogBuffer, sha256Hex, type Cog } from '../evidence/index.ts'
 import { parseItem } from '../stac/parse.ts'
 import {
   FIXTURE_DATES,
@@ -58,12 +58,44 @@ describe('runQuality', () => {
     expect(q.sha256).toMatch(/^[0-9a-f]{64}$/)
     expect(q.invalid?.length).toBe(GRID.width * GRID.height)
   })
-  it('reports NOT_COVERED when the AOI is outside the scene', async () => {
+  it('reports NOT_COVERED when the AOI is outside the scene, with every display pixel invalid', async () => {
     const far = {
       kind: 'site' as const,
       rings: [NAGPUR_SQUARE.map(([x, y]) => [x + 1, y] as [number, number])],
     }
-    expect((await runQuality(deps(), { item: item('2025-01-10'), aoi: far })).stats.label).toBe('NOT_COVERED')
+    const q = await runQuality(deps(), { item: item('2025-01-10'), aoi: far, grid: GRID })
+    expect(q.stats.label).toBe('NOT_COVERED')
+    expect(q.invalid).toHaveLength(GRID.width * GRID.height)
+    expect(q.invalid!.every((v) => v === 1)).toBe(true)
+    // Fresh objects per result: a caller that edits one must not change another.
+    expect(q.stats).not.toBe(q.parts[0]!.stats)
+    expect(q.stats.counts).not.toBe(q.parts[0]!.stats.counts)
+  })
+  // The fixture scene's west edge is x = 300000 m (UTM 44N); the strips straddle it at y 2339500-2340500 (all class 5).
+  const strip = (x0: number, x1: number) => ({
+    kind: 'site' as const,
+    rings: [
+      (
+        [
+          [x0, 2339500],
+          [x1, 2339500],
+          [x1, 2340500],
+          [x0, 2340500],
+          [x0, 2339500],
+        ] as [number, number][]
+      ).map((p) => fromUtm(32644, p)),
+    ],
+  })
+  it('counts the part of the AOI beyond the scene edge as no data: 60 % outside is NOT_COVERED', async () => {
+    const { stats } = await runQuality(deps(), { item: item('2025-01-10'), aoi: strip(299400, 300400) })
+    expect(stats.label).toBe('NOT_COVERED')
+    expect(stats.nodataFraction).toBeCloseTo(0.6, 1)
+  })
+  it('counts the part of the AOI beyond the scene edge as no data: 20 % outside is PARTIAL', async () => {
+    const { stats } = await runQuality(deps(), { item: item('2025-01-10'), aoi: strip(299800, 300800) })
+    expect(stats.label).toBe('PARTIAL')
+    expect(stats.nodataFraction).toBeGreaterThan(0.15)
+    expect(stats.nodataFraction).toBeLessThan(0.25)
   })
 })
 
@@ -104,6 +136,38 @@ describe('runFrame', () => {
     const b = await runFrame(d, { item: item('2025-01-10'), level: 0, aoi: SITE, grid: GRID })
     expect(b.sha256).toBe(a.sha256)
     expect(reads).toHaveBeenCalledTimes(1)
+  })
+  it('keys the byte cache without the query string, so a SAS token never reaches it or splits it', async () => {
+    const store = new Map<string, Uint8Array>()
+    const reads = vi.fn()
+    const d: CoreDeps = {
+      openCog: async (href) => {
+        const cog = await openCogBuffer(toArrayBuffer(files.get(href.split('?')[0]!)!))
+        return {
+          sizes: cog.sizes,
+          read: (...a: Parameters<Cog['read']>) => {
+            reads()
+            return cog.read(...a)
+          },
+        }
+      },
+      cache: {
+        get: async (k) => store.get(k),
+        put: async (k, v) => {
+          store.set(k, v)
+        },
+      },
+    }
+    const base = item('2025-01-10')
+    const signed = (token: string) => ({
+      ...base,
+      visual: { ...base.visual, href: `${base.visual.href}?sig=${token}` },
+    })
+    const a = await runFrame(d, { item: signed('one'), level: 0, aoi: SITE, grid: GRID })
+    const b = await runFrame(d, { item: signed('two'), level: 0, aoi: SITE, grid: GRID })
+    expect(b.sha256).toBe(a.sha256)
+    expect(reads).toHaveBeenCalledTimes(1)
+    expect([...store.keys()].join()).not.toMatch(/[?]|sig=/)
   })
   it('rejects with AbortError when aborted', async () => {
     const ac = new AbortController()

@@ -71,6 +71,24 @@ describe('parseItem', () => {
     evil.assets.visual.href = 'https://evil.example.com/TCI.tif'
     expect(parseItem(evil, 'sentinel-2-l2a')).toBeNull()
   })
+  it('rejects non-finite transforms and shapes that are not positive integers', () => {
+    const patched = (key: 'proj:transform' | 'proj:shape', value: number[]) => {
+      const x = structuredClone(REAL)
+      x.assets.scl[key] = value
+      return parseItem(x, 'sentinel-2-l2a')
+    }
+    expect(patched('proj:transform', [20, 0, 199980, 0, -20, NaN])).toBeNull()
+    expect(patched('proj:transform', [20, 0, Infinity, 0, -20, 2400000])).toBeNull()
+    for (const shape of [
+      [0, 5490],
+      [5490, -1],
+      [5490.5, 5490],
+      [5490, NaN],
+      [Infinity, 5490],
+    ])
+      expect(patched('proj:shape', shape)).toBeNull()
+    expect(patched('proj:shape', [5490, 5490])).not.toBeNull()
+  })
   it('drops footprints without a usable ring (one bad item must not break selection)', () => {
     const geo = (g: unknown) => parseItem({ ...REAL, geometry: g }, 'sentinel-2-l2a')
     expect(geo({ type: 'Polygon', coordinates: [] })).toBeNull()

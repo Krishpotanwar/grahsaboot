@@ -7,14 +7,16 @@ const isObj = (v: unknown): v is Obj => typeof v === 'object' && v !== null && !
 const str = (v: unknown) => (typeof v === 'string' && v ? v : null)
 const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null)
 const nums = (v: unknown, n: number) =>
-  Array.isArray(v) && v.length >= n && v.every((x) => typeof x === 'number') ? (v as number[]) : null
+  Array.isArray(v) && v.length >= n && v.every(Number.isFinite) ? (v as number[]) : null
+const posInt = (v: unknown) => Number.isInteger(v) && (v as number) > 0
 
 function asset(raw: unknown, props: Obj): AssetRef | null {
   if (!isObj(raw)) return null
   const href = str(raw.href)
   const transform = nums(raw['proj:transform'] ?? props['proj:transform'], 6)
   const shape = nums(raw['proj:shape'] ?? props['proj:shape'], 2)
-  if (!href || !transform || !shape || !isAllowedAssetUrl(href)) return null
+  if (!href || !transform || !shape || !shape.slice(0, 2).every(posInt) || !isAllowedAssetUrl(href))
+    return null
   return { href, transform: transform.slice(0, 6), shape: [shape[0]!, shape[1]!] }
 }
 
