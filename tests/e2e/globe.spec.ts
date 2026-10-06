@@ -74,6 +74,25 @@ test('theme toggle swaps the map style', async ({ page }) => {
   await page.waitForFunction(() => !!(window as any).__gs.map.getLayer('gs-gibs'))
 })
 
+// The Blue Marble covers the basemap labels (the approved mockup has none) until it fades out; the satellite layers stay above it, also after a style reload.
+test('the Blue Marble draws over the basemap labels and under the satellite layers', async ({ page }) => {
+  await page.goto('/?tier=2')
+  test.skip(!(await hasWebgl2(page)), 'no WebGL2 in this engine')
+  const order = () =>
+    page.evaluate(() => (window as any).__gs.map.getStyle().layers.map((l: any) => l.id) as string[])
+  const want = ['bg', 'labels', 'gs-gibs', 'gs-sat-swath', 'gs-sat-track']
+  await page.waitForFunction(() => !!(window as any).__gs?.map?.getLayer('gs-sat-track'))
+  expect(await order()).toEqual(want)
+  await page.getByRole('button', { name: copy.nav.themeToggle }).click()
+  await page.waitForFunction(
+    () =>
+      (window as any).__gs.map.getStyle().layers.find((l: any) => l.id === 'bg')?.paint?.[
+        'background-color'
+      ] === '#FFFFFF' && !!(window as any).__gs.map.getLayer('gs-sat-track'),
+  )
+  expect(await order()).toEqual(want)
+})
+
 // Ruled start zoom: the globe fills ~88% of the stage's short side. The map is created before the first layout is set, so this also pins the hidden stage sharing the globe's box (phones).
 test('the globe starts sized to the stage', async ({ page }) => {
   await page.goto('/?tier=2')

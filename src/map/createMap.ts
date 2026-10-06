@@ -73,19 +73,17 @@ export function applyBaseLayers(map: MlMap, tier: Tier, theme: Theme) {
   const firstSymbol = map.getStyle().layers.find((l) => l.type === 'symbol')?.id
   if (!map.getSource('gs-gibs'))
     map.addSource('gs-gibs', { type: 'raster', tiles: [config.gibsTiles], tileSize: 256, maxzoom: 8 })
+  // On top of the basemap, labels included: they would clutter the Blue Marble (approved mockup has none) until it fades out at z6. The satellite layers are added after this, so they stay above it.
   if (!map.getLayer('gs-gibs')) {
-    map.addLayer(
-      {
-        id: 'gs-gibs',
-        type: 'raster',
-        source: 'gs-gibs',
-        paint: {
-          'raster-opacity': ['interpolate', ['linear'], ['zoom'], 0, 1, 4, 1, 6, 0],
-          'raster-fade-duration': 0,
-        },
+    map.addLayer({
+      id: 'gs-gibs',
+      type: 'raster',
+      source: 'gs-gibs',
+      paint: {
+        'raster-opacity': ['interpolate', ['linear'], ['zoom'], 0, 1, 4, 1, 6, 0],
+        'raster-fade-duration': 0,
       },
-      firstSymbol,
-    )
+    })
   }
   if (tier >= 3) {
     if (!map.getSource('gs-terrain'))

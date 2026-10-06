@@ -8,11 +8,15 @@ const BLANK_PNG = Buffer.from(
   'base64',
 )
 const TLE = readFileSync(new URL('./tle.json', import.meta.url))
+// `labels` stands in for OpenFreeMap's place labels, so tests can see where the app's own layers go relative to a symbol layer.
 const style = (bg: string) =>
   JSON.stringify({
     version: 8,
-    sources: {},
-    layers: [{ id: 'bg', type: 'background', paint: { 'background-color': bg } }],
+    sources: { labels: { type: 'geojson', data: { type: 'FeatureCollection', features: [] } } },
+    layers: [
+      { id: 'bg', type: 'background', paint: { 'background-color': bg } },
+      { id: 'labels', type: 'symbol', source: 'labels' },
+    ],
   })
 
 const files = new Map<string, Buffer>()
