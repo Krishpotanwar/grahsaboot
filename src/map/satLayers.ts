@@ -87,7 +87,10 @@ export async function syncSatMarkers(map: MlMap, markers: Map<number, Marker>, s
   }
 }
 
-/** Accent dot plus a dark name chip on the picked place. The name is Nominatim text, so it goes in as textContent. */
+/**
+ * Accent dot plus a dark name chip on the picked place. The name is Nominatim text, so it goes in as textContent.
+ * The chip sits left of the dot: the place lands mid-map and the satellites panel covers the bottom right.
+ */
 export async function addPlacePin(map: MlMap, place: Place): Promise<Marker> {
   const MarkerCtor = await loadMarker()
   const el = document.createElement('div')
@@ -95,8 +98,8 @@ export async function addPlacePin(map: MlMap, place: Place): Promise<Marker> {
   el.setAttribute('aria-hidden', 'true')
   const label = document.createElement('span')
   label.textContent = placeLabel(place)
-  el.append(document.createElement('i'), label)
-  return new MarkerCtor({ element: el, anchor: 'left', offset: [-6, 0] })
+  el.append(label, document.createElement('i'))
+  return new MarkerCtor({ element: el, anchor: 'right', offset: [6, 0] })
     .setLngLat([place.lon, place.lat])
     .addTo(map)
 }
