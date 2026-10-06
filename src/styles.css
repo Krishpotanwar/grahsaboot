@@ -185,6 +185,10 @@
     display: none;
   }
 }
+/* The canvas fills MapLibre's overflow: hidden box, so the global focus ring (2 px outside the edge) would be clipped away: draw it inside. */
+.maplibregl-canvas:focus-visible {
+  outline-offset: -2px;
+}
 
 /* Map overlays (approved mockup 01-landing). They sit on Blue Marble imagery in both themes, so their text and halo colours are fixed, not theme tokens. MapLibre positions the marker element with transform; keep animations off it. */
 .sat-marker {

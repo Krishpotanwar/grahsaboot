@@ -127,6 +127,22 @@ test('the first Tab stop is the skip link, not the map', async ({ page }) => {
   await expect(page.getByRole('link', { name: copy.common.skip })).toBeFocused()
 })
 
+// WCAG 2.4.7: the canvas fills the map box and MapLibre clips overflow, so a ring drawn outside it never shows. It must be drawn inside.
+test('the keyboard focus ring on the map is visible', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.goto('/?tier=2')
+  test.skip(!(await hasWebgl2(page)), 'no WebGL2 in this engine')
+  await styleReady(page)
+  const canvas = page.locator('canvas.maplibregl-canvas')
+  const box = (await canvas.boundingBox())!
+  const corner = { x: box.x, y: box.y, width: 8, height: 8 }
+  const before = await page.screenshot({ clip: corner })
+  for (let i = 0; i < 30 && !(await canvas.evaluate((c) => c === document.activeElement)); i++)
+    await page.keyboard.press('Tab')
+  await expect(canvas).toBeFocused()
+  expect((await page.screenshot({ clip: corner })).equals(before)).toBe(false)
+})
+
 // The map outlives the globe screen, so the pick must too: the pin, the next pass and "start here" come back with it.
 test('the picked place is still there after a trip to another page', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' })
