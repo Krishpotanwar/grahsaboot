@@ -21,14 +21,14 @@ test('swapped Indian coordinates get a hint, a one-tap fix and a use-as-typed es
   await page.getByRole('button', { name: copy.search.useSwapped }).click()
   await expect(page.getByRole('link', { name: copy.nav.startHere })).toHaveAttribute(
     'href',
-    /lat=21\.145800&lon=79\.088200/,
+    `/new?lat=21.145800&lon=79.088200&name=${encodeURIComponent(copy.search.coordsResult(21.1458, 79.0882))}`,
   )
   // A real Arctic point must stay usable: the same input, taken exactly as typed.
   await page.getByRole('button', { name: copy.search.submit }).click()
   await page.getByRole('button', { name: copy.search.useAsTyped }).click()
   await expect(page.getByRole('link', { name: copy.nav.startHere })).toHaveAttribute(
     'href',
-    /lat=79\.088200&lon=21\.145800/,
+    `/new?lat=79.088200&lon=21.145800&name=${encodeURIComponent(copy.search.coordsResult(79.0882, 21.1458))}`,
   )
 })
 

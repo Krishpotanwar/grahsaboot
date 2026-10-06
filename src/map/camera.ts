@@ -24,5 +24,6 @@ export function flyToPlace(map: MlMap, p: Place, reducedMotion: boolean) {
   }
 }
 
+// Searched names are cut at the first comma ("Nagpur, Maharashtra, India" -> "Nagpur"); a coordinate point has no bbox and keeps its whole name, which has a comma in it.
 export const placeToQuery = (p: Place) =>
-  `/new?lat=${p.lat.toFixed(6)}&lon=${p.lon.toFixed(6)}&name=${encodeURIComponent(p.name.split(',')[0]!)}`
+  `/new?lat=${p.lat.toFixed(6)}&lon=${p.lon.toFixed(6)}&name=${encodeURIComponent(p.bbox ? p.name.split(',')[0]! : p.name)}`

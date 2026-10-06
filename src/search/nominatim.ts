@@ -29,6 +29,7 @@ export function createNominatim(
       if (!key) return []
       const hit = cache.get(key)
       if (hit) return hit
+      // ponytail: not serialized, concurrent callers all read the same `last` and fire together (SearchBox runs one search at a time); chain calls on a stored promise if a second caller appears.
       const wait = last + gap - now()
       if (wait > 0) await sleep(wait)
       last = now()
