@@ -10,6 +10,21 @@ test('navigates with history and links', async ({ page }) => {
   await expect(page).toHaveURL(/\/limits$/)
 })
 
+// WCAG 2.4.2 and 2.4.3: the router swaps pages without a load, so it has to retitle the page and move focus itself.
+test('a route change sets the page title and focuses the main region', async ({ page }) => {
+  await page.goto('/limits')
+  await expect(page).toHaveTitle('Limits · GrahSaboot')
+  await expect(page.locator('main')).not.toBeFocused() // a fresh load keeps the browser's own focus start
+  await page.getByRole('link', { name: 'Privacy' }).click()
+  await expect(page).toHaveTitle('Privacy · GrahSaboot')
+  await expect(page.locator('main')).toBeFocused()
+  await page.goBack()
+  await expect(page).toHaveTitle('Limits · GrahSaboot')
+  await page.getByRole('link', { name: 'GrahSaboot home' }).click()
+  await expect(page).toHaveTitle('GrahSaboot · Satellite proof for any place')
+  await expect(page.locator('main')).toBeFocused()
+})
+
 test('dark by default, light toggle persists across reloads', async ({ page }) => {
   await page.goto('/limits')
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
