@@ -281,7 +281,10 @@ test('the keyboard focus ring on the map is visible', async ({ page }) => {
   for (let i = 0; i < 30 && !(await canvas.evaluate((c) => c === document.activeElement)); i++)
     await page.keyboard.press('Tab')
   await expect(canvas).toBeFocused()
-  expect((await page.screenshot({ clip: corner })).equals(before)).toBe(false)
+  // Poll: under load the frame with the ring can be a moment behind the focus event.
+  await expect
+    .poll(async () => (await page.screenshot({ clip: corner })).equals(before), { timeout: 5000 })
+    .toBe(false)
 })
 
 // The map outlives the globe screen, so the pick must too: the pin, the next pass and "start here" come back with it.
