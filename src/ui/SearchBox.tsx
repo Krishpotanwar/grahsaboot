@@ -28,8 +28,8 @@ export function SearchBox({ onSelect }: { onSelect(place: Place): void }) {
   const pick = (p: Place) => {
     setState({ kind: 'idle' })
     onSelect(p)
-    // The result or fix button that was just pressed unmounts; without this focus falls to <body> (WCAG 2.4.3).
-    input.current?.focus()
+    // The result or fix button that was just pressed unmounts; without this focus falls to <body> (WCAG 2.4.3). Not on a touch screen: focusing a text field there reopens the on-screen keyboard over the map.
+    if (matchMedia('(pointer: fine)').matches) input.current?.focus()
   }
 
   async function submit(e: FormEvent) {

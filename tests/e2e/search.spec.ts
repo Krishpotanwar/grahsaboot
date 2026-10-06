@@ -1,8 +1,14 @@
 import AxeBuilder from '@axe-core/playwright'
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 import { copy } from '../../src/ui/copy.ts'
 
-test('search Nagpur, pick it, and start an investigation there', async ({ page }) => {
+// WCAG 2.4.3: the pressed result or fix button unmounts, so a mouse or keyboard user gets focus back in the input. A touch screen does not: focusing a text field there reopens the on-screen keyboard over the map.
+const checkFocusAfterPick = (page: Page, isMobile: boolean) =>
+  isMobile
+    ? expect(page.getByLabel(copy.search.label)).not.toBeFocused()
+    : expect(page.getByLabel(copy.search.label)).toBeFocused()
+
+test('search Nagpur, pick it, and start an investigation there', async ({ page, isMobile }) => {
   await page.goto('/?tier=0')
   await page.getByLabel(copy.search.label).fill('Nagpur')
   await page.getByRole('button', { name: copy.search.submit }).click()
@@ -11,11 +17,13 @@ test('search Nagpur, pick it, and start an investigation there', async ({ page }
     'href',
     '/new?lat=21.145800&lon=79.088200&name=Nagpur',
   )
-  // WCAG 2.4.3: the clicked result unmounts, so focus must land somewhere sensible instead of on <body>.
-  await expect(page.getByLabel(copy.search.label)).toBeFocused()
+  await checkFocusAfterPick(page, isMobile)
 })
 
-test('swapped Indian coordinates get a hint, a one-tap fix and a use-as-typed escape', async ({ page }) => {
+test('swapped Indian coordinates get a hint, a one-tap fix and a use-as-typed escape', async ({
+  page,
+  isMobile,
+}) => {
   await page.goto('/?tier=0')
   await page.getByLabel(copy.search.label).fill('79.0882, 21.1458')
   await page.getByRole('button', { name: copy.search.submit }).click()
@@ -25,7 +33,7 @@ test('swapped Indian coordinates get a hint, a one-tap fix and a use-as-typed es
     'href',
     `/new?lat=21.145800&lon=79.088200&name=${encodeURIComponent(copy.search.coordsResult(21.1458, 79.0882))}`,
   )
-  await expect(page.getByLabel(copy.search.label)).toBeFocused()
+  await checkFocusAfterPick(page, isMobile)
   // A real Arctic point must stay usable: the same input, taken exactly as typed.
   await page.getByRole('button', { name: copy.search.submit }).click()
   await page.getByRole('button', { name: copy.search.useAsTyped }).click()
