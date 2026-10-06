@@ -33,8 +33,9 @@ export default function GlobeScreen() {
   latest.current = { tracks, swaths, hot }
 
   // Slow auto-rotation on the landing globe: stops on interaction, once any camera move is under way (setCenter would cancel a fly-to), after 30 s, once zoomed 1.4 levels past its start, or under reduced motion.
+  // The map outlives this screen, so coming back from a place finds it zoomed in: never start below globe zoom (fit tops out ~3.9 on 4K).
   useEffect(() => {
-    if (!map || tier < 2 || reducedMotion()) return
+    if (!map || tier < 2 || reducedMotion() || map.getZoom() > 5) return
     const z0 = map.getZoom()
     let raf = 0
     let stopped = false
