@@ -36,6 +36,19 @@ test('tier 0 shows a plain notice and no map, but the main actions still work', 
   await expect(page.getByRole('link', { name: copy.nav.newInvestigation }).first()).toBeVisible()
 })
 
+// With no map there is nothing to put beside the text: one column, with the panel under the search instead of stranded bottom right.
+test('tier 0 on a desktop is one column with the satellites panel in it', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'the two-column desktop layout starts at 1024 px')
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto('/?tier=0')
+  const panel = page.getByRole('region', { name: copy.sats.title })
+  await expect(panel.getByText('Sentinel-2A')).toBeVisible()
+  const h1 = (await page.getByRole('heading', { level: 1 }).boundingBox())!
+  const box = (await panel.boundingBox())!
+  expect(Math.abs(box.x - h1.x)).toBeLessThan(2)
+  expect(box.y).toBeGreaterThan(h1.y + h1.height)
+})
+
 test('reduced motion disables auto-rotation', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.goto('/?tier=2')

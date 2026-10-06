@@ -122,7 +122,9 @@ export default function GlobeScreen() {
   )
 
   return (
-    <div className="grid min-h-[calc(100dvh-64px)] lg:grid-cols-[38%_1fr]">
+    <div
+      className={`grid min-h-[calc(100dvh-64px)] ${tier > 0 ? 'lg:grid-cols-[38%_1fr]' : 'lg:mx-auto lg:max-w-[40rem]'}`}
+    >
       <section
         className={`pointer-events-auto relative z-10 flex flex-col gap-6 bg-bg p-6 pb-10 lg:mt-0 lg:justify-center lg:p-12 ${tier > 0 ? 'mt-[calc(55dvh-64px)] justify-end' : ''}`}
       >
@@ -157,12 +159,14 @@ export default function GlobeScreen() {
             </Button>
           </div>
         )}
-        {!desktop && panel}
+        {(!desktop || tier === 0) && panel}
       </section>
-      <div className="relative hidden lg:block">
-        {/* right-14 / bottom-14 keep the panel off MapLibre's zoom buttons and attribution (bottom right of the map). */}
-        {desktop && <div className="pointer-events-auto absolute bottom-14 right-14 z-20">{panel}</div>}
-      </div>
+      {tier > 0 && (
+        <div className="relative hidden lg:block">
+          {/* right-14 / bottom-14 keep the panel off MapLibre's zoom buttons and attribution (bottom right of the map). */}
+          {desktop && <div className="pointer-events-auto absolute bottom-14 right-14 z-20">{panel}</div>}
+        </div>
+      )}
     </div>
   )
 }
