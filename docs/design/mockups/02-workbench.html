@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<title>GrahSaboot · Workbench</title>
+<link rel="stylesheet" href="base.css">
+<style>
+  body { width: 100vw; min-height: 100vh; overflow: hidden; }
+  a { text-decoration: none; color: inherit; }
+  header.top { height: 64px; display: flex; align-items: center; justify-content: space-between; padding: 0 28px; border-bottom: 1px solid var(--gs-line); }
+  header.top nav { display: flex; align-items: center; gap: 10px; }
+  header.top nav a.link { font-size: 15px; font-weight: 500; padding: 0 10px; }
+  .vr { width: 1px; height: 22px; background: var(--gs-line); margin: 0 6px; }
+
+  .titlebar { display: flex; align-items: flex-end; justify-content: space-between; padding: 22px 32px 20px; border-bottom: 1px solid var(--gs-line); }
+  .crumbs { font-size: 14px; color: var(--gs-fg-2); display: flex; gap: 8px; }
+  .crumbs b { font-weight: 500; color: var(--gs-fg); }
+  .titlebar h1 { font-size: 30px; line-height: 1.15; letter-spacing: -0.025em; font-weight: 650; margin: 8px 0 8px; }
+  .meta { font: 13px/1 'Geist Mono'; color: var(--gs-fg-2); letter-spacing: 0.04em; display: flex; gap: 10px; align-items: center; }
+  .meta i { width: 3px; height: 3px; border-radius: 50%; background: var(--gs-control); }
+  .actions { display: flex; align-items: center; gap: 10px; }
+  .status { display: inline-flex; align-items: center; gap: 8px; font: 13px 'Geist Mono'; color: var(--gs-fg-2); margin-right: 8px; }
+  .status::before { content: ''; width: 7px; height: 7px; border-radius: 50%; border: 1.5px solid var(--gs-fg-2); }
+
+  .body { display: grid; grid-template-columns: minmax(0, 1fr) 440px; height: calc(100vh - 64px - 117px); }
+  .work { padding: 0 32px 20px; border-right: 1px solid var(--gs-line); display: flex; flex-direction: column; min-width: 0; }
+  .tabs { display: flex; align-items: center; gap: 4px; height: 54px; }
+  .tab { height: 54px; display: inline-flex; align-items: center; gap: 8px; padding: 0 14px; font-size: 15px; font-weight: 500; color: var(--gs-fg-2); border-bottom: 2px solid transparent; }
+  .tab.on { color: var(--gs-fg); border-bottom-color: var(--gs-accent); }
+  .tab svg { color: currentColor; }
+  .tabs .sp { flex: 1; }
+  .tool { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: var(--gs-fg-2); padding: 0 10px; height: 36px; border-radius: 6px; }
+
+  .viewer { position: relative; aspect-ratio: 440 / 240; width: 100%; overflow: hidden; background: #000; }
+  .viewer img { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: auto; }
+  .viewer .after { clip-path: inset(0 0 0 52%); }
+  .viewer svg.outline { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .divider { position: absolute; top: 0; bottom: 0; left: 52%; width: 2px; margin-left: -1px; background: var(--gs-accent); }
+  .handle { position: absolute; top: 50%; left: 52%; width: 38px; height: 38px; margin: -19px 0 0 -19px; border-radius: 50%; background: var(--gs-accent); color: #09090b; display: grid; place-items: center; box-shadow: 0 2px 10px rgb(0 0 0 / .45); }
+  .chip { position: absolute; top: 14px; font: 500 12px/1 'Geist Mono'; letter-spacing: 0.08em; padding: 7px 9px; background: rgb(9 9 11 / .8); border: 1px solid #3f3f46; border-radius: 4px; color: var(--gs-fg); }
+  .chip.l { left: 14px; } .chip.r { right: 14px; }
+  .scale { position: absolute; left: 14px; bottom: 14px; padding: 6px 9px 7px; background: rgb(9 9 11 / .72); border-radius: 4px; font: 11px 'Geist Mono'; color: var(--gs-fg); }
+  .scale .bar { height: 5px; border: 1.5px solid #f4f4f5; border-top: 0; margin-top: 4px; }
+  .north { position: absolute; right: 14px; bottom: 14px; width: 30px; height: 30px; border-radius: 4px; background: rgb(9 9 11 / .72); display: grid; place-items: center; font: 600 10px 'Geist Mono'; color: var(--gs-fg); }
+
+  .captions { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 14px; }
+  .cap { display: grid; gap: 6px; font: 13px/1.3 'Geist Mono'; }
+  .cap.r { text-align: right; }
+  .cap .l1 { color: var(--gs-fg); }
+  .cap .l2 { color: var(--gs-fg-2); }
+  .cap .l3 { color: var(--gs-fg-2); }
+  .cap .l3 u { color: var(--gs-fg); text-decoration-color: var(--gs-accent); text-underline-offset: 3px; }
+  .note10 { margin-top: 12px; font-size: 13px; color: var(--gs-fg-2); }
+
+  aside { overflow: hidden; display: flex; flex-direction: column; }
+  aside section { padding: 20px 24px; border-bottom: 1px solid var(--gs-line); }
+  .sh { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 14px; }
+  .sh h2 { font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+  .sh span { font: 12px 'Geist Mono'; color: var(--gs-fg-2); }
+  .barcode { display: grid; gap: 5px; }
+  .yr { display: grid; grid-template-columns: 34px 1fr; align-items: end; gap: 8px; }
+  .yr label { font: 11px/1 'Geist Mono'; color: var(--gs-fg-2); padding-bottom: 1px; }
+  .yr .ticks { position: relative; height: 16px; border-bottom: 1px solid var(--gs-line); }
+  .yr .ticks i { position: absolute; bottom: 0; width: 2px; background: var(--gs-fg); opacity: .85; }
+  .yr .ticks i.p { height: 8px !important; opacity: .7; }
+  .yr .ticks i.o { height: 3px !important; background: var(--gs-fg-2); opacity: .45; }
+  .yr .ticks i.pin { background: var(--gs-accent); opacity: 1; width: 3px; }
+  .legend { display: flex; gap: 14px; margin-top: 10px; font: 11px 'Geist Mono'; color: var(--gs-fg-2); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .rows { display: grid; margin-top: 14px; border-top: 1px solid var(--gs-line); }
+  .row { display: grid; grid-template-columns: 52px 1fr auto; gap: 12px; align-items: center; padding: 9px 8px; border-bottom: 1px solid var(--gs-line); }
+  .row.sel { outline: 1px solid var(--gs-accent); outline-offset: -1px; }
+  .row img, .row .ob { width: 52px; height: 52px; object-fit: cover; display: block; }
+  .row .ob { display: grid; place-items: center; background: repeating-linear-gradient(135deg, #27272a 0 6px, #18181b 6px 12px); color: var(--gs-fg-2); }
+  .row .d { font: 500 14px 'Geist Mono'; display: flex; align-items: center; gap: 10px; }
+  .row .q { display: inline-flex; align-items: center; gap: 6px; font: 500 11px 'Geist Mono'; letter-spacing: 0.08em; color: var(--gs-fg); }
+  .row .m { font: 12px 'Geist Mono'; color: var(--gs-fg-2); margin-top: 5px; }
+  .row .pinned { font: 11px 'Geist Mono'; color: var(--gs-accent); letter-spacing: .08em; }
+  .obs label { display: block; margin-bottom: 8px; }
+  .select { height: 44px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; border: 1px solid var(--gs-accent); border-radius: 6px; font-size: 15px; }
+  .textarea { margin-top: 10px; min-height: 66px; padding: 11px 14px; border: 1px solid #3f3f46; border-radius: 6px; font-size: 14px; line-height: 1.45; background: #0d0d10; }
+  .obs .foot { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; font-size: 13px; color: var(--gs-fg-2); }
+  .claim { display: flex; justify-content: space-between; align-items: center; }
+  .claim p { font-size: 13px; color: var(--gs-fg-2); margin-top: 8px; max-width: 42ch; line-height: 1.45; }
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="wordmark" href="#"><span id="mk"></span><span class="type"><b>GRAH</b><span>SABOOT</span></span></a>
+  <nav>
+    <a class="link" href="#">Globe</a>
+    <a class="link" href="#">New investigation</a>
+    <span class="vr"></span>
+    <button class="icon-btn" aria-label="Switch theme"><svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M233.54 142.23a8 8 0 0 0-8-2 88.08 88.08 0 0 1-109.8-109.8 8 8 0 0 0-10-10 104.84 104.84 0 0 0-52.91 37A104 104 0 0 0 136 224a103.09 103.09 0 0 0 62.52-20.88 104.84 104.84 0 0 0 37-52.91 8 8 0 0 0-1.98-7.98Zm-44.64 48.11A88 88 0 0 1 65.66 67.11a89 89 0 0 1 31.4-26A106 106 0 0 0 96 56a104.11 104.11 0 0 0 104 104 106 106 0 0 0 14.92-1.06 89 89 0 0 1-26.02 31.4Z"/></svg></button>
+    <a class="btn ghost sm" href="#">Sign in</a>
+  </nav>
+</header>
+
+<div class="titlebar">
+  <div>
+    <div class="crumbs"><span>Investigations</span><span>/</span><b>Navi Mumbai airport site</b></div>
+    <h1>Navi Mumbai airport site</h1>
+    <div class="meta"><span>SITE</span><i></i><span>3.99 KM²</span><i></i><span>18.9914° N, 73.0658° E</span><i></i><span>1 DEC 2017 – 31 DEC 2025</span></div>
+  </div>
+  <div class="actions">
+    <span class="status">Local draft</span>
+    <a class="btn accent-outline" href="#">Save and verify</a>
+    <a class="btn primary" href="#">Report</a>
+    <button class="icon-btn" aria-label="More"><svg width="18" height="18" viewBox="0 0 256 256" fill="currentColor"><circle cx="60" cy="128" r="16"/><circle cx="128" cy="128" r="16"/><circle cx="196" cy="128" r="16"/></svg></button>
+  </div>
+</div>
+
+<div class="body">
+  <div class="work">
+    <div class="tabs" role="tablist">
+      <span class="tab on"><svg width="18" height="18" viewBox="0 0 256 256" fill="currentColor"><path d="M136 32v192a8 8 0 0 1-16 0V32a8 8 0 0 1 16 0ZM88 80H40a16 16 0 0 0-16 16v64a16 16 0 0 0 16 16h48a8 8 0 0 0 0-16H40V96h48a8 8 0 0 0 0-16Zm128 0h-48a8 8 0 0 0 0 16h48v64h-48a8 8 0 0 0 0 16h48a16 16 0 0 0 16-16V96a16 16 0 0 0-16-16Z"/></svg>Swipe</span>
+      <span class="tab"><svg width="18" height="18" viewBox="0 0 256 256" fill="currentColor"><path d="M216 40H40a16 16 0 0 0-16 16v144a16 16 0 0 0 16 16h176a16 16 0 0 0 16-16V56a16 16 0 0 0-16-16ZM40 56h80v144H40Zm176 144h-80V56h80v144Z"/></svg>Side by side</span>
+      <span class="tab"><svg width="18" height="18" viewBox="0 0 256 256" fill="currentColor"><path d="M200 32H56a24 24 0 0 0-24 24v144a24 24 0 0 0 24 24h144a24 24 0 0 0 24-24V56a24 24 0 0 0-24-24Zm8 168a8 8 0 0 1-8 8H56a8 8 0 0 1-8-8V56a8 8 0 0 1 8-8h144a8 8 0 0 1 8 8Zm-40-72a40 40 0 1 1-40-40 40 40 0 0 1 40 40Z"/></svg>Difference</span>
+      <span class="sp"></span>
+      <span class="tool"><svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M216 48v40a8 8 0 0 1-16 0V56h-32a8 8 0 0 1 0-16h40a8 8 0 0 1 8 8ZM88 200H56v-32a8 8 0 0 0-16 0v40a8 8 0 0 0 8 8h40a8 8 0 0 0 0-16Zm120-40a8 8 0 0 0-8 8v32h-32a8 8 0 0 0 0 16h40a8 8 0 0 0 8-8v-40a8 8 0 0 0-8-8ZM88 40H48a8 8 0 0 0-8 8v40a8 8 0 0 0 16 0V56h32a8 8 0 0 0 0-16Z"/></svg>Fit outline</span>
+      <span class="tool"><svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M128 24a104 104 0 1 0 104 104A104.11 104.11 0 0 0 128 24Zm0 192a88 88 0 1 1 88-88 88.1 88.1 0 0 1-88 88Zm16-40a8 8 0 0 1-8 8 16 16 0 0 1-16-16v-40a8 8 0 0 1 0-16 16 16 0 0 1 16 16v40a8 8 0 0 1 8 8Zm-32-92a12 12 0 1 1 12 12 12 12 0 0 1-12-12Z"/></svg>Show map</span>
+    </div>
+    <div class="viewer">
+      <img src="site-20180222.png" alt="">
+      <img class="after" src="site-20251212.png" alt="">
+      <svg class="outline" viewBox="0 0 440 240" preserveAspectRatio="none"><polygon points="118.7,218.5 318.9,220.7 321.1,21.6 120.9,19.4" fill="none" stroke="#e48444" stroke-width="1.1" vector-effect="non-scaling-stroke" style="stroke-width:2px"/></svg>
+      <span class="divider"></span>
+      <span class="handle"><svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M100.24 72.24 44.49 128l55.75 55.76a8 8 0 0 1-11.32 11.32l-61.42-61.42a8 8 0 0 1 0-11.32l61.42-61.42a8 8 0 0 1 11.32 11.32Zm128.94 50.1-61.42-61.42a8 8 0 0 0-11.32 11.32L212.2 128l-55.76 55.76a8 8 0 0 0 11.32 11.32l61.42-61.42a8 8 0 0 0 0-11.32Z"/></svg></span>
+      <span class="chip l">BEFORE · 22 FEB 2018</span>
+      <span class="chip r">AFTER · 12 DEC 2025</span>
+      <span class="scale" id="scale">500 m<div class="bar"></div></span>
+      <span class="north">N↑</span>
+    </div>
+    <div class="captions num">
+      <div class="cap"><span class="l1">22 Feb 2018 · Sentinel-2B · 10 m</span><span class="l2">100% clear view · not saved yet</span><span class="l3">S2B_43QBB_20180222_0_L2A · <u>Details</u></span></div>
+      <div class="cap r"><span class="l1">12 Dec 2025 · Sentinel-2B · 10 m</span><span class="l2">100% clear view · not saved yet</span><span class="l3">S2B_43QBB_20251212_0_L2A · <u>Details</u></span></div>
+    </div>
+    <p class="note10">Real Sentinel-2 photos at 10 m per pixel. Things smaller than about 20 m may not be visible.</p>
+  </div>
+
+  <aside>
+    <section>
+      <div class="sh"><h2>Photo timeline</h2><span id="count"></span></div>
+      <div class="barcode" id="barcode"></div>
+      <div class="legend"><span><i style="width:2px;height:12px;background:var(--gs-fg)"></i>Clear</span><span><i style="width:2px;height:7px;background:var(--gs-fg);opacity:.7"></i>Partly clear</span><span><i style="width:2px;height:3px;background:var(--gs-fg-2)"></i>Cloud</span><span style="color:var(--gs-accent)"><i style="width:3px;height:12px;background:var(--gs-accent)"></i>Pinned</span></div>
+      <div class="rows" id="rows"></div>
+    </section>
+    <section class="obs">
+      <label class="micro">Your observation</label>
+      <div class="select"><span>Visible change</span><svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="m213.66 101.66-80 80a8 8 0 0 1-11.32 0l-80-80a8 8 0 0 1 11.32-11.32L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32Z"/></svg></div>
+      <div class="textarea">A terminal building and a runway are visible inside the outline.</div>
+      <div class="foot"><span>Your note · 12 Dec 2025</span><span class="btn primary sm">Add note</span></div>
+    </section>
+    <section class="claim"><div><h2 style="font-size:17px;font-weight:600">Claim to compare <span class="fg2" style="font-weight:400">(optional)</span></h2><p>Photos show visible change. They do not establish completion, payments or quality.</p></div><svg width="18" height="18" viewBox="0 0 256 256" fill="currentColor" style="color:var(--gs-fg-2)"><path d="m213.66 101.66-80 80a8 8 0 0 1-11.32 0l-80-80a8 8 0 0 1 11.32-11.32L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32Z"/></svg></section>
+  </aside>
+</div>
+
+<script type="module">
+document.getElementById('mk').innerHTML = (await (await fetch('mark.svg')).text()).replace('<svg ', '<svg width="30" height="30" ')
+const dates = await (await fetch('timeline.json')).json()
+const rows = await (await fetch('rows.json')).json()
+const pinned = new Set(['2018-02-22', '2025-12-12'])
+document.getElementById('count').textContent = `${dates.length} dates · ${pinned.size} pinned`
+const bc = document.getElementById('barcode')
+for (let y = 2018; y <= 2025; y++) {
+  const row = document.createElement('div'); row.className = 'yr'
+  const ticks = dates.filter((d) => d.date.startsWith(String(y))).map((d) => {
+    const doy = (Date.parse(d.date) - Date.parse(`${y}-01-01`)) / 864e5 / 365
+    const cls = pinned.has(d.date) ? 'pin' : d.cloud < 5 ? '' : d.cloud < 60 ? 'p' : 'o'
+    return `<i class="${cls}" style="left:${(doy * 100).toFixed(2)}%;height:16px"></i>`
+  }).join('')
+  row.innerHTML = `<label>${y}</label><div class="ticks">${ticks}</div>`
+  bc.append(row)
+}
+const glyph = { CLEAR: '<svg width="12" height="12"><rect x=".5" y=".5" width="11" height="11" fill="currentColor"/></svg>', PARTIAL: '<svg width="12" height="12"><rect x=".5" y=".5" width="11" height="11" fill="none" stroke="currentColor"/><path d="M.5 11.5 11.5 .5V11.5Z" fill="currentColor"/></svg>', OBSCURED: '<svg width="12" height="12"><rect x=".5" y=".5" width="11" height="11" fill="none" stroke="currentColor"/><path d="M1 1l10 10M11 1 1 11" stroke="currentColor"/></svg>' }
+const word = { CLEAR: 'CLEAR', PARTIAL: 'PARTLY CLEAR', OBSCURED: 'CLOUD' }
+const fmt = (d) => new Date(d + 'T00:00:00Z').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' })
+const sat = (p) => p.replace('sentinel-', 'Sentinel-').toUpperCase().replace('SENTINEL-', 'Sentinel-')
+document.getElementById('rows').innerHTML = rows.map((r) => `
+  <div class="row ${r.date === '2025-12-12' ? 'sel' : ''}">
+    ${r.label === 'OBSCURED' ? `<span class="ob">${glyph.OBSCURED}</span>` : `<img src="thumb-${r.date}.png" alt="">`}
+    <div><div class="d">${fmt(r.date)} <span class="q">${glyph[r.label]}${word[r.label]}</span></div>
+    <div class="m">${sat(r.platform)} · 10 m · ${Math.round(r.clear * 100)}% clear view</div></div>
+    ${pinned.has(r.date) ? '<span class="pinned">PINNED</span>' : '<span class="fg2">⋯</span>'}
+  </div>`).join('')
+const v = document.querySelector('.viewer').clientWidth
+document.querySelector('#scale .bar').style.width = `${(50 / 440) * v}px`
+document.body.dataset.ready = '1'
+</script>
+</body>
+</html>

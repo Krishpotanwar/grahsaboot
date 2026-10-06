@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<title>GrahSaboot · Road</title>
+<link rel="stylesheet" href="base.css">
+<style>
+  body { width: 100vw; min-height: 100vh; overflow: hidden; }
+  a { text-decoration: none; color: inherit; }
+  header.top { height: 64px; display: flex; align-items: center; justify-content: space-between; padding: 0 28px; border-bottom: 1px solid var(--gs-line); }
+  header.top nav { display: flex; align-items: center; gap: 10px; }
+  header.top nav a.link { font-size: 15px; font-weight: 500; padding: 0 10px; }
+  .vr { width: 1px; height: 22px; background: var(--gs-line); margin: 0 6px; }
+  .titlebar { display: flex; align-items: flex-end; justify-content: space-between; padding: 22px 32px 20px; border-bottom: 1px solid var(--gs-line); }
+  .crumbs { font-size: 14px; color: var(--gs-fg-2); display: flex; gap: 8px; } .crumbs b { font-weight: 500; color: var(--gs-fg); }
+  .titlebar h1 { font-size: 30px; line-height: 1.15; letter-spacing: -0.025em; font-weight: 650; margin: 8px 0; }
+  .meta { font: 13px/1 'Geist Mono'; color: var(--gs-fg-2); letter-spacing: 0.04em; display: flex; gap: 10px; align-items: center; }
+  .meta i { width: 3px; height: 3px; border-radius: 50%; background: var(--gs-control); }
+  .actions { display: flex; align-items: center; gap: 10px; }
+  .status { display: inline-flex; align-items: center; gap: 8px; font: 13px 'Geist Mono'; color: var(--gs-fg-2); margin-right: 8px; }
+  .status::before { content: ''; width: 7px; height: 7px; border-radius: 50%; border: 1.5px solid var(--gs-fg-2); }
+  .body { display: grid; grid-template-columns: minmax(0, 1fr) 520px; height: calc(100vh - 181px); }
+  .work { padding: 0 28px 16px 32px; border-right: 1px solid var(--gs-line); min-width: 0; }
+  .tabs { display: flex; align-items: center; gap: 4px; height: 52px; }
+  .tab { height: 52px; display: inline-flex; align-items: center; gap: 8px; padding: 0 14px; font-size: 15px; font-weight: 500; color: var(--gs-fg-2); border-bottom: 2px solid transparent; }
+  .tab.on { color: var(--gs-fg); border-bottom-color: var(--gs-accent); }
+  .panes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .pane { position: relative; aspect-ratio: 702 / 511; overflow: hidden; background: #000; }
+  .pane img { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .pane svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .chip { position: absolute; top: 10px; left: 10px; font: 500 12px/1 'Geist Mono'; letter-spacing: .08em; padding: 7px 9px; background: rgb(9 9 11 / .8); border: 1px solid #3f3f46; border-radius: 4px; }
+  .north { position: absolute; right: 10px; top: 10px; width: 28px; height: 28px; border-radius: 4px; background: rgb(9 9 11 / .72); display: grid; place-items: center; font: 600 10px 'Geist Mono'; }
+  .scale { position: absolute; left: 10px; bottom: 10px; padding: 5px 8px 6px; background: rgb(9 9 11 / .72); border-radius: 4px; font: 11px 'Geist Mono'; }
+  .scale .bar { height: 5px; border: 1.5px solid #f4f4f5; border-top: 0; margin-top: 4px; }
+  .pcap { display: flex; justify-content: space-between; margin-top: 8px; font: 12px 'Geist Mono'; color: var(--gs-fg-2); }
+  .pcap b { font-weight: 500; color: var(--gs-fg); }
+  .strip { margin-top: 18px; }
+  .strip .bars { position: relative; height: 22px; border-bottom: 1px solid var(--gs-line); }
+  .strip .bars i { position: absolute; bottom: 0; width: 2px; height: 22px; background: var(--gs-fg); opacity: .8; }
+  .strip .bars i.p { height: 11px; opacity: .65; } .strip .bars i.o { height: 4px; background: var(--gs-fg-2); opacity: .45; }
+  .strip .bars i.sel { background: var(--gs-accent); opacity: 1; width: 3px; }
+  .strip .years { position: relative; height: 18px; font: 11px 'Geist Mono'; color: var(--gs-fg-2); }
+  .strip .years span { position: absolute; top: 5px; }
+  aside { overflow: hidden; }
+  aside section { padding: 20px 24px; border-bottom: 1px solid var(--gs-line); }
+  aside h2 { font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+  aside p.help { font-size: 13px; color: var(--gs-fg-2); margin: 6px 0 14px; }
+  table.grid { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .grid th, .grid td { border: 1px solid var(--gs-line); padding: 8px 6px; font: 11px/1.25 'Geist Mono'; text-align: left; }
+  .grid thead th { color: var(--gs-fg); font-weight: 500; font-size: 12px; } .grid thead th small { display: block; color: var(--gs-fg-2); font-weight: 400; }
+  .grid tbody th { font-weight: 500; font-size: 12px; white-space: nowrap; }
+  .grid thead th:first-child { width: 104px; }
+  .grid td .c { display: inline-flex; align-items: center; gap: 6px; letter-spacing: .06em; }
+  .grid td.sel { outline: 1.5px solid var(--gs-accent); outline-offset: -2px; }
+  .detail h3 { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
+  .detail .sub { font: 13px 'Geist Mono'; color: var(--gs-fg-2); margin-top: 6px; }
+  .detail p { font-size: 13px; color: var(--gs-fg-2); margin-top: 10px; }
+  .kinds { display: flex; gap: 8px; margin: 12px 0 10px; }
+  .kinds span { height: 34px; display: inline-flex; align-items: center; padding: 0 12px; border: 1px solid var(--gs-control); border-radius: 6px; font-size: 13px; }
+  .kinds span.on { background: var(--gs-fg); color: var(--gs-bg); border-color: var(--gs-fg); }
+  .textarea { min-height: 58px; padding: 10px 12px; border: 1px solid #3f3f46; border-radius: 6px; font-size: 14px; line-height: 1.45; background: #0d0d10; }
+  .nfoot { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; font-size: 13px; color: var(--gs-fg-2); }
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="wordmark" href="#"><span id="mk"></span><span class="type"><b>GRAH</b><span>SABOOT</span></span></a>
+  <nav><a class="link" href="#">Globe</a><a class="link" href="#">New investigation</a><span class="vr"></span>
+    <button class="icon-btn" aria-label="Switch theme"><svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M233.54 142.23a8 8 0 0 0-8-2 88.08 88.08 0 0 1-109.8-109.8 8 8 0 0 0-10-10 104.84 104.84 0 0 0-52.91 37A104 104 0 0 0 136 224a103.09 103.09 0 0 0 62.52-20.88 104.84 104.84 0 0 0 37-52.91 8 8 0 0 0-1.98-7.98Z"/></svg></button>
+    <a class="btn ghost sm" href="#">Sign in</a></nav>
+</header>
+<div class="titlebar">
+  <div>
+    <div class="crumbs"><span>Investigations</span><span>/</span><b>Atal Setu, Navi Mumbai approach</b></div>
+    <h1>Atal Setu, Navi Mumbai approach</h1>
+    <div class="meta"><span>ROAD</span><i></i><span>8.0 KM</span><i></i><span>40 M WIDE</span><i></i><span>4 SECTIONS</span><i></i><span>1 JAN 2018 – 31 DEC 2025</span></div>
+  </div>
+  <div class="actions"><span class="status">Local draft</span><a class="btn accent-outline" href="#">Save and verify</a><a class="btn primary" href="#">Report</a></div>
+</div>
+<div class="body">
+  <div class="work">
+    <div class="tabs"><span class="tab">Swipe</span><span class="tab on">Side by side</span><span class="tab">Difference</span><span style="flex:1"></span><span class="outline-t" style="display:inline-flex;align-items:center;gap:8px;font-size:14px;color:var(--gs-fg-2)"><span style="width:30px;height:18px;border-radius:9px;background:var(--gs-accent);position:relative;display:inline-block"><span style="position:absolute;right:2px;top:2px;width:14px;height:14px;border-radius:50%;background:#09090b"></span></span>Outline</span></div>
+    <div class="panes">
+      <div><div class="pane" id="p0"><img src="road-2018-02-22.png" alt=""><span class="chip">22 FEB 2018</span><span class="north">N↑</span><span class="scale">1 km<div class="bar"></div></span></div>
+        <div class="pcap"><span><b>Sentinel-2B</b> · 10 m · 100% clear view</span><span>Details</span></div></div>
+      <div><div class="pane" id="p1"><img src="road-2025-12-12.png" alt=""><span class="chip">12 DEC 2025</span><span class="north">N↑</span><span class="scale">1 km<div class="bar"></div></span></div>
+        <div class="pcap"><span><b>Sentinel-2B</b> · 10 m · 100% clear view</span><span>Details</span></div></div>
+    </div>
+    <div class="strip"><div class="bars" id="bars"></div><div class="years" id="years"></div></div>
+  </div>
+  <aside>
+    <section>
+      <h2>Sections × photo dates</h2>
+      <p class="help">How clearly each 2 km section is visible on each date.</p>
+      <table class="grid" id="grid"></table>
+    </section>
+    <section class="detail">
+      <h3>Section 02 · 2.0–4.0 km</h3>
+      <div class="sub">12 DEC 2025 · CLEAR VIEW</div>
+      <p>Cloudy or missing views are gaps in the evidence, not "no change".</p>
+    </section>
+    <section>
+      <h2>Your notes</h2>
+      <div class="kinds"><span class="on">Visible change</span><span>No clear visible change</span><span>Not sure</span></div>
+      <div class="textarea">A continuous bridge deck is visible across this section.</div>
+      <div class="nfoot"><span>Section 02 · 12 Dec 2025</span><span class="btn primary sm">Add note</span></div>
+    </section>
+  </aside>
+</div>
+<script type="module">
+document.getElementById('mk').innerHTML = (await (await fetch('mark.svg')).text()).replace('<svg ', '<svg width="30" height="30" ')
+const road = await (await fetch('road.json')).json()
+const W = road.size.width, H = road.size.height
+for (const id of ['p0', 'p1']) {
+  const pane = document.getElementById(id)
+  const pts = road.linePx.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ')
+  const marks = road.cutsPx.map(([x, y], i) => `<g transform="translate(${x} ${y})"><rect x="-11" y="-9" width="22" height="18" rx="2" fill="#09090b" stroke="${i === 1 ? '#e48444' : '#f4f4f5'}" stroke-width="1.2"/><text x="0" y="4" text-anchor="middle" font-family="Geist Mono" font-size="10" fill="#f4f4f5">0${i + 1}</text></g>`).join('')
+  pane.insertAdjacentHTML('beforeend', `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><polyline points="${pts}" fill="none" stroke="rgb(228 132 68 / .16)" stroke-width="7" stroke-linejoin="round"/><polyline points="${pts}" fill="none" stroke="#e48444" stroke-opacity=".55" stroke-width="1" stroke-dasharray="6 5" stroke-linejoin="round"/>${marks}</svg>`)
+  pane.querySelector('.scale .bar').style.width = `${(100 / W) * pane.clientWidth}px`
+}
+// one-row barcode over 8 years (tile cloud cover as a stand-in; the product uses per-outline cloud checks)
+const dates = await (await fetch('timeline.json')).json()
+const t0 = Date.parse('2018-01-01'), t1 = Date.parse('2026-01-01')
+const sel = new Set(road.dates.map((d) => d.date))
+document.getElementById('bars').innerHTML = dates.filter((d) => d.date >= '2018').map((d) => {
+  const x = (Date.parse(d.date) - t0) / (t1 - t0) * 100
+  const c = sel.has(d.date) ? 'sel' : d.cloud < 5 ? '' : d.cloud < 60 ? 'p' : 'o'
+  return `<i class="${c}" style="left:${x.toFixed(2)}%"></i>`
+}).join('')
+document.getElementById('years').innerHTML = [2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025].map((y) => `<span style="left:${((Date.parse(y + '-01-01') - t0) / (t1 - t0) * 100).toFixed(2)}%">${y}</span>`).join('')
+const glyph = { CLEAR: '<svg width="11" height="11"><rect x=".5" y=".5" width="10" height="10" fill="currentColor"/></svg>', PARTIAL: '<svg width="11" height="11"><rect x=".5" y=".5" width="10" height="10" fill="none" stroke="currentColor"/><path d="M.5 10.5 10.5 .5V10.5Z" fill="currentColor"/></svg>', OBSCURED: '<svg width="11" height="11"><rect x=".5" y=".5" width="10" height="10" fill="none" stroke="currentColor"/><path d="M1 1l9 9M10 1 1 10" stroke="currentColor"/></svg>', NOT_COVERED: '<svg width="11" height="11"><rect x=".5" y=".5" width="10" height="10" fill="none" stroke="currentColor" stroke-dasharray="2 2"/></svg>' }
+const word = { CLEAR: 'CLEAR', PARTIAL: 'PARTLY', OBSCURED: 'CLOUD', NOT_COVERED: 'NO DATA' }
+const fmt = (d) => { const x = new Date(d + 'T00:00:00Z'); return [x.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', timeZone: 'UTC' }), x.getUTCFullYear()] }
+const head = '<thead><tr><th>Section</th>' + road.dates.map((d) => { const [a, b] = fmt(d.date); return `<th>${a}<small>${b}</small></th>` }).join('') + '</tr></thead>'
+const body = road.parts.map((p, i) => `<tr><th>0${i + 1} · ${(p.fromM / 1000).toFixed(0)}–${(p.toM / 1000).toFixed(0)} km</th>` + road.dates.map((d, j) => `<td class="${i === 1 && j === road.dates.length - 1 ? 'sel' : ''}"><span class="c">${glyph[d.parts[i].label]}${word[d.parts[i].label]}</span></td>`).join('') + '</tr>').join('')
+document.getElementById('grid').innerHTML = head + '<tbody>' + body + '</tbody>'
+document.body.dataset.ready = '1'
+</script>
+</body>
+</html>

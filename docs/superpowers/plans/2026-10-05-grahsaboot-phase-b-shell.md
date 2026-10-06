@@ -10,6 +10,8 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-05-grahsaboot-design.md`: §7.2 globe, §7.3 satellites, §7.4 screens, §7.5 design system, §7.6 tiers, §7.7 accessibility, §8.4 Cloudflare Worker, §14 probe P8. Execution rules: `docs/superpowers/plans/2026-10-05-grahsaboot-plan.md`.
 
+**Visual target (approved 2026-10-06):** `docs/design/README.md` and `docs/design/mockups/`. Mockups win on looks; this plan wins on behaviour, copy, tokens and accessibility. Also apply `docs/superpowers/plans/2026-10-06-phase-a-carry-forward.md`.
+
 ## Global Constraints
 
 - Default `data-theme="dark"`. Light is a persisted toggle (`localStorage['gs-theme']`). Both themes use exactly these tokens:

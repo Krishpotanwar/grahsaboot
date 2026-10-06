@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<title>GrahSaboot · Report</title>
+<link rel="stylesheet" href="base.css">
+<style>
+  body { width: 100vw; min-height: 100vh; overflow: hidden; background: #fafafa; }
+  a { text-decoration: none; color: inherit; }
+  header.top { height: 64px; display: flex; align-items: center; justify-content: space-between; padding: 0 28px; border-bottom: 1px solid var(--gs-line); background: #fff; }
+  header.top nav { display: flex; align-items: center; gap: 10px; }
+  header.top nav a.link { font-size: 15px; font-weight: 500; padding: 0 10px; }
+  .toolbar { display: flex; align-items: center; justify-content: space-between; padding: 14px 32px; }
+  .toolbar .back { display: inline-flex; align-items: center; gap: 8px; font-size: 15px; }
+  .toolbar .btns { display: flex; gap: 10px; }
+  .btn { border-color: #d4d4d8; }
+  .btn.dark { background: #18181b; color: #fff; border-color: #18181b; }
+  .sheet { width: 1180px; margin: 0 auto; background: #fff; border: 1px solid var(--gs-line); padding: 34px 44px 20px; }
+  .eyebrow { font: 12px 'Geist Mono'; letter-spacing: .14em; color: var(--gs-fg-2); display: flex; justify-content: space-between; }
+  h1 { font-size: 38px; letter-spacing: -0.03em; font-weight: 700; margin: 12px 0 6px; }
+  .lede { font-size: 17px; color: var(--gs-fg-2); }
+  .badge { display: inline-flex; align-items: center; gap: 8px; font: 500 12px 'Geist Mono'; padding: 7px 10px; border: 1px solid #a74e1b; color: #a74e1b; background: #fdf4ee; border-radius: 4px; }
+  .strip { display: grid; grid-template-columns: repeat(4, auto) 1fr; border-top: 1px solid var(--gs-line); border-bottom: 1px solid var(--gs-line); margin: 22px 0 6px; }
+  .strip div { padding: 12px 28px 12px 0; margin-right: 28px; border-right: 1px solid var(--gs-line); display: grid; gap: 6px; }
+  .strip div:last-child { border-right: 0; margin-right: 0; text-align: right; align-content: center; color: var(--gs-fg-2); font-size: 14px; }
+  .strip small { font: 11px 'Geist Mono'; letter-spacing: .14em; color: var(--gs-fg-2); }
+  .strip b { font: 500 16px 'Geist Mono'; }
+  .sec { display: grid; grid-template-columns: 44px 1fr; padding: 16px 0; border-bottom: 1px solid var(--gs-line); }
+  .sec > span { font: 14px 'Geist Mono'; color: var(--gs-fg-2); padding-top: 2px; }
+  .sec h2 { font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
+  .sec p { font-size: 15px; color: var(--gs-fg-2); margin-top: 6px; }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 12px; }
+  .ph { position: relative; aspect-ratio: 440 / 240; overflow: hidden; }
+  .ph img { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .ph svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .cap { display: flex; justify-content: space-between; margin-top: 8px; font: 13px 'Geist Mono'; }
+  .cap span:last-child { color: var(--gs-fg-2); }
+  .two { display: grid; grid-template-columns: 1fr 1fr; }
+  .two > div:first-child { padding-right: 24px; border-right: 1px solid var(--gs-line); }
+  .two > div:last-child { padding-left: 24px; }
+  .tag { display: inline-block; font: 500 12px 'Geist'; color: #a74e1b; background: #fdf4ee; padding: 4px 8px; border-radius: 4px; margin: 10px 0 6px; }
+  table.dates { width: 100%; border-collapse: collapse; margin-top: 10px; font: 13px 'Geist Mono'; }
+  .dates th, .dates td { text-align: left; padding: 8px 10px 8px 0; border-bottom: 1px solid var(--gs-line); }
+  .dates th { font: 11px 'Geist Mono'; letter-spacing: .12em; color: var(--gs-fg-2); font-weight: 400; }
+  .foot { display: flex; justify-content: space-between; padding-top: 12px; font: 11px 'Geist Mono'; color: var(--gs-fg-2); }
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="wordmark" href="#"><span id="mk"></span><span class="type"><b>GRAH</b><span>SABOOT</span></span></a>
+  <nav><a class="link" href="#">Globe</a><a class="link" href="#">New investigation</a>
+    <button class="icon-btn" aria-label="Switch theme"><svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M120 40V16a8 8 0 0 1 16 0v24a8 8 0 0 1-16 0Zm72 88a64 64 0 1 1-64-64 64.07 64.07 0 0 1 64 64Zm-16 0a48 48 0 1 0-48 48 48.05 48.05 0 0 0 48-48Z"/></svg></button></nav>
+</header>
+<div class="toolbar">
+  <a class="back" href="#"><svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M224 128a8 8 0 0 1-8 8H59.31l58.35 58.34a8 8 0 0 1-11.32 11.32l-72-72a8 8 0 0 1 0-11.32l72-72a8 8 0 0 1 11.32 11.32L59.31 120H216a8 8 0 0 1 8 8Z"/></svg>Back to the workbench</a>
+  <div class="btns"><a class="btn" href="#">Download HTML</a><a class="btn" href="#">Provenance JSON</a><a class="btn dark" href="#">Print or save as PDF</a></div>
+</div>
+<div class="sheet">
+  <div class="eyebrow"><span>GRAHSABOOT · EVIDENCE REPORT · GENERATED 5 OCT 2026 12:40 UTC</span><span class="badge">Local preview · not verified yet</span></div>
+  <h1>Navi Mumbai airport site</h1>
+  <p class="lede">A dated record of what was visible from above.</p>
+  <div class="strip num">
+    <div><small>AREA</small><b>3.99 km²</b></div>
+    <div><small>DATES</small><b>22 Feb 2018 – 12 Dec 2025</b></div>
+    <div><small>SOURCE</small><b>Sentinel-2 L2A</b></div>
+    <div><small>RESOLUTION</small><b>10 m</b></div>
+    <div>Prepared by: Field team, Panvel</div>
+  </div>
+  <div class="sec"><span>01</span><div><h2>Before and after</h2>
+    <div class="pair">
+      <div><div class="ph" id="b"><img src="site-20180222.png" alt=""></div><div class="cap"><span>22 Feb 2018 · Sentinel-2B</span><span>100% clear view · 10 m</span></div></div>
+      <div><div class="ph" id="a"><img src="site-20251212.png" alt=""></div><div class="cap"><span>12 Dec 2025 · Sentinel-2B</span><span>100% clear view · 10 m</span></div></div>
+    </div></div></div>
+  <div class="sec"><span>02</span><div class="two">
+    <div><h2>Observations</h2><span class="tag">Visible change · 12 Dec 2025</span><p style="margin-top:2px">A terminal building and a runway are visible inside the outline.</p></div>
+    <div><h2>Gaps and limits</h2><p>Monsoon dates (June–September) are mostly cloud. 10 m pixels can hide small features. Photos do not establish completion, payments or quality.</p></div>
+  </div></div>
+  <div class="sec"><span>03</span><div><h2>Pinned dates</h2>
+    <table class="dates num"><thead><tr><th>DATE</th><th>VIEW</th><th>CLEAR</th><th>SERVER CHECK</th><th>SOURCE</th><th>SHA-256 (SOURCE PIXELS)</th></tr></thead><tbody>
+      <tr><td>22 Feb 2018</td><td>Clear</td><td>100%</td><td>Not checked</td><td>S2B_43QBB_20180222_0_L2A</td><td>3f9c…a417</td></tr>
+      <tr><td>12 Dec 2025</td><td>Clear</td><td>100%</td><td>Not checked</td><td>S2B_43QBB_20251212_0_L2A</td><td>b20e…19c8</td></tr>
+    </tbody></table></div></div>
+  <div class="foot"><span>Contains modified Copernicus Sentinel data 2018, 2025 · © OpenStreetMap contributors</span><span>01</span></div>
+</div>
+<script type="module">
+document.getElementById('mk').innerHTML = (await (await fetch('mark.svg')).text()).replace('<svg ', '<svg width="30" height="30" ')
+for (const id of ['a', 'b']) document.getElementById(id).insertAdjacentHTML('beforeend', '<svg viewBox="0 0 440 240" preserveAspectRatio="none"><polygon points="118.7,218.5 318.9,220.7 321.1,21.6 120.9,19.4" fill="none" stroke="#a74e1b" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>')
+document.body.dataset.ready = '1'
+</script>
+</body>
+</html>

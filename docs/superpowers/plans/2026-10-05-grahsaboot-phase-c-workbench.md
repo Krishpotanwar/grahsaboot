@@ -10,6 +10,8 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-05-grahsaboot-design.md`: §2 promise and wording, §3 journeys, §5 evidence pipeline, §6 roads, §7.4 screens, §7.5 design, §7.6 tiers, §7.7 accessibility, §9 privacy, §10 limits. Execution rules: `docs/superpowers/plans/2026-10-05-grahsaboot-plan.md`.
 
+**Visual target (approved 2026-10-06):** `docs/design/README.md` and `docs/design/mockups/`. Mockups win on looks; this plan wins on behaviour, copy, tokens and accessibility. Also apply `docs/superpowers/plans/2026-10-06-phase-a-carry-forward.md`.
+
 ## Global Constraints
 
 - All user-visible text lives in `src/ui/copy.ts` (Phase B) or `src/ui/copy-flow.ts` (this phase). The verdict-word test covers both files.

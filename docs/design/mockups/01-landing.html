@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<title>GrahSaboot · Globe</title>
+<link rel="stylesheet" href="node_modules/maplibre-gl/dist/maplibre-gl.css">
+<link rel="stylesheet" href="base.css">
+<style>
+  body { width: 100vw; height: 100vh; overflow: hidden; }
+  a { text-decoration: none; }
+  .shade { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(circle at 40% 36%, transparent 28%, rgb(9 9 11 / .38) 66%); }
+  header { position: relative; z-index: 30; height: 64px; display: flex; align-items: center; justify-content: space-between; padding: 0 28px; border-bottom: 1px solid var(--gs-line); background: var(--gs-bg); }
+  nav { display: flex; align-items: center; gap: 10px; }
+  nav a.link { font-size: 15px; font-weight: 500; color: var(--gs-fg); text-decoration: none; padding: 0 10px; }
+  .vr { width: 1px; height: 22px; background: var(--gs-line); margin: 0 6px; }
+
+  .stage { position: fixed; inset: 64px 0 0 38%; z-index: 0; background: var(--gs-bg); }
+  .stage > div { width: 100%; height: 100%; }
+  main { position: relative; z-index: 10; height: calc(100vh - 64px); display: grid; grid-template-columns: 38% 1fr; pointer-events: none; }
+  .lead { pointer-events: auto; background: var(--gs-bg); display: flex; flex-direction: column; justify-content: center; padding: 0 56px 72px 48px; gap: 0; }
+  .lead h1 { font-size: 58px; line-height: 1.02; letter-spacing: -0.035em; font-weight: 700; margin: 18px 0 20px; }
+  .lead .sub { font-size: 19px; line-height: 1.5; color: var(--gs-fg-2); max-width: 40ch; }
+  .search { margin-top: 40px; }
+  .input .go { height: 42px; padding: 0 18px; border-radius: 4px; background: var(--gs-fg); color: var(--gs-bg); font: 500 15px 'Geist'; display: inline-flex; align-items: center; gap: 8px; }
+  .ctas { display: flex; align-items: center; gap: 20px; margin-top: 22px; }
+  .ctas .btn.primary { height: 50px; padding: 0 22px; font-size: 16px; }
+  .example { font-size: 15px; color: var(--gs-fg-2); text-decoration: none; }
+  .example b { font-weight: 500; color: var(--gs-fg); border-bottom: 1px solid var(--gs-accent); padding-bottom: 2px; }
+  .quiet { margin-top: 26px; font-size: 14px; color: var(--gs-fg-2); }
+  .foot { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; height: 40px; display: flex; align-items: center; justify-content: space-between; padding: 0 28px 0 48px; font-size: 12px; color: var(--gs-fg-2); pointer-events: none; }
+  .foot nav { gap: 18px; pointer-events: auto; } .foot a { color: var(--gs-fg-2); text-decoration: none; }
+
+  .panel { position: absolute; right: 28px; bottom: 56px; width: 352px; padding: 18px 20px 16px; pointer-events: auto; }
+  .panel h2 { font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+  .panel .head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .panel table { width: 100%; border-collapse: collapse; font: 13px/1 'Geist Mono'; }
+  .panel td { padding: 10px 0; border-top: 1px solid var(--gs-line); }
+  .panel td:last-child { text-align: right; color: var(--gs-fg-2); }
+  .panel tr.hot td:first-child { color: var(--gs-accent); }
+  .panel .next { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--gs-line); display: grid; gap: 6px; }
+  .panel .next strong { font-size: 15px; font-weight: 500; }
+  .panel .note { margin-top: 12px; font-size: 12px; line-height: 1.45; color: var(--gs-fg-2); }
+
+  .sat { display: flex; align-items: center; gap: 8px; color: var(--gs-fg); font: 500 12px 'Geist'; text-shadow: 0 1px 2px rgb(0 0 0 / .9); pointer-events: none; white-space: nowrap; }
+  .sat svg { filter: drop-shadow(0 1px 1px rgb(0 0 0 / .8)); }
+  .sat.hot { color: #fff; }
+  .pin { display: flex; align-items: center; gap: 8px; }
+  .pin i { width: 12px; height: 12px; border-radius: 50%; background: var(--gs-accent); box-shadow: 0 0 0 4px rgb(228 132 68 / .28), 0 0 0 1px #09090b; }
+  .pin span { font: 500 13px 'Geist'; padding: 4px 8px; border-radius: 6px; background: rgb(9 9 11 / .78); border: 1px solid #3f3f46; }
+  .maplibregl-ctrl-group { background: var(--gs-panel) !important; border: 1px solid var(--gs-line); border-radius: 6px !important; box-shadow: none !important; }
+  .maplibregl-ctrl-group button + button { border-top: 1px solid var(--gs-line) !important; }
+  .maplibregl-ctrl-group button .maplibregl-ctrl-icon { filter: invert(1) brightness(1.2); }
+  .maplibregl-ctrl-attrib.maplibregl-compact { background: rgb(24 24 27 / .8) !important; color: var(--gs-fg-2); }
+  .maplibregl-ctrl-attrib { display: none !important; }
+  .maplibregl-ctrl-attrib-button { filter: invert(1); }
+</style>
+</head>
+<body>
+<header>
+  <a class="wordmark" href="#"><span id="mk"></span><span class="type"><b>GRAH</b><span>SABOOT</span></span></a>
+  <nav>
+    <a class="link" href="#">Start an investigation</a>
+    <span class="vr"></span>
+    <button class="icon-btn" aria-label="Switch theme"><svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M120 40V16a8 8 0 0 1 16 0v24a8 8 0 0 1-16 0Zm72 88a64 64 0 1 1-64-64 64.07 64.07 0 0 1 64 64Zm-16 0a48 48 0 1 0-48 48 48.05 48.05 0 0 0 48-48ZM58.34 69.66a8 8 0 0 0 11.32-11.32l-16-16a8 8 0 0 0-11.32 11.32Zm0 116.68-16 16a8 8 0 0 0 11.32 11.32l16-16a8 8 0 0 0-11.32-11.32ZM192 72a8 8 0 0 0 5.66-2.34l16-16a8 8 0 0 0-11.32-11.32l-16 16A8 8 0 0 0 192 72Zm5.66 114.34a8 8 0 0 0-11.32 11.32l16 16a8 8 0 0 0 11.32-11.32ZM48 128a8 8 0 0 0-8-8H16a8 8 0 0 0 0 16h24a8 8 0 0 0 8-8Zm80 80a8 8 0 0 0-8 8v24a8 8 0 0 0 16 0v-24a8 8 0 0 0-8-8Zm112-88h-24a8 8 0 0 0 0 16h24a8 8 0 0 0 0-16Z"/></svg></button>
+    <a class="btn primary sm" href="#">Sign in</a>
+  </nav>
+</header>
+
+<div class="stage"><div id="map"></div></div>
+
+<main>
+  <section class="lead">
+    <p class="micro">Satellite proof for any place</p>
+    <h1>See what changed<br>at any place.</h1>
+    <p class="sub">Dated Sentinel-2 photos of a site or road, checked for clouds and kept as evidence you can share.</p>
+    <div class="search field">
+      <label class="micro" for="q">Search a place or paste coordinates</label>
+      <div class="input"><span class="ph" style="color:var(--gs-fg)">Nagpur, Maharashtra</span><span class="go">Search</span></div>
+    </div>
+    <div class="ctas">
+      <a class="btn primary" href="#">Start an investigation here</a>
+      <a class="example" href="#">or try <b>Navi Mumbai airport</b></a>
+    </div>
+    <p class="quiet">Explore freely. Sign in only when you want to save.</p>
+  </section>
+  <section style="position:relative">
+    <div class="panel glass">
+      <div class="head"><h2>Live satellites</h2><span class="live">LIVE</span></div>
+      <table class="num" id="rows"></table>
+      <div class="next">
+        <span class="micro">Next pass over Nagpur · estimated</span>
+        <strong id="next"></strong>
+      </div>
+      <p class="note">Positions from public orbit data. A pass is not a usable photo: clouds can block it.</p>
+    </div>
+  </section>
+</main>
+<div class="foot"><span>NASA Blue Marble · © OpenStreetMap contributors</span><nav><a href="#">Privacy</a><a href="#">Limits</a></nav></div>
+
+<script type="module">
+import * as ml from './node_modules/maplibre-gl/dist/maplibre-gl.mjs'
+ml.setWorkerUrl('./node_modules/maplibre-gl/dist/maplibre-gl-worker.mjs')
+document.getElementById('mk').innerHTML = (await (await fetch('mark.svg')).text()).replace('<svg ', '<svg width="30" height="30" ')
+const { sats, place } = await (await fetch('sats.json')).json()
+const fmt = (v, p, n) => `${Math.abs(v).toFixed(1)}° ${v >= 0 ? p : n}`
+const hot = sats.filter((s) => s.next).sort((a, b) => a.next.localeCompare(b.next))[0]
+document.getElementById('rows').innerHTML = sats.map((s) => `<tr class="${s === hot ? 'hot' : ''}"><td>${s.name}</td><td>${fmt(s.lat, 'N', 'S')}&nbsp;&nbsp;${fmt(s.lon, 'E', 'W')}</td></tr>`).join('')
+const ist = new Date(new Date(hot.next).getTime() + 5.5 * 3600e3)
+document.getElementById('next').textContent = `${hot.name} · ${ist.toUTCString().slice(0, 11)} · ${ist.toISOString().slice(11, 16)} IST`
+
+const el = document.getElementById('map')
+const h = el.clientHeight, w = el.clientWidth
+const zoom = Math.log2((0.44 * Math.min(w, h) * 2 * Math.PI) / 512) + 0.36
+const map = new ml.Map({
+  container: el, attributionControl: false, center: [81, 16], zoom,
+  style: {
+    version: 8, projection: { type: 'globe' },
+    sources: { bm: { type: 'raster', tiles: ['https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/' + (new URLSearchParams(location.search).get('bm') || 'BlueMarble_ShadedRelief_Bathymetry') + '/default/GoogleMapsCompatible_Level8/{z}/{y}/{x}.jpeg'], tileSize: 256, maxzoom: 8, attribution: 'NASA GIBS' } },
+    layers: [{ id: 'bg', type: 'background', paint: { 'background-color': '#09090b' } }, { id: 'bm', type: 'raster', source: 'bm', paint: { 'raster-fade-duration': 0, 'raster-saturation': -0.08, 'raster-contrast': 0.06 } }],
+    sky: { 'atmosphere-blend': 0.9 },
+    light: { anchor: 'map', position: [1.5, 60, 50] },
+  },
+})
+map.addControl(new ml.NavigationControl({ showCompass: false }), 'top-right')
+map.addControl(new ml.AttributionControl({ compact: true, customAttribution: ['© OpenStreetMap contributors'] }), 'bottom-left')
+el.parentElement.insertAdjacentHTML('beforeend', '<div class="shade"></div>')
+map.on('load', () => {
+  const tracks = { type: 'FeatureCollection', features: sats.map((s) => ({ type: 'Feature', properties: { hot: s === hot }, geometry: { type: 'MultiLineString', coordinates: s.track } })) }
+  map.addSource('tracks', { type: 'geojson', data: tracks })
+  map.addLayer({ id: 'tracks', type: 'line', source: 'tracks', paint: { 'line-color': ['case', ['get', 'hot'], '#e48444', 'rgba(244,244,245,0.6)'], 'line-width': ['case', ['get', 'hot'], 1.6, 1.1], 'line-dasharray': [3, 3] } })
+  const glyph = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><g transform="rotate(-35 12 12)"><rect x="1.5" y="9.5" width="6.5" height="5" rx=".5" fill="currentColor" fill-opacity=".85"/><rect x="16" y="9.5" width="6.5" height="5" rx=".5" fill="currentColor" fill-opacity=".85"/><path d="M8 12h2M14 12h2"/><rect x="10" y="9" width="4" height="6" rx="1" fill="#09090b"/></g></svg>`
+  for (const s of sats) {
+    const m = document.createElement('div'); m.className = 'sat' + (s === hot ? ' hot' : '')
+    m.innerHTML = glyph + `<span>${s.name}</span>`
+    new ml.Marker({ element: m, anchor: 'left', offset: [-11, 0], opacityWhenCovered: '0' }).setLngLat([s.lon, s.lat]).addTo(map)
+  }
+  const p = document.createElement('div'); p.className = 'pin'; p.innerHTML = `<i></i><span>${place.name}</span>`
+  new ml.Marker({ element: p, anchor: 'left', offset: [-6, 0] }).setLngLat([place.lon, place.lat]).addTo(map)
+  map.once('idle', () => { document.body.dataset.ready = '1' })
+})
+</script>
+</body>
+</html>
