@@ -20,11 +20,14 @@ import { SearchBox } from '../ui/SearchBox.tsx'
 
 const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches
 
+// The map outlives this screen (it remounts on every visit to /), so the picked place has to as well: the pin and the next pass come back with it.
+let lastPlace: Place | null = null
+
 export default function GlobeScreen() {
   useMapLayout('globe')
   const { map, tier, setTierOverride, installLayers } = useMapStage()
   const desktop = useMediaQuery('(min-width: 1024px)')
-  const [place, setPlace] = useState<Place | null>(null)
+  const [place, setPlace] = useState<Place | null>(lastPlace)
   const [hot, setHot] = useState<number | null>(null)
   // Positions run at every tier (T0 and T1 show the text list); only the map layers need T2+.
   const { sats, status, stale, tracks, swaths, passes } = useSatellites(true)
@@ -103,6 +106,7 @@ export default function GlobeScreen() {
   }, [map, place])
 
   const select = (p: Place) => {
+    lastPlace = p
     setPlace(p)
     if (map) flyToPlace(map, p, reducedMotion())
   }

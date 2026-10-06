@@ -105,6 +105,23 @@ test('coming back to the globe from a place does not spin the zoomed-in map', as
   expect(await lng()).toBeCloseTo(before, 6)
 })
 
+// The map outlives the globe screen, so the pick must too: the pin, the next pass and "start here" come back with it.
+test('the picked place is still there after a trip to another page', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.goto('/?tier=2')
+  test.skip(!(await hasWebgl2(page)), 'no WebGL2 in this engine')
+  await styleReady(page)
+  await page.getByLabel(copy.search.label).fill('21.1458, 79.0882')
+  await page.getByRole('button', { name: copy.search.submit }).click()
+  const pin = page.locator('.place-pin')
+  await expect(pin).toHaveText(copy.search.coordsResult(21.1458, 79.0882))
+  await page.getByRole('link', { name: copy.nav.startHere }).click()
+  await page.getByRole('link', { name: copy.notFound.home }).click()
+  await expect(pin).toHaveText(copy.search.coordsResult(21.1458, 79.0882))
+  await expect(page.getByRole('link', { name: copy.nav.startHere })).toBeVisible()
+  await expect(page.getByText(/^Next look at/)).toBeVisible()
+})
+
 test('the globe auto-rotates on a large screen', async ({ page, isMobile }) => {
   test.skip(isMobile, 'a 2200 px wide emulated phone (DPR 2.6) would need a ~12 MP canvas')
   await page.setViewportSize({ width: 2200, height: 1300 })
