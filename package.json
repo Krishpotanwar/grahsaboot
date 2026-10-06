@@ -35,6 +35,7 @@
     "terra-draw-maplibre-gl-adapter": "1.4.1"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
     "@electric-sql/pglite": "0.5.8",
     "@electric-sql/pglite-postgis": "0.2.8",
     "@playwright/test": "1.63.0",

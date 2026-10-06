@@ -3,6 +3,7 @@ dist/
 .wrangler/
 .env
 .env.*
+!.env.e2e
 !.env.example
 supabase/.temp/
 supabase/.branches/
