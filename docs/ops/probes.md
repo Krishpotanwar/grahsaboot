@@ -9,7 +9,7 @@
 | P4 | Google sign-in non-team user | | pending | | |
 | P5 | Globe FPS at 4x CPU throttle | | pending | | |
 | P6 | OpenFreeMap buildings + styles; EOX 2016 layer id | | pending | | |
-| P8 | CelesTrak GROUP=resource; Nominatim policy | | pending | | |
+| P8 | CelesTrak GROUP=resource; Nominatim policy | 2026-10-06 | PASS | CelesTrak `GROUP=resource&FORMAT=json`: `200 40697:true 42063:true 60989:true 39084:true 49260:true` (167 objects, 70,351 B re-serialised; the five-satellite subset is 2,110 B). Nominatim policy re-read: at most 1 request per second, HTTP Referer or User-Agent identifying the app, no client-side autocomplete, attribution, cached results; the requirements do not ask for an email. See P8 notes. | keep `GROUP=resource` and the five NORAD IDs for B7. Keep search on submit only, 1 req/s plus cache, attribution shown. |
 
 ## P7 notes
 
@@ -26,3 +26,12 @@
 - STAC fields confirmed on the known item: `properties.datetime`, `eo:cloud_cover`, `s2:processing_baseline`, `s2:nodata_pixel_percentage`, `proj:epsg` (number 32644; `proj:code` is absent); `assets.visual` and `assets.scl` each have `href`, `proj:shape` `[rows, cols]`, `proj:transform`.
 - Second S3 host `e84-earth-search-sentinel-data.s3.us-west-2.amazonaws.com`: header check only (curl on a `sentinel-2-c1-l2a` TCI asset with `Origin` and `Range`: `206`, `Access-Control-Allow-Origin: *`, `Accept-Ranges: bytes`). No geotiff read from it, and no `sentinel-2-l2a` item sampled was served from it, so "both hosts" in spec §14 P1 is only half checked.
 - `ms` covers the item fetch, two COG opens and two window reads end to end from this VM; the browser pages took about the same.
+
+## P8 notes
+
+- CelesTrak probe, 2026-10-06 07:46 UTC from this VM (Node 22.22.1 `fetch` with its default headers: no custom header, no email). Command, which printed `200 40697:true 42063:true 60989:true 39084:true 49260:true`:
+  `node -e "fetch('https://celestrak.org/NORAD/elements/gp.php?GROUP=resource&FORMAT=json').then(async (r) => { const all = await r.json(); console.log(r.status, [40697, 42063, 60989, 39084, 49260].map((id) => id + ':' + all.some((s) => s.NORAD_CAT_ID === id)).join(' ')) })"`
+  (I also wrote the body to a scratch file so nothing had to hit CelesTrak twice.) Response `content-type: application/json; charset=UTF-8`, no `last-modified` or `cache-control`. Records: SENTINEL-2A, SENTINEL-2B, SENTINEL-2C, LANDSAT 8, LANDSAT 9 (epochs 2026-10-05 18:07 to 23:36 UTC); `NORAD_CAT_ID` is a number; the 17 field names equal those in `tests/fixtures/tle.json`.
+- One live request only. CelesTrak's page (https://celestrak.org/NORAD/documentation/gp-data-formats.php, read 2026-10-06) says new GP data is checked once every 2 hours; for some datasets since March 2026 (its example is `GROUP=active`) a repeat inside that window gets HTTP 403, "GP data has not updated since your last successful download ... Data is updated once every 2 hours"; and 50 HTTP 301/403/404 errors in 2 hours put the IP address in the firewall. The Worker's 2-hour cache window matches this. Whether `GROUP=resource` is enforced the same way was not tested (that would need a second request). The dev and preview smoke tests used a stubbed upstream.
+- Nominatim policy (https://operations.osmfoundation.org/policies/nominatim/, read 2026-10-06, no revision date on the page): "an absolute maximum of 1 request per second"; "Provide a valid HTTP Referer or User-Agent identifying the application (stock User-Agents as set by http libraries will not do)"; auto-complete "you must not implement such a service on the client side"; "Clearly display attribution as suitable for your medium"; "Results must be cached on your side". The requirement list does not ask for an email address.
+- App against the policy: search runs on submit only, at most 1 request per second with a cache (B5); the browser sends its own Referer (no Referrer-Policy override in `index.html`); the request adds only `Accept-Language`; the panel shows "Search by OpenStreetMap Nominatim" and the map shows "© OpenStreetMap contributors". No User-Agent or email is set for Nominatim; the Worker's CelesTrak request uses the fixed `User-Agent: GrahSaboot/1.0`.
