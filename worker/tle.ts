@@ -41,10 +41,10 @@ export async function handleTle(
   const fetchedAt = Number(cached?.headers.get('x-gs-fetched') ?? -Infinity)
   if (cached && now() - fetchedAt < FRESH_MS) return reply(cachedBody, cached.headers.has('x-gs-stale'))
   try {
-    // CelesTrak normally answers in ~1 s; from some Cloudflare colos its origin times out (522 after ~20 s).
+    // CelesTrak normally answers in ~1 s; from some Cloudflare colos its origin times out (522 after ~20 s). 3 s is the longest a first visitor waits for the satellites panel before it gets the snapshot.
     const up = await deps.fetch(deps.upstream ?? UPSTREAM, {
       headers: { 'user-agent': 'GrahSaboot/1.0' },
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(3000),
     })
     if (!up.ok) throw new Error(`UPSTREAM_${up.status}`)
     const all = (await up.json()) as Array<{ NORAD_CAT_ID?: number }>
