@@ -14,12 +14,16 @@ function tleDev(): Plugin {
       store.set(r.url, res.clone())
     },
   }
-  const mw = async (req: IncomingMessage, res: ServerResponse, next: () => void) => {
-    if (!req.url?.startsWith('/api/tle')) return next()
-    const r = await handleTle(new Request(`http://localhost${req.url}`), { fetch, cache })
-    res.statusCode = r.status
-    r.headers.forEach((v, k) => res.setHeader(k, v))
-    res.end(Buffer.from(await r.arrayBuffer()))
+  const mw = async (req: IncomingMessage, res: ServerResponse, next: (err?: unknown) => void) => {
+    if (req.url?.split('?')[0] !== '/api/tle') return next()
+    try {
+      const r = await handleTle(new Request(`http://localhost${req.url}`), { fetch, cache })
+      res.statusCode = r.status
+      r.headers.forEach((v, k) => res.setHeader(k, v))
+      res.end(Buffer.from(await r.arrayBuffer()))
+    } catch (err) {
+      next(err)
+    }
   }
   return {
     name: 'gs-tle-dev',

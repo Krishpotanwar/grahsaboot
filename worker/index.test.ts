@@ -7,7 +7,10 @@ const SATS = JSON.parse(
 ) as unknown[]
 const ASSETS = { fetch: vi.fn(async () => new Response('<!doctype html>')) }
 
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => {
+  vi.unstubAllGlobals()
+  vi.clearAllMocks()
+})
 
 describe('worker entry', () => {
   it('serves /api/tle with a receiver-free fetch and caches.default', async () => {
