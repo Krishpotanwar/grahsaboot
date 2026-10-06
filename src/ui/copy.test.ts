@@ -1,8 +1,12 @@
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { copy, issueMessage } from './copy.ts'
 
-const SOURCE = readFileSync(new URL('./copy.ts', import.meta.url), 'utf8')
+const dir = new URL('./', import.meta.url)
+const SOURCE = readdirSync(dir)
+  .filter((f) => /^copy.*\.ts$/.test(f) && !f.endsWith('.test.ts'))
+  .map((f) => readFileSync(new URL(f, dir), 'utf8'))
+  .join('\n')
 const BANNED = [
   /\bconstructed\b/i,
   /\bcomplete(d)?\b/i,
@@ -14,7 +18,7 @@ const BANNED = [
 ]
 
 describe('copy', () => {
-  it('never uses verdict words (spec §2.2)', () => {
+  it('never uses verdict words (spec §2.2) in any copy file', () => {
     for (const re of BANNED) expect(re.test(SOURCE), String(re)).toBe(false)
   })
   it('tells visitors which tile hosts see their IP address and the area they view', () => {
