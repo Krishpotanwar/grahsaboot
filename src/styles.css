@@ -226,6 +226,11 @@
   border-radius: 6px;
   background: rgb(9 9 11 / 0.78);
   border: 1px solid #3f3f46;
+  /* The chip sits left of the pin: a long name must not run off the left edge of a phone. */
+  max-width: 40vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 /* The LIVE dot: the one perpetual animation besides the globe drift (transform and opacity only; reduced motion stops it). */
 .sat-dot {

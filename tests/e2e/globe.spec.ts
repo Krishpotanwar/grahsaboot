@@ -74,6 +74,21 @@ test('theme toggle swaps the map style', async ({ page }) => {
   await page.waitForFunction(() => !!(window as any).__gs.map.getLayer('gs-gibs'))
 })
 
+// The chip sits left of the pin, so a long name used to start off the left edge of a 360 px phone.
+test('the place chip stays on screen on a narrow phone', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 })
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.goto('/?tier=2')
+  test.skip(!(await hasWebgl2(page)), 'no WebGL2 in this engine')
+  await styleReady(page)
+  await page.getByLabel(copy.search.label).fill('21.1458, 79.0882')
+  await page.getByRole('button', { name: copy.search.submit }).click()
+  const chip = page.locator('.place-pin span')
+  await expect(chip).toBeVisible()
+  await page.waitForFunction(() => !(window as any).__gs.map.isMoving())
+  expect((await chip.boundingBox())!.x).toBeGreaterThanOrEqual(0)
+})
+
 // The terrain tiles' licence asks for credit, but only a tier-3 map uses them.
 test('terrain attribution shows at tier 3 and not at tier 2', async ({ page }) => {
   await page.goto('/?tier=2')
