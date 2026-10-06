@@ -15,6 +15,7 @@ function pageTitle(r: Route): string | null {
     case 'limits':
       return copy.pages.limits.title
     case 'new':
+      return copy.titles.new
     case 'investigation':
     case 'report':
       return copy.soon.title

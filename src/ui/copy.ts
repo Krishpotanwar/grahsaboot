@@ -22,7 +22,7 @@ export const copy = {
     home: 'GrahSaboot home',
     newInvestigation: 'Start an investigation',
     startHere: 'Start an investigation here',
-    example: 'Try a worked example: Nagpur',
+    example: 'Try a worked example: Navi Mumbai airport',
     privacy: 'Privacy',
     limits: 'Limits',
     themeToggle: 'Switch theme',
@@ -31,6 +31,7 @@ export const copy = {
     disclaimer:
       'Satellite photos show what is visible from above. They are not proof of contracts, payments or quality.',
   },
+  titles: { new: 'New investigation', investigation: 'Investigation', report: 'Evidence report' },
   notFound: { title: 'Page not found', body: 'That address does not exist.', home: 'Go to the globe' },
   // ponytail: prototype stand-in for the Phase C workbench routes; delete when /new, /i/:id and reports exist.
   soon: {

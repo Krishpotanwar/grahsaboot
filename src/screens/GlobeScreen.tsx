@@ -140,7 +140,7 @@ export default function GlobeScreen() {
             {place ? copy.nav.startHere : copy.nav.newInvestigation}
           </Link>
           <Link
-            to="/new?example=nagpur"
+            to="/new?example=navi-mumbai-airport"
             className="inline-flex h-11 items-center rounded-[6px] px-4 text-fg-2 hover:bg-panel hover:text-fg"
           >
             {copy.nav.example}

@@ -233,12 +233,16 @@ test('coming back to the globe from a place does not spin the zoomed-in map', as
   await page.getByLabel(copy.search.label).fill('21.1458, 79.0882')
   await page.getByRole('button', { name: copy.search.submit }).click()
   await expect
-    .poll(() => page.evaluate(() => !(window as any).__gs.map.isMoving() && (window as any).__gs.map.getZoom() > 10), {
-      timeout: 20_000,
-    })
+    .poll(
+      () =>
+        page.evaluate(() => !(window as any).__gs.map.isMoving() && (window as any).__gs.map.getZoom() > 10),
+      {
+        timeout: 20_000,
+      },
+    )
     .toBe(true)
   await page.getByRole('link', { name: copy.nav.startHere }).click()
-  await page.getByRole('link', { name: copy.notFound.home }).click()
+  await page.getByRole('link', { name: copy.nav.home }).click()
   await expect(page.getByLabel(copy.search.label)).toBeVisible()
   const lng = () => page.evaluate(() => (window as any).__gs.map.getCenter().lng as number)
   const before = await lng()
@@ -298,7 +302,7 @@ test('the picked place is still there after a trip to another page', async ({ pa
   const pin = page.locator('.place-pin')
   await expect(pin).toHaveText(copy.search.coordsResult(21.1458, 79.0882))
   await page.getByRole('link', { name: copy.nav.startHere }).click()
-  await page.getByRole('link', { name: copy.notFound.home }).click()
+  await page.getByRole('link', { name: copy.nav.home }).click()
   await expect(pin).toHaveText(copy.search.coordsResult(21.1458, 79.0882))
   await expect(page.getByRole('link', { name: copy.nav.startHere })).toBeVisible()
   await expect(page.getByText(/^Next look at/)).toBeVisible()

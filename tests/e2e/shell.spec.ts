@@ -1,5 +1,7 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test } from '@playwright/test'
+import { copy } from '../../src/ui/copy.ts'
+import { flow } from '../../src/ui/copy-flow.ts'
 
 test('navigates with history and links', async ({ page }) => {
   await page.goto('/limits')
@@ -39,11 +41,12 @@ test('unknown routes render not found', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible()
 })
 
-test('workbench routes say they are not in the prototype yet', async ({ page }) => {
-  await page.goto('/new?example=nagpur')
-  await expect(page.getByRole('heading', { name: 'Investigations are not in this prototype yet' })).toBeVisible()
-  await page.getByRole('link', { name: 'Go to the globe' }).click()
-  await expect(page).toHaveURL(/\/$/)
+// The Review step itself arrives in C3; until then step 4 shows the stepper at "Review" under the new page title.
+test('/new?example=navi-mumbai-airport opens the review step', async ({ page }) => {
+  await page.goto('/new?example=navi-mumbai-airport')
+  await expect(page).toHaveTitle(`${copy.titles.new} · ${copy.app.name}`)
+  await expect(page.getByText(flow.stepOf(4), { exact: true })).toBeVisible()
+  await expect(page.locator('[aria-current="step"]')).toHaveText(flow.steps[3]!)
 })
 
 for (const path of ['/limits', '/privacy', '/dev/kit', '/new']) {
