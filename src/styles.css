@@ -185,3 +185,57 @@
     display: none;
   }
 }
+
+/* Map overlays (approved mockup 01-landing). They sit on Blue Marble imagery in both themes, so their text and halo colours are fixed, not theme tokens. MapLibre positions the marker element with transform; keep animations off it. */
+.sat-marker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #f4f4f5;
+  font: 500 0.75rem/1 var(--font-sans);
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.9);
+  white-space: nowrap;
+  pointer-events: none;
+}
+.sat-marker svg {
+  filter: drop-shadow(0 1px 1px rgb(0 0 0 / 0.8));
+}
+.place-pin {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+.place-pin i {
+  width: 12px;
+  height: 12px;
+  border-radius: 9999px;
+  background: var(--gs-accent);
+  box-shadow:
+    0 0 0 4px rgb(228 132 68 / 0.28),
+    0 0 0 1px #09090b;
+}
+.place-pin span {
+  font: 500 0.8125rem/1.2 var(--font-sans);
+  color: #f4f4f5;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgb(9 9 11 / 0.78);
+  border: 1px solid #3f3f46;
+}
+/* The LIVE dot: the one perpetual animation besides the globe drift (transform and opacity only; reduced motion stops it). */
+.sat-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 9999px;
+  background: var(--gs-ok);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--gs-ok) 16%, transparent);
+  animation: sat-breathe 2.4s ease-in-out infinite;
+}
+@keyframes sat-breathe {
+  50% {
+    transform: scale(1.35);
+    opacity: 0.7;
+  }
+}

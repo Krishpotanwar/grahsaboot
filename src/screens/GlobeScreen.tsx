@@ -1,18 +1,36 @@
-import { useEffect, useState } from 'react'
+import type { Marker } from 'maplibre-gl'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from '../lib/router.tsx'
+import { useMediaQuery } from '../lib/useMediaQuery.ts'
 import { flyToPlace, placeToQuery } from '../map/camera.ts'
 import { useMapLayout, useMapStage } from '../map/MapStage.tsx'
+import {
+  addPlacePin,
+  installSatLayers,
+  syncSatMarkers,
+  uninstallSatLayers,
+  updateSatLayers,
+} from '../map/satLayers.ts'
 import type { Place } from '../search/nominatim.ts'
+import { useSatellites } from '../sats/useSatellites.ts'
 import { copy } from '../ui/copy.ts'
 import { Button } from '../ui/kit.tsx'
+import { SatellitesPanel } from '../ui/SatellitesPanel.tsx'
 import { SearchBox } from '../ui/SearchBox.tsx'
 
 const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches
 
 export default function GlobeScreen() {
   useMapLayout('globe')
-  const { map, tier, setTierOverride } = useMapStage()
+  const { map, tier, setTierOverride, installLayers } = useMapStage()
+  const desktop = useMediaQuery('(min-width: 1024px)')
   const [place, setPlace] = useState<Place | null>(null)
+  const [hot, setHot] = useState<number | null>(null)
+  // Positions run at every tier (T0 and T1 show the text list); only the map layers need T2+.
+  const { sats, status, tracks, swaths, passes } = useSatellites(true)
+  const markers = useRef(new Map<number, Marker>())
+  const latest = useRef({ tracks, swaths, hot })
+  latest.current = { tracks, swaths, hot }
 
   // Slow auto-rotation on the landing globe: stops on interaction, once any camera move is under way (setCenter would cancel a fly-to), after 30 s, once zoomed 1.4 levels past its start, or under reduced motion.
   useEffect(() => {
@@ -46,10 +64,48 @@ export default function GlobeScreen() {
     }
   }, [map, tier])
 
+  // Satellite layers (T2+). The installer re-applies the latest data after a style reload (theme switch).
+  useEffect(
+    () =>
+      map && tier >= 2
+        ? installLayers(
+            'sats',
+            (m) => {
+              installSatLayers(m)
+              updateSatLayers(m, latest.current.tracks, latest.current.swaths, latest.current.hot)
+            },
+            uninstallSatLayers,
+          )
+        : undefined,
+    [map, tier, installLayers],
+  )
+  useEffect(() => {
+    if (map && tier >= 2) updateSatLayers(map, tracks, swaths, hot)
+  }, [map, tier, tracks, swaths, hot])
+  useEffect(() => {
+    if (map && tier >= 2) void syncSatMarkers(map, markers.current, sats)
+  }, [map, tier, sats])
+  useEffect(() => {
+    const all = markers.current
+    return () => {
+      for (const m of all.values()) m.remove()
+      all.clear()
+    }
+  }, [map])
+  // Pin on the picked place, at every tier that has a map.
+  useEffect(() => {
+    if (!map || !place) return
+    const pin = addPlacePin(map, place)
+    return () => {
+      void pin.then((m) => m.remove())
+    }
+  }, [map, place])
+
   const select = (p: Place) => {
     setPlace(p)
     if (map) flyToPlace(map, p, reducedMotion())
   }
+  const panel = <SatellitesPanel sats={sats} status={status} place={place} passes={passes} onHot={setHot} />
 
   return (
     <div className="grid min-h-[calc(100dvh-64px)] lg:grid-cols-[38%_1fr]">
@@ -87,8 +143,12 @@ export default function GlobeScreen() {
             </Button>
           </div>
         )}
+        {!desktop && panel}
       </section>
-      <div aria-hidden className="hidden lg:block" />
+      <div className="relative hidden lg:block">
+        {/* right-14 / bottom-14 keep the panel off MapLibre's zoom buttons and attribution (bottom right of the map). */}
+        {desktop && <div className="pointer-events-auto absolute bottom-14 right-14 z-20">{panel}</div>}
+      </div>
     </div>
   )
 }
