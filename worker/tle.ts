@@ -47,12 +47,12 @@ export async function handleTle(
     const subset = Array.isArray(all) ? all.filter((o) => SAT_IDS.includes(Number(o.NORAD_CAT_ID))) : []
     if (subset.length === 0) throw new Error('UPSTREAM_EMPTY')
     const body = JSON.stringify(subset)
-    await deps.cache.put(
-      key,
-      json(body, 200, { 'cache-control': 'public, max-age=86400', 'x-gs-fetched': String(now()) }),
-    )
+    await deps.cache
+      .put(key, json(body, 200, { 'cache-control': 'public, max-age=86400', 'x-gs-fetched': String(now()) }))
+      .catch(() => {}) // a failed write only loses the cache; the fresh body is still good
     return reply(body, false)
-  } catch {
+  } catch (err) {
+    console.error('TLE refresh failed:', err instanceof Error ? err.message : err)
     // Back off: stamp the last good body (or an empty one) so it counts as fresh for BACKOFF_MS only.
     const stamp = String(now() - FRESH_MS + BACKOFF_MS)
     await deps.cache

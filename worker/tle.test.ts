@@ -29,6 +29,12 @@ describe('handleTle', () => {
       headers: { 'user-agent': 'GrahSaboot/1.0' },
     })
   })
+  it('still returns fresh data when the cache write fails', async () => {
+    const cache: TleCache = { match: async () => undefined, put: async () => Promise.reject(new Error('nope')) }
+    const fetchImpl = vi.fn().mockResolvedValue(new Response(JSON.stringify(SATS)))
+    const res = await handleTle(REQ, { fetch: fetchImpl, cache, now: () => 0 })
+    expect(res.status).toBe(200)
+  })
   it('serves from cache for 2 hours, then refreshes', async () => {
     const cache = memCache()
     const fetchImpl = vi.fn().mockImplementation(async () => new Response(JSON.stringify(SATS)))
