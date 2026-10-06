@@ -40,6 +40,15 @@ describe('worker entry', () => {
     }
     expect(up).toHaveBeenCalledOnce()
   })
+  it('falls back to the bundled snapshot when CelesTrak is down and nothing is cached', async () => {
+    vi.stubGlobal('caches', { default: { match: async () => undefined, put: async () => {} } })
+    vi.stubGlobal('fetch', async () => new Response('', { status: 500 }))
+    const snap = { fetch: vi.fn(async () => new Response(JSON.stringify(SATS))) }
+    const res = await worker.fetch(new Request('https://down.example/api/tle'), { ASSETS: snap })
+    expect(res.status).toBe(200)
+    expect(res.headers.get('x-gs-stale')).toBe('1')
+    expect(await res.json()).toEqual(SATS)
+  })
   it('hands every other path to the assets binding', async () => {
     const res = await worker.fetch(new Request('https://app.example/new'), { ASSETS })
     expect(await res.text()).toBe('<!doctype html>')
