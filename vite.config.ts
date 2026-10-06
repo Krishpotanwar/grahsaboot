@@ -1,43 +1,10 @@
 /// <reference types="vitest/config" />
-import type { IncomingMessage, ServerResponse } from 'node:http'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
-import { defineConfig, type Plugin } from 'vite'
-import { handleTle, type TleCache } from './worker/tle.ts'
-
-/** Serves /api/tle in `vite dev` and `vite preview` with the same handler the Cloudflare Worker uses. */
-function tleDev(): Plugin {
-  const store = new Map<string, Response>()
-  const cache: TleCache = {
-    match: async (r) => store.get(r.url)?.clone(),
-    put: async (r, res) => {
-      store.set(r.url, res.clone())
-    },
-  }
-  const mw = async (req: IncomingMessage, res: ServerResponse, next: (err?: unknown) => void) => {
-    if (req.url?.split('?')[0] !== '/api/tle') return next()
-    try {
-      const r = await handleTle(new Request(`http://localhost${req.url}`), { fetch, cache })
-      res.statusCode = r.status
-      r.headers.forEach((v, k) => res.setHeader(k, v))
-      res.end(Buffer.from(await r.arrayBuffer()))
-    } catch (err) {
-      next(err)
-    }
-  }
-  return {
-    name: 'gs-tle-dev',
-    configureServer: (s) => {
-      s.middlewares.use(mw)
-    },
-    configurePreviewServer: (s) => {
-      s.middlewares.use(mw)
-    },
-  }
-}
+import { defineConfig } from 'vite'
 
 export default defineConfig({
-  plugins: [react(), tailwindcss(), tleDev()],
+  plugins: [react(), tailwindcss()],
   worker: { format: 'es' },
   build: {
     target: 'es2022',

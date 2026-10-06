@@ -1,7 +1,4 @@
-const env = ((import.meta as unknown as { env?: Record<string, string | undefined> }).env ?? {}) as Record<
-  string,
-  string | undefined
->
+const env = (import.meta.env ?? {}) as Record<string, string | undefined>
 const pick = (k: string, d: string) => env[k] || d
 
 export const config = {
@@ -12,7 +9,8 @@ export const config = {
     'https://planetarycomputer.microsoft.com/api/sas/v1/token/sentinel-2-l2a',
   ),
   nominatimUrl: pick('VITE_NOMINATIM_URL', 'https://nominatim.openstreetmap.org'),
-  tleUrl: pick('VITE_TLE_URL', '/api/tle'),
+  // `vite dev` has no Worker, so it reads the bundled snapshot; `wrangler dev` and production serve the real route.
+  tleUrl: pick('VITE_TLE_URL', env.MODE === 'development' ? '/tle-snapshot.json' : '/api/tle'),
   styleDark: pick('VITE_STYLE_DARK', 'https://tiles.openfreemap.org/styles/dark'),
   styleLight: pick('VITE_STYLE_LIGHT', 'https://tiles.openfreemap.org/styles/positron'),
   gibsTiles: pick(

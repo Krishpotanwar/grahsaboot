@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { config, isAllowedAssetUrl } from './config.ts'
 
 // config is a plain object at runtime; flip testMode to see how the allowlist behaves in a production build.
@@ -6,6 +6,20 @@ const flags = config as { testMode: boolean }
 const original = flags.testMode
 afterEach(() => {
   flags.testMode = original
+  vi.unstubAllEnvs()
+})
+
+describe('tleUrl', () => {
+  it('reads the bundled snapshot in `vite dev`, which has no Worker, and the Worker route everywhere else', async () => {
+    for (const [mode, url] of [
+      ['development', '/tle-snapshot.json'],
+      ['production', '/api/tle'],
+    ] as const) {
+      vi.stubEnv('MODE', mode)
+      vi.resetModules()
+      expect((await import('./config.ts')).config.tleUrl, mode).toBe(url)
+    }
+  })
 })
 
 describe('isAllowedAssetUrl', () => {
