@@ -7,13 +7,18 @@ import { useMapLayout, useMapStage } from '../map/MapStage.tsx'
 import { copy } from '../ui/copy.ts'
 import { flow } from '../ui/copy-flow.ts'
 import { Button, MicroLabel, Skeleton } from '../ui/kit.tsx'
+import { ClaimPanel } from '../workbench/ClaimPanel.tsx'
 import { canPickDefaults, isUsable, pickDefaults } from '../workbench/defaults.ts'
 import { EvidenceViewer, type Slot } from '../workbench/EvidenceViewer.tsx'
+import { NotesPanel } from '../workbench/NotesPanel.tsx'
 import type { DateEntry } from '../workbench/runner.ts'
 import { SectionGrid } from '../workbench/SectionGrid.tsx'
 import { Timeline } from '../workbench/Timeline.tsx'
 import { useEvidence } from '../workbench/useEvidence.ts'
 import NotFound from './NotFound.tsx'
+
+// A fallback that is the same array every render, so the memoised NotesPanel is not rendered again for it.
+const NO_PARTS: never[] = []
 
 const slot = (e: DateEntry | undefined): Slot =>
   e
@@ -108,8 +113,12 @@ export default function Workbench({ id }: { id: string }) {
       <NotFound text={{ title: copy.notFound.title, body: flow.workbench.notFound }} />
     )
 
-  // A refused pin is shown next to the pin buttons; every other error in the header.
+  // A refused pin is shown next to the pin buttons, a refused note or claim in its own panel (the header is far above a panel
+  // the user has scrolled to); every other error in the header.
   const pinError = error === 'TOO_MANY_PINS' || error === 'BAD_ORDER' ? error : null
+  const noteError =
+    error === 'NOTE_EMPTY' || error === 'NOTE_TOO_LONG' || error === 'TOO_MANY_NOTES' ? error : null
+  const claimError = error === 'CLAIM_TOO_LONG' ? error : null
 
   // With no pair to show, say plainly why there is none. A failed check is not "obscured", so any failure holds these back.
   const settled =
@@ -146,7 +155,7 @@ export default function Workbench({ id }: { id: string }) {
             {flow.workbench.report}
           </Link>
         </header>
-        {error && !pinError && (
+        {error && !pinError && !noteError && !claimError && (
           <p role="alert" className="text-sm text-bad">
             {flow.workbench.errors[error] ?? error}
           </p>
@@ -210,6 +219,14 @@ export default function Workbench({ id }: { id: string }) {
             onSelect={setCurrent}
           />
         )}
+        <NotesPanel
+          inv={inv}
+          parts={summary?.parts ?? NO_PARTS}
+          current={current}
+          update={update}
+          error={noteError}
+        />
+        <ClaimPanel inv={inv} update={update} error={claimError} />
       </aside>
     </div>
   )

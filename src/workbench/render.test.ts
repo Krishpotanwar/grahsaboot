@@ -1,12 +1,16 @@
-// Timeline and SectionGrid rendered to a string (no DOM): the states they show, and the sizes real data brings.
-// The featured worked example yields ~1,100 passes; a pinned-date grid holds at most 24 columns (26 here, for margin).
+// Timeline, SectionGrid, NotesPanel and ClaimPanel rendered to a string (no DOM): the states they show, and the sizes real data brings.
+// The featured worked example yields ~1,100 passes; a pinned-date grid holds at most 24 columns (26 here, for margin); notes go up to 200.
 import { createElement } from 'react'
 import { renderToString } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
+import { addNote, newInvestigation, setClaim, type Investigation, type Note } from '../data/investigation.ts'
 import type { QualityLabel, QualityStats } from '../evidence/types.ts'
+import type { AoiInput } from '../geo/aoi.ts'
 import { copy } from '../ui/copy.ts'
 import { flow } from '../ui/copy-flow.ts'
 import type { QualityResult } from '../workers/imagery-core.ts'
+import { ClaimPanel } from './ClaimPanel.tsx'
+import { NotesPanel } from './NotesPanel.tsx'
 import type { DateEntry, EntryStatus } from './runner.ts'
 import { SectionGrid } from './SectionGrid.tsx'
 import { Timeline } from './Timeline.tsx'
@@ -204,5 +208,133 @@ describe('SectionGrid', () => {
   it('shows nothing for a single section or without pinned dates', () => {
     expect(grid([entry('2025-01-10', 'CLEAR', { parts: 1 })], { parts: PARTS.slice(0, 1) })).toBe('')
     expect(grid([])).toBe('')
+  })
+})
+
+const SITE: AoiInput = {
+  kind: 'site',
+  geometry: {
+    type: 'Polygon',
+    coordinates: [
+      [
+        [79.08, 21.14],
+        [79.09, 21.14],
+        [79.09, 21.15],
+        [79.08, 21.14],
+      ],
+    ],
+  },
+}
+const KINDS = ['change', 'no_clear_change', 'unsure'] as const
+/** An investigation holding `n` notes; `over` sets a note's text, date or section. */
+const withNotes = (
+  n: number,
+  over: (i: number) => Partial<Pick<Note, 'body' | 'date' | 'sectionIdx'>> = () => ({}),
+) =>
+  Array.from({ length: n }).reduce<Investigation>(
+    (inv, _, i) =>
+      addNote(
+        inv,
+        { kind: KINDS[i % 3]!, body: `Note ${i}`, date: null, sectionIdx: null, ...over(i) },
+        new Date(Date.UTC(2025, 0, 1, 0, 0, i)),
+        `n${i}`,
+      ),
+    newInvestigation({ name: 'Test', aoi: SITE, dateFrom: '2018-01-01', dateTo: '2025-12-31' }),
+  )
+const notes = (inv: Investigation, over: Record<string, unknown> = {}) =>
+  renderToString(
+    createElement(NotesPanel, {
+      inv,
+      parts: [],
+      current: '2025-12-20',
+      update: () => true,
+      error: null,
+      ...over,
+    }),
+  )
+const list = (html: string) => html.slice(html.indexOf('<ul'), html.indexOf('</ul>'))
+const optionsOf = (html: string) => [...html.matchAll(/<option[^>]*>([^<]*)<\/option>/g)].map((m) => m[1])
+
+describe('NotesPanel', () => {
+  it('renders 200 notes quickly, with one tab stop per control and none in the list but its buttons', () => {
+    const inv = withNotes(200, (i) => ({ date: i % 2 ? day(i) : null }))
+    const t0 = performance.now()
+    const html = notes(inv)
+    expect(performance.now() - t0).toBeLessThan(100)
+    const ul = list(html)
+    expect(ul.match(/<li\b/g)).toHaveLength(200)
+    expect(ul.match(/<button\b/g)).toHaveLength(400) // Edit and Delete on each note
+    expect(ul).not.toMatch(/<(input|textarea|select|a)\b/)
+    expect(html).not.toContain('tabindex') // nothing is a roving stop: every control is reached once, in page order
+    expect(html.match(/type="radio"/g)).toHaveLength(3) // one group
+    expect(html.match(/<(textarea|select)\b/g)).toHaveLength(2) // the text and the photo date; a site has no section
+  })
+
+  it('offers exactly two photo dates: the one on show and "no specific date"', () => {
+    const inv = withNotes(0)
+    expect(optionsOf(notes(inv))).toEqual(['20 Dec 2025', flow.notes.anyDate])
+    expect(notes(inv)).toMatch(/<option[^>]*value="2025-12-20"[^>]*selected/)
+    expect(optionsOf(notes(inv, { current: null }))).toEqual([flow.notes.anyDate])
+    expect(optionsOf(notes(inv, { current: '2018-01-05' }))).toEqual(['5 Jan 2018', flow.notes.anyDate])
+  })
+
+  it('lets a road note pick its section, and shows the section on the note', () => {
+    const parts = PARTS.slice(0, 3)
+    const inv = withNotes(3, (i) => ({ sectionIdx: i === 1 ? 1 : i === 2 ? 9 : null })) // 9: no such section
+    const html = notes(inv, { parts })
+    expect(optionsOf(html)).toEqual([
+      '20 Dec 2025',
+      flow.notes.anyDate,
+      flow.notes.anySection,
+      '0.0–2.0 km',
+      '2.0–4.0 km',
+      '4.0–6.0 km',
+    ])
+    const rows = list(html).match(/<li\b.*?<\/li>/g)!
+    expect(rows[1]).toContain('2.0–4.0 km')
+    expect(rows[0]).not.toContain('km')
+    expect(rows[2]).not.toContain('km') // a section that is not there is left out, never mislabelled
+    expect(notes(inv, { parts: PARTS.slice(0, 1) }).match(/<select\b/g)).toHaveLength(1) // a site has one part: nothing to pick
+  })
+
+  it('shows what was written as text', () => {
+    const html = notes(withNotes(1, () => ({ body: '<img src=x onerror=alert(1)> New roof' })))
+    expect(html).toContain('&lt;img src=x onerror=alert(1)&gt; New roof')
+    expect(html).not.toContain('<img')
+  })
+
+  it('is memoised with ClaimPanel, so a runner update that changes none of their props renders neither', () => {
+    for (const c of [NotesPanel, ClaimPanel])
+      expect((c as unknown as { $$typeof: symbol }).$$typeof).toBe(Symbol.for('react.memo'))
+  })
+
+  it('shows a refusal only beside the control that was refused: a code left over from elsewhere shows nothing', () => {
+    // A fresh panel has refused nothing, so an error code it was handed (an old one, another panel's) is not printed here.
+    expect(notes(withNotes(1), { error: 'NOTE_EMPTY' })).not.toContain('role="alert"')
+  })
+})
+
+describe('ClaimPanel', () => {
+  const claim = (inv: Investigation, error: string | null = null) =>
+    renderToString(createElement(ClaimPanel, { inv, update: () => true, error }))
+
+  it('says why Save was refused, in the panel', () => {
+    expect(claim(withNotes(0))).not.toContain('role="alert"')
+    const html = claim(withNotes(0), 'CLAIM_TOO_LONG')
+    expect(html).toMatch(new RegExp(`<p role="alert"[^>]*>${flow.workbench.errors.CLAIM_TOO_LONG}</p>`))
+  })
+
+  it('starts from the saved claim, and offers Remove and Save only when they can do something', () => {
+    const empty = claim(withNotes(0))
+    expect(empty).not.toContain(flow.claim.remove)
+    expect(empty).toMatch(new RegExp(`<button[^>]*\\sdisabled=""[^>]*>${flow.claim.save}`))
+    const saved = claim(
+      setClaim(withNotes(0), { text: 'Roof done by June', date: '2025-06-30', criterion: 'A bright roof' }),
+    )
+    expect(saved).toContain('>Roof done by June</textarea>')
+    expect(saved).toContain('value="2025-06-30"')
+    expect(saved).toContain('value="A bright roof"')
+    expect(saved).toContain(flow.claim.remove)
+    expect(saved).not.toContain('disabled=""')
   })
 })

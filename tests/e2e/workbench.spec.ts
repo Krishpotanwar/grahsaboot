@@ -193,9 +193,19 @@ test('resizing the window does not search again', async ({ page }) => {
   await waitForPhotos(page)
 })
 
-test('the workbench passes axe in every view, in both themes', async ({ page }) => {
+test('the workbench passes axe in every view, in both themes, with a note and a claim on the page', async ({
+  page,
+}) => {
   await openFixtureSite(page)
   await waitForPhotos(page)
+  const notes = page.getByRole('region', { name: flow.notes.title })
+  await notes.getByLabel(flow.notes.what).fill('Roof visible from March')
+  await notes.getByRole('button', { name: flow.notes.add }).click()
+  await expect(notes.getByText('Roof visible from March')).toBeVisible()
+  const claim = page.getByRole('region', { name: flow.claim.title })
+  await claim.getByLabel(flow.claim.text, { exact: true }).fill('Roof finished by March')
+  await claim.getByRole('button', { name: flow.claim.save }).click()
+  await expect(claim.getByRole('button', { name: flow.claim.remove })).toBeVisible()
   for (const view of ['swipe', 'side', 'diff'] as const) {
     await page.getByRole('radio', { name: flow.workbench.modes[view] }).check()
     for (let i = 0; i < 2; i++) {
@@ -206,6 +216,13 @@ test('the workbench passes axe in every view, in both themes', async ({ page }) 
       await page.getByRole('button', { name: copy.nav.themeToggle }).click()
     }
   }
+  // The inline note editor too.
+  await notes.getByRole('button', { name: flow.notes.edit }).click()
+  await expect(notes.getByLabel(flow.notes.edit)).toBeVisible()
+  const editing = await new AxeBuilder({ page })
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'])
+    .analyze()
+  expect(editing.violations, `editing: ${JSON.stringify(editing.violations, null, 2)}`).toEqual([])
 })
 
 test('the road workbench, with its section grid and the Details open, passes axe in both themes', async ({
@@ -215,6 +232,12 @@ test('the road workbench, with its section grid and the Details open, passes axe
   await waitForPhotos(page)
   await expect(page.getByRole('grid', { name: flow.workbench.grid })).toBeVisible()
   await page.locator('summary', { hasText: copy.common.details }).click()
+  // A road note names its section: the section picker and the section on the note are covered too.
+  const notes = page.getByRole('region', { name: flow.notes.title })
+  await notes.getByLabel(flow.notes.what).fill('Surface patched here')
+  await notes.getByLabel(flow.notes.forSection).selectOption({ label: '2.0–2.9 km' })
+  await notes.getByRole('button', { name: flow.notes.add }).click()
+  await expect(notes.getByRole('listitem')).toContainText('2.0–2.9 km')
   for (let i = 0; i < 2; i++) {
     const results = await new AxeBuilder({ page })
       .withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'])
