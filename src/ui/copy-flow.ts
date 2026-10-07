@@ -93,6 +93,9 @@ export const flow = {
     report: 'Report',
     notSaved: 'Not saved',
     loadingPhoto: 'Loading photo',
+    checkFailed: 'This photo could not be checked.',
+    badOutline: 'This outline can no longer be read. Draw it again from the start.',
+    thumbFailed: 'Preview unavailable.',
     notFound:
       'This investigation is not in this browser. It may have been deleted, or saved on another device.',
     disclaimer: '"No clear visible change" does not prove nothing happened. Roofs hide interiors.',
