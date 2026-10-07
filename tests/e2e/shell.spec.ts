@@ -41,10 +41,10 @@ test('unknown routes render not found', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible()
 })
 
-// The Review step itself arrives in C3; until then step 4 shows the stepper at "Review" under the new page title.
 test('/new?example=navi-mumbai-airport opens the review step', async ({ page }) => {
   await page.goto('/new?example=navi-mumbai-airport')
   await expect(page).toHaveTitle(`${copy.titles.new} · ${copy.app.name}`)
+  await expect(page.getByRole('heading', { name: flow.review.title })).toBeVisible()
   await expect(page.getByText(flow.stepOf(4), { exact: true })).toBeVisible()
   await expect(page.locator('[aria-current="step"]')).toHaveText(flow.steps[3]!)
 })

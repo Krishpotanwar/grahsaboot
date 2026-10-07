@@ -120,8 +120,9 @@ test('drawing starts while the map is still loading tiles', async ({ page }) => 
     await held
     await route.continue()
   })
+  // The deep link already flew to Nagpur and loaded its tiles: go somewhere new, or no tile is requested and none can be held back.
   await page.evaluate(() =>
-    (window as any).__gs.map.jumpTo({ center: [79.0882, 21.1458], zoom: 15, pitch: 0, bearing: 0 }),
+    (window as any).__gs.map.jumpTo({ center: [72.8777, 19.076], zoom: 15, pitch: 0, bearing: 0 }),
   )
   try {
     await expect.poll(() => page.evaluate(() => (window as any).__gs.map.isStyleLoaded())).toBe(false)
@@ -252,4 +253,27 @@ test('step 2 passes axe in both themes, with an error and the swapped question s
     expect(results.violations, JSON.stringify(results.violations, null, 2)).toEqual([])
     await page.getByRole('button', { name: copy.nav.themeToggle }).click()
   }
+})
+
+// A deep link or a reload at step 2 starts with the map on the globe; it has to go to the place the link names.
+test('a deep link at step 2 flies the map to the place', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await startAt(page, 'tier=2&lat=21.1458&lon=79.0882&name=Nagpur')
+  test.skip(!(await hasWebgl2(page)), 'no WebGL2')
+  await page.waitForFunction(() => {
+    const m = (window as any).__gs?.map
+    if (!m) return false
+    const c = m.getCenter()
+    return m.getZoom() > 10 && Math.abs(c.lng - 79.0882) < 0.01 && Math.abs(c.lat - 21.1458) < 0.01
+  })
+})
+
+// The forms make an outline without a click on the map, so the map has to go and show it (the place alone flies to zoom 13).
+test('the square form fits the map to the outline it makes', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await startAt(page, 'tier=2&lat=21.1458&lon=79.0882&name=Nagpur')
+  test.skip(!(await hasWebgl2(page)), 'no WebGL2')
+  await styleReady(page)
+  await outlineSiteByCoords(page, 1000)
+  await page.waitForFunction(() => (window as any).__gs.map.getZoom() > 13)
 })

@@ -1,6 +1,7 @@
 import type { LonLat } from '../evidence/types.ts'
 import type { AoiInput } from '../geo/aoi.ts'
 import { LIMITS } from '../geo/limits.ts'
+import { placeLabel } from '../map/camera.ts'
 import type { Place } from '../search/nominatim.ts'
 import { copy } from '../ui/copy.ts'
 import { EXAMPLES } from '../data/examples.ts'
@@ -46,6 +47,10 @@ export function draftToAoi(d: Draft): AoiInput | null {
     ? { kind: 'road', geometry: { type: 'LineString', coordinates: d.line }, widthM: d.widthM }
     : null
 }
+
+/** The name follows the place until the user types their own: empty, or still the previous place's label. */
+export const nameForPlace = (d: Draft, p: Place) =>
+  !d.name || (d.place && d.name === placeLabel(d.place)) ? placeLabel(p) : d.name
 
 export function emptyDraft(today = new Date()): Draft {
   return {

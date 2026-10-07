@@ -2,10 +2,13 @@ import { useEffect, useRef, useState } from 'react'
 import { summarizeAoi } from '../geo/aoi.ts'
 import { useSearchParams } from '../lib/router.tsx'
 import { accentColor, fitAoi, removeAoiLayer, setAoiLayer } from '../map/aoiLayer.ts'
+import { flyToPlace } from '../map/camera.ts'
 import { useMapLayout, useMapStage } from '../map/MapStage.tsx'
+import { DatesStep } from '../new/DatesStep.tsx'
 import { draftFromParams, draftToAoi } from '../new/draft.ts'
 import { OutlineStep } from '../new/OutlineStep.tsx'
-import { PlaceStep, type StepProps } from '../new/PlaceStep.tsx'
+import { PlaceStep } from '../new/PlaceStep.tsx'
+import { ReviewStep } from '../new/ReviewStep.tsx'
 import { Stepper } from '../new/Stepper.tsx'
 
 export default function NewInvestigation() {
@@ -26,6 +29,13 @@ export default function NewInvestigation() {
         : undefined,
     [map, installLayers, draft],
   )
+  // A link or a reload at step 2 opens on the globe: go to the place it names, once the map exists. From the globe's button the map is already there. Declared before the fit below, which wins when both apply.
+  const flown = useRef(false)
+  useEffect(() => {
+    if (!map || flown.current || firstStep !== 2 || !initial.place) return
+    flown.current = true
+    flyToPlace(map, { ...initial.place, bbox: null }, matchMedia('(prefers-reduced-motion: reduce)').matches)
+  }, [map, firstStep, initial.place])
   useEffect(() => {
     if (!map || step < 3 || !aoi) return
     const r = summarizeAoi(aoi)
@@ -64,7 +74,3 @@ export default function NewInvestigation() {
     </div>
   )
 }
-
-// Placeholders until C3 adds the dates and review steps.
-const DatesStep = (_: StepProps) => null
-const ReviewStep = (_: StepProps) => null

@@ -25,12 +25,18 @@ export function memoryStore(): InvestigationStore {
 }
 
 export function idbStore(name = 'gs-investigations'): InvestigationStore {
-  const db = openDb(name, ['investigations'])
+  // Opened on first use, and a failed open is forgotten so "Try again" can open it again (a rejected promise kept for the page's life would never recover).
+  let db: Promise<IDBDatabase> | null = null
+  const open = () =>
+    (db ??= openDb(name, ['investigations']).catch((e: unknown) => {
+      db = null
+      throw e
+    }))
   return {
-    list: async () => (await idbAll<Investigation>(await db, 'investigations')).sort(newestFirst),
-    get: async (id) => idbGet<Investigation>(await db, 'investigations', id),
-    put: async (inv) => idbPut(await db, 'investigations', inv.id, inv),
-    remove: async (id) => idbDelete(await db, 'investigations', id),
+    list: async () => (await idbAll<Investigation>(await open(), 'investigations')).sort(newestFirst),
+    get: async (id) => idbGet<Investigation>(await open(), 'investigations', id),
+    put: async (inv) => idbPut(await open(), 'investigations', inv.id, inv),
+    remove: async (id) => idbDelete(await open(), 'investigations', id),
   }
 }
 

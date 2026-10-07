@@ -23,3 +23,12 @@ export async function outlineRoadByCoords(page: Page) {
   await page.getByLabel(flow.outline.end).fill('21.157819, 79.095988')
   await page.getByRole('button', { name: flow.outline.useLine }).click()
 }
+
+export async function finishDatesAndOpen(page: Page, from = '2025-01-01', to = '2025-12-31') {
+  await page.getByRole('button', { name: 'Continue' }).click()
+  await page.getByLabel(flow.dates.from, { exact: true }).fill(from)
+  await page.getByLabel(flow.dates.to, { exact: true }).fill(to)
+  await page.getByRole('button', { name: 'Continue' }).click()
+  await page.getByRole('button', { name: flow.review.open }).click()
+  await expect(page).toHaveURL(/\/i\/local-[0-9a-f-]{36}$/)
+}

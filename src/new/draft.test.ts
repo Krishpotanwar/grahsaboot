@@ -4,10 +4,12 @@ import {
   draftFromParams,
   draftToAoi,
   emptyDraft,
+  nameForPlace,
   squareAround,
   validateDates,
 } from './draft.ts'
 import { summarizeAoi } from '../geo/aoi.ts'
+import type { Place } from '../search/nominatim.ts'
 import { copy } from '../ui/copy.ts'
 
 const TODAY = new Date('2026-10-05T10:00:00Z')
@@ -74,5 +76,35 @@ describe('draft helpers', () => {
     // The query string is untrusted: inherited keys, empty values and half pairs are not a place.
     for (const q of ['example=constructor', 'example=__proto__', 'lat=&lon=', 'lat=21.1', 'lat=abc&lon=79'])
       expect(draftFromParams(new URLSearchParams(q), TODAY).step, q).toBe(1)
+  })
+  // The name follows the place until the user types their own (C2 carry-in C).
+  it('names the investigation after the place until the user edits the name', () => {
+    const nagpur: Place = {
+      name: 'Nagpur, Maharashtra, India',
+      lat: 21.1458,
+      lon: 79.0882,
+      bbox: [78.9, 21, 79.2, 21.3],
+    }
+    const pune: Place = {
+      name: 'Pune, Maharashtra, India',
+      lat: 18.52,
+      lon: 73.85,
+      bbox: [73.7, 18.4, 74, 18.6],
+    }
+    const point: Place = {
+      name: copy.search.coordsResult(21.1458, 79.0882),
+      lat: 21.1458,
+      lon: 79.0882,
+      bbox: null,
+    }
+    const empty = emptyDraft(TODAY)
+    expect(nameForPlace(empty, nagpur)).toBe('Nagpur')
+    const first = { ...empty, place: nagpur, name: 'Nagpur' }
+    expect(nameForPlace(first, pune)).toBe('Pune') // untouched: follows the new place
+    expect(nameForPlace({ ...first, name: '' }, pune)).toBe('Pune') // cleared: filled again
+    expect(nameForPlace({ ...first, name: 'Airport apron' }, pune)).toBe('Airport apron') // the user's own name stays
+    // A coordinate point keeps its whole name, comma included, both as the new name and as the "previous label".
+    expect(nameForPlace(empty, point)).toBe(copy.search.coordsResult(21.1458, 79.0882))
+    expect(nameForPlace({ ...empty, place: point, name: point.name }, pune)).toBe('Pune')
   })
 })

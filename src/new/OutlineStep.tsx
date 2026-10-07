@@ -1,12 +1,13 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { parseCoordinates, type ParsedCoords } from '../geo/coords.ts'
 import { summarizeAoi } from '../geo/aoi.ts'
+import { fitAoi } from '../map/aoiLayer.ts'
 import { startDrawing } from '../map/draw.ts'
 import { useMapStage } from '../map/MapStage.tsx'
 import { copy, issueMessage } from '../ui/copy.ts'
 import { flow } from '../ui/copy-flow.ts'
 import { Button, TextField } from '../ui/kit.tsx'
-import { draftToAoi } from './draft.ts'
+import { draftToAoi, type Draft } from './draft.ts'
 import { squareAround } from '../geo/square.ts'
 import type { StepProps } from './PlaceStep.tsx'
 
@@ -36,6 +37,13 @@ export function OutlineStep({ draft, setDraft, onBack, onNext }: StepProps) {
   }, [map, tier, draft.kind, round, setDraft])
 
   const setKind = (kind: 'site' | 'road') => setDraft((d) => ({ ...d, kind, ring: null, line: null }))
+  // A form makes its outline without a click on the map, so show where it went (a drawn outline is already under the cursor).
+  const setByForm = (outline: Pick<Draft, 'ring'> | Pick<Draft, 'line'>) => {
+    setDraft((d) => ({ ...d, ...outline }))
+    const made = draftToAoi({ ...draft, ...outline })
+    const r = made && summarizeAoi(made)
+    if (map && r?.ok) fitAoi(map, r.summary.bbox, matchMedia('(prefers-reduced-motion: reduce)').matches)
+  }
 
   return (
     <div className="grid gap-6">
@@ -101,9 +109,9 @@ export function OutlineStep({ draft, setDraft, onBack, onNext }: StepProps) {
         <summary className="-m-3 cursor-pointer p-3 font-medium">{flow.outline.byCoords}</summary>
         <div className="mt-4">
           {draft.kind === 'site' ? (
-            <SquareForm draft={draft} setDraft={setDraft} />
+            <SquareForm draft={draft} onOutline={setByForm} />
           ) : (
-            <LineForm setDraft={setDraft} />
+            <LineForm onOutline={setByForm} />
           )}
         </div>
       </details>
@@ -155,7 +163,9 @@ function SwappedQuestion({ at, onAnswer }: { at: ParsedCoords; onAnswer(how: How
   )
 }
 
-function SquareForm({ draft, setDraft }: Pick<StepProps, 'draft' | 'setDraft'>) {
+type FormProps = { onOutline(outline: Pick<Draft, 'ring'> | Pick<Draft, 'line'>): void }
+
+function SquareForm({ draft, onOutline }: FormProps & Pick<StepProps, 'draft'>) {
   const [centre, setCentre] = useState(
     draft.place ? `${draft.place.lat.toFixed(6)}, ${draft.place.lon.toFixed(6)}` : '',
   )
@@ -172,7 +182,7 @@ function SquareForm({ draft, setDraft }: Pick<StepProps, 'draft' | 'setDraft'>) 
     setAsked(null)
     const at = resolve(c, how)
     if (how === 'swapped') setCentre(asText(at))
-    setDraft((d) => ({ ...d, ring: squareAround(at.lon, at.lat, s) }))
+    onOutline({ ring: squareAround(at.lon, at.lat, s) })
   }
   return (
     <form
@@ -206,7 +216,7 @@ function SquareForm({ draft, setDraft }: Pick<StepProps, 'draft' | 'setDraft'>) 
   )
 }
 
-function LineForm({ setDraft }: Pick<StepProps, 'setDraft'>) {
+function LineForm({ onOutline }: FormProps) {
   const [a, setA] = useState('')
   const [b, setB] = useState('')
   const [err, setErr] = useState<string | null>(null)
@@ -225,13 +235,12 @@ function LineForm({ setDraft }: Pick<StepProps, 'setDraft'>) {
       if (p.swappedHint) setA(asText(from))
       if (q.swappedHint) setB(asText(to))
     }
-    setDraft((d) => ({
-      ...d,
+    onOutline({
       line: [
         [from.lon, from.lat],
         [to.lon, to.lat],
       ],
-    }))
+    })
   }
   return (
     <form
