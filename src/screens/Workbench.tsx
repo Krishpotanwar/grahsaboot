@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { setBeforeAfter } from '../data/investigation.ts'
+import { useEffect, useLayoutEffect, useMemo, useState } from 'react'
+import { setBeforeAfter, togglePin } from '../data/investigation.ts'
 import { useInvestigation } from '../data/useInvestigation.ts'
 import { fmtDate } from '../lib/format.ts'
 import { Link } from '../lib/router.tsx'
@@ -10,6 +10,8 @@ import { Button, MicroLabel, Skeleton } from '../ui/kit.tsx'
 import { canPickDefaults, isUsable, pickDefaults } from '../workbench/defaults.ts'
 import { EvidenceViewer, type Slot } from '../workbench/EvidenceViewer.tsx'
 import type { DateEntry } from '../workbench/runner.ts'
+import { SectionGrid } from '../workbench/SectionGrid.tsx'
+import { Timeline } from '../workbench/Timeline.tsx'
 import { useEvidence } from '../workbench/useEvidence.ts'
 import NotFound from './NotFound.tsx'
 
@@ -32,11 +34,17 @@ export default function Workbench({ id }: { id: string }) {
   const [maxSide] = useState(() =>
     matchMedia('(min-width: 1024px)').matches ? (tier >= 2 ? 1024 : 768) : 512,
   )
-  const { state, grid, summary, requestFull, retry } = useEvidence(inv, maxSide)
+  const { state, grid, thumbGrid, summary, requestFull, requestThumb, requestCheck, retry } = useEvidence(
+    inv,
+    maxSide,
+  )
   const entries = state.entries
   const byDate = useMemo(() => new Map(entries.map((e) => [e.date, e])), [entries])
   const beforeEntry = inv?.before ? byDate.get(inv.before) : undefined
   const afterEntry = inv?.after ? byDate.get(inv.after) : undefined
+  // Stable while those two entries are, so scrubbing the timeline never renders the viewer again.
+  const beforeSlot = useMemo(() => slot(beforeEntry), [beforeEntry])
+  const afterSlot = useMemo(() => slot(afterEntry), [afterEntry])
   // A pixel is unusable for the difference when either photo cannot show it clearly. Null until both masks have arrived.
   const invalid = useMemo(() => {
     const a = beforeEntry?.invalid
@@ -56,6 +64,35 @@ export default function Workbench({ id }: { id: string }) {
     for (const d of [inv.before, inv.after]) if (d && byDate.get(d) && !byDate.get(d)!.full) requestFull(d)
   }, [state.phase, inv?.before, inv?.after, byDate]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // The date on show in the timeline: the after date, else the latest pass, and kept for as long as it is a pass.
+  const [current, setCurrent] = useState<string | null>(null)
+  useLayoutEffect(() => {
+    // Before paint, so the first passes never show a frame of the wrong date.
+    if (current !== null && byDate.has(current)) return
+    const d = inv?.after && byDate.has(inv.after) ? inv.after : entries[entries.length - 1]?.date
+    if (d) setCurrent(d)
+  }, [current, byDate, entries, inv?.after])
+
+  // Resting on a date asks for what it still lacks, after 250 ms so that scrubbing past dates asks for nothing: its check,
+  // moved to the front of the sweep (which takes minutes on a long range), then, once it is usable, its preview.
+  const cur = current ? byDate.get(current) : undefined
+  const wantCheck = cur?.status === 'queued'
+  const wantThumb = !!cur && isUsable(cur) && !cur.thumb && !cur.thumbFailed
+  useEffect(() => {
+    if (!current || !(wantCheck || wantThumb)) return
+    const t = setTimeout(() => {
+      requestCheck(current)
+      if (wantThumb) requestThumb(current)
+    }, 250)
+    return () => clearTimeout(t)
+  }, [current, wantCheck, wantThumb, requestCheck, requestThumb])
+
+  // The road grid's columns: the pinned dates, which always include before and after.
+  const pinnedEntries = useMemo(() => {
+    const pins = new Set(inv?.pinned)
+    return entries.filter((e) => pins.has(e.date))
+  }, [entries, inv?.pinned])
+
   if (inv === undefined) return <Skeleton className="m-6 h-64" />
   if (inv === null)
     return error ? (
@@ -70,6 +107,9 @@ export default function Workbench({ id }: { id: string }) {
     ) : (
       <NotFound text={{ title: copy.notFound.title, body: flow.workbench.notFound }} />
     )
+
+  // A refused pin is shown next to the pin buttons; every other error in the header.
+  const pinError = error === 'TOO_MANY_PINS' || error === 'BAD_ORDER' ? error : null
 
   // With no pair to show, say plainly why there is none. A failed check is not "obscured", so any failure holds these back.
   const settled =
@@ -106,7 +146,7 @@ export default function Workbench({ id }: { id: string }) {
             {flow.workbench.report}
           </Link>
         </header>
-        {error && (
+        {error && !pinError && (
           <p role="alert" className="text-sm text-bad">
             {flow.workbench.errors[error] ?? error}
           </p>
@@ -129,8 +169,8 @@ export default function Workbench({ id }: { id: string }) {
         </div>
         {grid && !allCloudy && !notEnoughClear && entries.length > 0 && (
           <EvidenceViewer
-            before={slot(beforeEntry)}
-            after={slot(afterEntry)}
+            before={beforeSlot}
+            after={afterSlot}
             grid={grid}
             invalid={invalid}
             aoi={inv.aoi}
@@ -141,7 +181,36 @@ export default function Workbench({ id }: { id: string }) {
           {flow.workbench.disclaimer} {flow.workbench.catalogueNote}
         </p>
       </div>
-      <aside className="grid content-start gap-6 bg-bg p-4 lg:p-6" aria-label={flow.workbench.timeline} />
+      <aside
+        className="grid min-w-0 content-start gap-6 bg-bg p-4 lg:p-6"
+        aria-label={flow.workbench.timeline}
+      >
+        <Timeline
+          entries={entries}
+          from={inv.dateFrom}
+          to={inv.dateTo}
+          current={current}
+          before={inv.before}
+          after={inv.after}
+          pinned={inv.pinned}
+          thumbGrid={thumbGrid}
+          sections={summary?.kind === 'road' ? summary.parts : undefined}
+          error={pinError}
+          onSelect={setCurrent}
+          onBefore={(d) => update((i) => setBeforeAfter(i, d, i.after!))}
+          onAfter={(d) => update((i) => setBeforeAfter(i, i.before!, d))}
+          onPin={(d) => update((i) => togglePin(i, d))}
+          onRetry={retry}
+        />
+        {summary?.kind === 'road' && (
+          <SectionGrid
+            entries={pinnedEntries}
+            parts={summary.parts}
+            current={current}
+            onSelect={setCurrent}
+          />
+        )}
+      </aside>
     </div>
   )
 }

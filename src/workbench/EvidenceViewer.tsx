@@ -1,6 +1,6 @@
 import { ArrowsLeftRight } from '@phosphor-icons/react'
 import { animate } from 'motion/react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { brightnessDiff } from '../evidence/diff.ts'
 import type { DisplayGrid, QualityStats } from '../evidence/types.ts'
 import type { AoiInput } from '../geo/aoi.ts'
@@ -91,7 +91,7 @@ function Photo({
   )
 }
 
-export function EvidenceViewer({
+function EvidenceViewerBody({
   before,
   after,
   grid,
@@ -271,3 +271,6 @@ export function EvidenceViewer({
     </div>
   )
 }
+
+/** Memoised: the timeline changes the date on show with every slider step, and nothing here depends on it. */
+export const EvidenceViewer = memo(EvidenceViewerBody)

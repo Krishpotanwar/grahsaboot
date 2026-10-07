@@ -87,11 +87,12 @@ export function useEvidence(
     }
   }, [inv?.id, inv?.dateFrom, inv?.dateTo, summary, grid, thumbGrid, onlyKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Stable, so effects that depend on them do not re-run on every render. All three are safe to call repeatedly.
+  // Stable, so effects that depend on them do not re-run on every render. All of them are safe to call repeatedly.
   const api = useMemo(
     () => ({
       requestFull: (date: string) => runner.current?.requestFull(date),
       requestThumb: (date: string) => runner.current?.requestThumb(date),
+      requestCheck: (date: string) => runner.current?.requestCheck(date),
       retry: (date?: string) => runner.current?.retry(date),
     }),
     [],

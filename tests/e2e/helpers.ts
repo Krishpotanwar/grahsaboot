@@ -53,3 +53,49 @@ export async function openFixtureRoad(page: Page) {
   await outlineRoadByCoords(page)
   await finishDatesAndOpen(page, '2025-01-01', '2025-12-31')
 }
+
+/** The investigation this page's own IndexedDB holds. */
+export const readStored = (page: Page, id: string) =>
+  page.evaluate(async (key) => {
+    const db = await new Promise<IDBDatabase>((res) => {
+      const r = indexedDB.open('gs-investigations')
+      r.onsuccess = () => res(r.result)
+    })
+    return await new Promise<Record<string, unknown>>((res) => {
+      const g = db.transaction('investigations').objectStore('investigations').get(key)
+      g.onsuccess = () => res(g.result)
+    })
+  }, id)
+
+/** Merges `patch` into the investigation this page's own IndexedDB holds. */
+export const editStored = (page: Page, id: string, patch: Record<string, unknown>) =>
+  page.evaluate(
+    async ([key, changes]) => {
+      const db = await new Promise<IDBDatabase>((res) => {
+        const r = indexedDB.open('gs-investigations')
+        r.onsuccess = () => res(r.result)
+      })
+      const tx = db.transaction('investigations', 'readwrite')
+      const st = tx.objectStore('investigations')
+      const inv = await new Promise<Record<string, unknown>>((res) => {
+        const g = st.get(key)
+        g.onsuccess = () => res(g.result)
+      })
+      st.put({ ...inv, ...changes }, key)
+      await new Promise((res) => (tx.oncomplete = res))
+    },
+    [id, patch] as [string, Record<string, unknown>],
+  )
+
+/** Opens a fixture investigation, then leaves it for the globe: a live workbench would write its default pick over an edit. */
+export async function openThenEdit(
+  page: Page,
+  patch: Record<string, unknown>,
+  open: (page: Page) => Promise<void> = openFixtureSite,
+) {
+  await open(page)
+  const id = page.url().split('/i/')[1]!
+  await page.goto('/?tier=0')
+  await editStored(page, id, patch)
+  return id
+}

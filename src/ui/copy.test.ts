@@ -42,6 +42,14 @@ describe('copy', () => {
   it('says some passes are not shown when a window is cut, without a number the search no longer has', () => {
     expect(flow.workbench.limited).toBe('Some passes are not shown. Narrow the dates to see them all.')
   })
+  it('names the four class shares shown under Details', () => {
+    expect(flow.workbench.shares).toEqual({
+      valid: 'Visible ground',
+      uncertain: 'Uncertain (shadow or unclassified)',
+      obstructed: 'Obscured (cloud, shadow, snow)',
+      nodata: 'No data',
+    })
+  })
   it('has a word and help line for every quality label', () => {
     for (const l of ['CLEAR', 'PARTIAL', 'OBSCURED', 'NOT_COVERED'] as const) {
       expect(copy.quality[l].word.length).toBeGreaterThan(2)

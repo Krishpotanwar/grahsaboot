@@ -158,7 +158,10 @@ export function createRunner(
       const checked = entry(date)
       if (checked && isUsable(checked) && eager < EAGER_THUMBS) {
         eager++
-        queueThumb(date)
+        // In this job's own place, not queued: at the back it would wait out the whole sweep (minutes on a long range),
+        // and meanwhile `thumbBusy` would turn away `requestThumb` for the date on show.
+        thumbBusy.add(date)
+        await loadThumb(date)()
       }
     } catch (err) {
       checkErr.set(date, (err as Error).message)
@@ -207,6 +210,14 @@ export function createRunner(
     queueFull(date)
   }
 
+  /**
+   * Quality check of a date still waiting in the sweep, next, ahead of the rest. Idempotent: the date's own slot in the
+   * queue finds it no longer `queued` and does nothing, and a date that is checking, checked or failed is left alone.
+   */
+  const requestCheck = (date: string) => {
+    if (entry(date)?.status === 'queued') enqueue(check(date), true)
+  }
+
   /** 256 px preview of a usable date. Idempotent, like `requestFull`. */
   const requestThumb = (date: string) => {
     const e = entry(date)
@@ -245,5 +256,5 @@ export function createRunner(
     queue.length = 0
   }
 
-  return { start, requestFull, requestThumb, retry, dispose }
+  return { start, requestFull, requestThumb, requestCheck, retry, dispose }
 }

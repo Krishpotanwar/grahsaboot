@@ -78,6 +78,23 @@ describe('createRunner', () => {
     ])
     expect(last!.entries.every((e) => e.status === 'checked')).toBe(true)
   })
+  it('loads an eager thumbnail in its own check turn, not at the back of the sweep', async () => {
+    const { d, calls } = deps()
+    const r = createRunner(d, input, () => {}, 1)
+    await r.start()
+    await settle()
+    // One place at a time: each usable date's preview follows its own check. Queued behind the sweep it would also block
+    // `requestThumb` for that date, and the date on show would keep its skeleton for as long as the sweep takes.
+    expect(calls).toEqual([
+      'q:2025-01-10',
+      'f1:2025-01-10',
+      'q:2025-12-20',
+      'f1:2025-12-20',
+      'q:2025-03-05',
+      'f1:2025-03-05',
+      'q:2025-06-15',
+    ])
+  })
   it('runs 6 checks at once by default, and no more', async () => {
     const MANY = Array.from({ length: 10 }, (_, i) => `2025-02-${String(i + 1).padStart(2, '0')}`)
     const { held, open } = gate()
@@ -340,6 +357,71 @@ describe('createRunner', () => {
     r.retry()
     await settle()
     expect(searches).toBe(2)
+  })
+  describe('requestCheck', () => {
+    /** The only slot is held by the first check, so every other date waits in the queue. */
+    function held01() {
+      const { d, calls } = deps()
+      const { held, open } = gate()
+      const quality: RunnerDeps['quality'] = async (req) => {
+        calls.push(`q:${req.item.id}`)
+        if (req.item.id === '2025-01-10') await held
+        return { stats: { label: LABEL[req.item.id], validFraction: 1 } } as never
+      }
+      return { d: { ...d, quality }, calls, open }
+    }
+    const asked = (calls: string[]) => calls.filter((c) => c.startsWith('q:'))
+
+    it('checks a date that is still queued next, ahead of the dates before it', async () => {
+      const { d, calls, open } = held01()
+      const r = createRunner(d, input, () => {}, 1)
+      await r.start()
+      r.requestCheck('2025-06-15') // the last date of the sweep
+      open()
+      await settle()
+      expect(asked(calls)).toEqual(['q:2025-01-10', 'q:2025-06-15', 'q:2025-12-20', 'q:2025-03-05'])
+    })
+    it('makes one quality request per date, however often it is called or when', async () => {
+      const { d, calls, open } = held01()
+      const r = createRunner(d, input, () => {}, 1)
+      await r.start()
+      r.requestCheck('2025-01-10') // its own check is already running
+      r.requestCheck('2025-06-15')
+      r.requestCheck('2025-06-15') // already asked for
+      open()
+      await settle()
+      r.requestCheck('2025-06-15') // already checked
+      await settle()
+      expect(asked(calls)).toHaveLength(4)
+      expect(calls.filter((c) => c === 'q:2025-01-10')).toHaveLength(1)
+      expect(calls.filter((c) => c === 'q:2025-06-15')).toHaveLength(1)
+    })
+    it('does nothing for a failed, an unknown or a disposed date; retry(date) is the way back for a failure', async () => {
+      const { d, calls } = deps()
+      const quality: RunnerDeps['quality'] = async (req) => {
+        calls.push(`q:${req.item.id}`)
+        if (req.item.id === '2025-01-10') throw new Error('SCL_500')
+        return { stats: { label: LABEL[req.item.id], validFraction: 1 } } as never
+      }
+      let last = null as EvidenceState | null
+      const r = createRunner({ ...d, quality }, input, (s) => (last = s), 1)
+      await r.start()
+      await settle()
+      expect(last!.entries[0]).toMatchObject({ date: '2025-01-10', status: 'error' })
+      r.requestCheck('2025-01-10')
+      r.requestCheck('1999-01-01')
+      await settle()
+      expect(asked(calls)).toHaveLength(4)
+
+      const b = held01()
+      const gone = createRunner(b.d, input, () => {}, 1)
+      await gone.start()
+      gone.dispose()
+      gone.requestCheck('2025-06-15')
+      b.open()
+      await settle()
+      expect(asked(b.calls)).toEqual(['q:2025-01-10'])
+    })
   })
   it('does nothing after dispose, whatever is requested or retried', async () => {
     const onState = vi.fn()

@@ -1,38 +1,9 @@
 import AxeBuilder from '@axe-core/playwright'
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test } from '@playwright/test'
 import { copy } from '../../src/ui/copy.ts'
 import { flow } from '../../src/ui/copy-flow.ts'
 import { itemId } from '../fixtures/scene.ts'
-import { openFixtureRoad, openFixtureSite, waitForPhotos } from './helpers.ts'
-
-/** Merges `patch` into the investigation this page's own IndexedDB holds. */
-const editStored = (page: Page, id: string, patch: Record<string, unknown>) =>
-  page.evaluate(
-    async ([key, changes]) => {
-      const db = await new Promise<IDBDatabase>((res) => {
-        const r = indexedDB.open('gs-investigations')
-        r.onsuccess = () => res(r.result)
-      })
-      const tx = db.transaction('investigations', 'readwrite')
-      const st = tx.objectStore('investigations')
-      const inv = await new Promise<Record<string, unknown>>((res) => {
-        const g = st.get(key)
-        g.onsuccess = () => res(g.result)
-      })
-      st.put({ ...inv, ...changes }, key)
-      await new Promise((res) => (tx.oncomplete = res))
-    },
-    [id, patch] as [string, Record<string, unknown>],
-  )
-
-/** Opens a fixture site, then leaves it for the globe: a live workbench would write its default pick over an edit. */
-async function openThenEdit(page: Page, patch: Record<string, unknown>) {
-  await openFixtureSite(page)
-  const id = page.url().split('/i/')[1]!
-  await page.goto('/?tier=0')
-  await editStored(page, id, patch)
-  return id
-}
+import { openFixtureRoad, openFixtureSite, openThenEdit, waitForPhotos } from './helpers.ts'
 
 test('defaults to the clearest early and late passes and shows both photos', async ({ page }) => {
   await openFixtureSite(page)
@@ -234,5 +205,21 @@ test('the workbench passes axe in every view, in both themes', async ({ page }) 
       expect(results.violations, `${view}: ${JSON.stringify(results.violations, null, 2)}`).toEqual([])
       await page.getByRole('button', { name: copy.nav.themeToggle }).click()
     }
+  }
+})
+
+test('the road workbench, with its section grid and the Details open, passes axe in both themes', async ({
+  page,
+}) => {
+  await openFixtureRoad(page)
+  await waitForPhotos(page)
+  await expect(page.getByRole('grid', { name: flow.workbench.grid })).toBeVisible()
+  await page.locator('summary', { hasText: copy.common.details }).click()
+  for (let i = 0; i < 2; i++) {
+    const results = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'])
+      .analyze()
+    expect(results.violations, JSON.stringify(results.violations, null, 2)).toEqual([])
+    await page.getByRole('button', { name: copy.nav.themeToggle }).click()
   }
 })
