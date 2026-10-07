@@ -82,6 +82,8 @@ export const copy = {
     gibs: 'NASA GIBS Blue Marble',
     terrain: 'Terrain: Mapzen Joerd / AWS Terrain Tiles',
     sentinel: (year: number) => `Contains modified Copernicus Sentinel data ${year}`,
+    sentinelYears: (years: number[]) =>
+      `Contains modified Copernicus Sentinel data ${[...new Set(years)].sort((a, b) => a - b).join(', ')}`,
   },
   pages: {
     limits: {

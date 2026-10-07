@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { copy, issueMessage } from './copy.ts'
+import { flow } from './copy-flow.ts'
 
 const dir = new URL('./', import.meta.url)
 const SOURCE = readdirSync(dir)
@@ -25,6 +26,18 @@ describe('copy', () => {
     const text = copy.pages.privacy.items.join(' ')
     for (const host of ['OpenFreeMap', 'NASA GIBS', 'AWS']) expect(text, host).toContain(host)
     expect(text).toContain('IP address')
+  })
+  it('credits Sentinel data once per year shown, oldest first', () => {
+    expect(copy.attribution.sentinelYears([2025])).toBe('Contains modified Copernicus Sentinel data 2025')
+    expect(copy.attribution.sentinelYears([2025, 2018, 2025])).toBe(
+      'Contains modified Copernicus Sentinel data 2018, 2025',
+    )
+  })
+  it('captions a photo without a clear-view figure until the check has one', () => {
+    expect(flow.workbench.caption('10 Jan 2025', 100)).toBe(
+      '10 Jan 2025 · Sentinel-2 · 10 m · 100% clear view',
+    )
+    expect(flow.workbench.caption('10 Jan 2025')).toBe('10 Jan 2025 · Sentinel-2 · 10 m')
   })
   it('has a word and help line for every quality label', () => {
     for (const l of ['CLEAR', 'PARTIAL', 'OBSCURED', 'NOT_COVERED'] as const) {

@@ -68,12 +68,15 @@ export const flow = {
     before: 'Before',
     after: 'After',
     pickPair: 'Pick a clear "before" and "after" date on the timeline.',
+    notEnoughClear: 'Only one photo in these dates is clear enough to compare. Try a longer date range.',
     view: 'View',
     modes: { swipe: 'Swipe', side: 'Side by side', diff: 'Difference' },
     swipeLabel: 'Reveal the after photo',
+    outlineToggle: 'Show outline',
     diffCaption:
       'Brightness difference between these two dates. Season, moisture, shadows and clouds also cause differences. This is not a construction detector.',
-    caption: (date: string, clearPct: number) => `${date} · Sentinel-2 · 10 m · ${clearPct}% clear view`,
+    caption: (date: string, clearPct?: number) =>
+      `${date} · Sentinel-2 · 10 m${clearPct === undefined ? '' : ` · ${clearPct}% clear view`}`,
     photoAlt: (role: string, date: string, clearPct?: number) =>
       `${role} photo, ${date}, Sentinel-2 true colour${clearPct !== undefined ? ` · ${clearPct}% clear view` : ''}`,
     timeline: 'Timeline',
@@ -92,13 +95,19 @@ export const flow = {
     hideMap: 'Hide map',
     report: 'Report',
     notSaved: 'Not saved',
+    meta: {
+      site: (km2: number, dates: string) => `Site · ${km2.toFixed(2)} km² · ${dates}`,
+      road: (km: number, widthM: number, dates: string) =>
+        `Road · ${km.toFixed(1)} km · ${widthM} m wide · ${dates}`,
+      pair: (before: string, after: string) => `${before} ↔ ${after}`,
+    },
     loadingPhoto: 'Loading photo',
     checkFailed: 'This photo could not be checked.',
     badOutline: 'This outline can no longer be read. Draw it again from the start.',
     thumbFailed: 'Preview unavailable.',
     notFound:
       'This investigation is not in this browser. It may have been deleted, or saved on another device.',
-    disclaimer: '"No clear visible change" does not prove nothing happened. Roofs hide interiors.',
+    disclaimer: '"No clear visible change" does not prove that nothing happened. Roofs hide interiors.',
     errors: {
       BAD_ORDER: 'The before date must be earlier than the after date.',
       TOO_MANY_PINS: 'You can pin up to 24 dates.',

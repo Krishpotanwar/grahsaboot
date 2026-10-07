@@ -268,3 +268,33 @@
     opacity: 0.7;
   }
 }
+
+/* Swipe: the native range is the control (keyboard, screen readers, touch); its track and 44 px thumb are invisible. EvidenceViewer draws the divider and the round handle, so nothing here depends on the thumb's vertical position. */
+.swipe-range {
+  appearance: none;
+  background: transparent;
+  margin: 0;
+  cursor: ew-resize;
+  touch-action: pan-y;
+}
+.swipe-range::-webkit-slider-runnable-track {
+  background: transparent;
+  height: 44px;
+}
+.swipe-range::-moz-range-track {
+  background: transparent;
+  height: 44px;
+}
+.swipe-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 44px;
+  height: 44px;
+  background: transparent;
+  border: 0;
+}
+.swipe-range::-moz-range-thumb {
+  width: 44px;
+  height: 44px;
+  background: transparent;
+  border: 0;
+}

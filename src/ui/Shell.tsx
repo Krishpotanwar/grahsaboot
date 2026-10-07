@@ -17,6 +17,7 @@ function pageTitle(r: Route): string | null {
     case 'new':
       return copy.titles.new
     case 'investigation':
+      return copy.titles.investigation
     case 'report':
       return copy.soon.title
     case 'notFound':

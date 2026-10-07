@@ -12,6 +12,7 @@ import TextPage from './screens/TextPage.tsx'
 const GlobeScreen = lazy(() => import('./screens/GlobeScreen.tsx'))
 const KitScreen = lazy(() => import('./screens/KitScreen.tsx'))
 const NewInvestigation = lazy(() => import('./screens/NewInvestigation.tsx'))
+const Workbench = lazy(() => import('./screens/Workbench.tsx'))
 
 export function screenFor(r: Route): ReactNode {
   switch (r.name) {
@@ -24,6 +25,7 @@ export function screenFor(r: Route): ReactNode {
     case 'new':
       return <NewInvestigation />
     case 'investigation':
+      return <Workbench key={r.id} id={r.id} />
     case 'report':
       return <NotFound text={copy.soon} />
     case 'kit':
