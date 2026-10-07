@@ -7,7 +7,7 @@ import { useMapLayout, useMapStage } from '../map/MapStage.tsx'
 import { copy } from '../ui/copy.ts'
 import { flow } from '../ui/copy-flow.ts'
 import { Button, MicroLabel, Skeleton } from '../ui/kit.tsx'
-import { isUsable, pickDefaults, quartilesDone } from '../workbench/defaults.ts'
+import { canPickDefaults, isUsable, pickDefaults } from '../workbench/defaults.ts'
 import { EvidenceViewer, type Slot } from '../workbench/EvidenceViewer.tsx'
 import type { DateEntry } from '../workbench/runner.ts'
 import { useEvidence } from '../workbench/useEvidence.ts'
@@ -45,9 +45,10 @@ export default function Workbench({ id }: { id: string }) {
   }, [beforeEntry?.invalid, afterEntry?.invalid])
 
   useEffect(() => {
-    if (!inv || inv.before || !quartilesDone(entries, inv.dateFrom, inv.dateTo)) return
+    if (!inv || inv.before || !canPickDefaults(entries, inv.dateFrom, inv.dateTo)) return
     const d = pickDefaults(entries, inv.dateFrom, inv.dateTo)
-    if (d.before && d.after) update((i) => setBeforeAfter(i, d.before!, d.after!)) // a refusal sets `error`, shown below
+    // Once: `update` reads the latest record, so a run racing the first pick cannot overwrite it.
+    if (d.before && d.after) update((i) => (i.before ? i : setBeforeAfter(i, d.before!, d.after!))) // a refusal sets `error`, shown below
   }, [inv, entries, update])
 
   useEffect(() => {

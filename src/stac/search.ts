@@ -19,6 +19,7 @@ export interface SearchArgs {
   to: string
   signal?: AbortSignal
   fetchImpl?: typeof fetch
+  /** Pages per window (never more than `LIMITS.stacMaxPagesPerWindow`). */
   maxPages?: number
   sleep?: (ms: number) => Promise<void>
 }
@@ -38,6 +39,8 @@ const FIELDS = [
 ]
 const BACKOFF = [500, 1500]
 const TIMEOUT_MS = 20_000
+const WINDOW_MONTHS = 12
+const WINDOWS_AT_ONCE = 3
 /**
  * A stalled network ends in a retry or the fallback (TimeoutError), never a hung spinner; a caller abort stays an abort.
  * Without AbortSignal.any (Safari < 17.4) the caller's signal goes through untimed, else the timeout alone.
@@ -86,16 +89,28 @@ async function fetchJson(req: Req, a: SearchArgs): Promise<Json> {
   throw last
 }
 
-async function searchEndpoint(
+/** Consecutive windows of at most 12 calendar months: window k is [from + 12k months, from + 12(k+1) months - 1 day], the last cut at `to`. */
+function windows(from: string, to: string): Array<[string, string]> {
+  const [y, m, d] = from.split('-').map(Number)
+  const day = (k: number, back = 0) =>
+    new Date(Date.UTC(y!, m! - 1 + WINDOW_MONTHS * k, d! - back)).toISOString().slice(0, 10)
+  const out: Array<[string, string]> = []
+  // The first window is always searched, so a reversed range fails at the server as it always did.
+  for (let k = 0; k === 0 || day(k) <= to; k++) out.push([day(k), day(k + 1, 1) < to ? day(k + 1, 1) : to])
+  return out
+}
+
+async function searchWindow(
   base: string,
   collection: Collection,
   a: SearchArgs,
+  [from, to]: [string, string],
   useFields: boolean,
-): Promise<SearchResult> {
+): Promise<{ items: S2Item[]; limited: boolean }> {
   const body = {
     collections: ['sentinel-2-l2a'],
     bbox: coarsenBbox(a.bbox), // privacy: the exact outline never leaves the browser
-    datetime: `${a.from}T00:00:00Z/${a.to}T23:59:59Z`,
+    datetime: `${from}T00:00:00Z/${to}T23:59:59Z`,
     limit: 100,
     sortby: [{ field: 'properties.datetime', direction: 'asc' }],
     ...(useFields ? { fields: { include: FIELDS } } : {}),
@@ -109,9 +124,9 @@ async function searchEndpoint(
       if (it) items.push(it)
     }
     const next = (json.links ?? []).find((l) => l.rel === 'next' && l.href)
-    if (!next) return { items, limited: false, source: collection }
-    if (pages >= Math.min(a.maxPages ?? LIMITS.stacMaxPages, LIMITS.stacMaxPages))
-      return { items, limited: true, source: collection }
+    if (!next) return { items, limited: false }
+    if (pages >= Math.min(a.maxPages ?? LIMITS.stacMaxPagesPerWindow, LIMITS.stacMaxPagesPerWindow))
+      return { items, limited: true }
     req =
       next.method === 'POST'
         ? {
@@ -120,6 +135,34 @@ async function searchEndpoint(
             body: next.merge ? { ...(req.body as object), ...(next.body as object) } : next.body,
           }
         : { url: next.href!, method: 'GET' }
+  }
+}
+
+/** Every window of the range, 3 at a time, merged oldest first. `limited` when any window ran out of pages. */
+async function searchEndpoint(
+  base: string,
+  collection: Collection,
+  a: SearchArgs,
+  useFields: boolean,
+): Promise<SearchResult> {
+  const ws = windows(a.from, a.to)
+  const done: Array<{ items: S2Item[]; limited: boolean }> = []
+  let next = 0
+  // ponytail: a window that fails leaves the others to finish their pages, and the result is thrown away; cancel them if that load ever matters.
+  const worker = async () => {
+    while (next < ws.length) {
+      const i = next++
+      done[i] = await searchWindow(base, collection, a, ws[i]!, useFields)
+      a.signal?.throwIfAborted() // no new window once the caller has gone, whatever the fetch does
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(WINDOWS_AT_ONCE, ws.length) }, worker))
+  const byId = new Map<string, S2Item>()
+  for (const w of done) for (const it of w.items) byId.set(it.id, it)
+  return {
+    items: [...byId.values()].sort((x, y) => Date.parse(x.datetime) - Date.parse(y.datetime)),
+    limited: done.some((w) => w.limited),
+    source: collection,
   }
 }
 

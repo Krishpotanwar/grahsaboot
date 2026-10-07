@@ -55,11 +55,15 @@ export function interleaveEnds(dates: string[]): string[] {
 /** Thumbnails that load unasked. The review screen's estimate (src/geo/estimate.ts) counts the same 12. */
 const EAGER_THUMBS = 12
 
+/**
+ * `concurrency` 6 is what a browser opens per HTTP/1.1 host, and the COG hosts are the bottleneck. Measured on the worked example
+ * (docs/ops/probes.md, P9): 48 checks in 30 s at 6 against 32 at 4; 8 and 12 did no better than 6.
+ */
 export function createRunner(
   deps: RunnerDeps,
   input: RunnerInput,
   onState: (s: EvidenceState) => void,
-  concurrency = 4,
+  concurrency = 6,
 ) {
   const ac = new AbortController()
   let state: EvidenceState = { phase: 'searching', limited: false, source: null, entries: [], error: null }

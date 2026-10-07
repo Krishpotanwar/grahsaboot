@@ -14,5 +14,8 @@ export const LIMITS = {
   notes: { maxChars: 2000, maxPerInvestigation: 200 },
   investigationsPerUser: 50,
   verifiedFramesPerDay: 600,
-  stacMaxPages: 10,
+  // STAC pages (100 items each) walked per 12-month window. The old whole-search cap of 10 pages was a guess: the P9 probe
+  // (docs/ops/probes.md, 2026-10-07) found ~3.6 items per date, so 1,000 items were only ~280 dates and the oldest-first sort
+  // dropped the newest photos. A year is 180 items (88 dates) in 2025, so 5 pages (500 items) per window has room to spare.
+  stacMaxPagesPerWindow: 5,
 } as const

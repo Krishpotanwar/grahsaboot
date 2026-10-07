@@ -3,6 +3,7 @@ import {
   defaultDates,
   draftFromParams,
   draftToAoi,
+  dropStalePair,
   emptyDraft,
   nameForPlace,
   squareAround,
@@ -76,6 +77,32 @@ describe('draft helpers', () => {
     // The query string is untrusted: inherited keys, empty values and half pairs are not a place.
     for (const q of ['example=constructor', 'example=__proto__', 'lat=&lon=', 'lat=21.1', 'lat=abc&lon=79'])
       expect(draftFromParams(new URLSearchParams(q), TODAY).step, q).toBe(1)
+  })
+  it('the worked example carries its known pair; a plain place link and a blank draft do not', () => {
+    expect(draftFromParams(new URLSearchParams('example=navi-mumbai-airport'), TODAY).draft).toMatchObject({
+      before: '2018-02-22',
+      after: '2025-12-12',
+    })
+    expect(draftFromParams(new URLSearchParams('lat=21.1458&lon=79.0882'), TODAY).draft).toMatchObject({
+      before: null,
+      after: null,
+    })
+    expect(emptyDraft(TODAY)).toMatchObject({ before: null, after: null })
+  })
+  it('keeps the example pair through renames and date edits, and drops it once the place or outline changes', () => {
+    const ex = draftFromParams(new URLSearchParams('example=navi-mumbai-airport'), TODAY).draft
+    const pair = { before: '2018-02-22', after: '2025-12-12' }
+    expect(dropStalePair(ex, { ...ex, name: 'Mine', dateTo: '2025-12-30' })).toMatchObject(pair)
+    const elsewhere: Place = { name: 'Nagpur', lat: 21.1458, lon: 79.0882, bbox: null }
+    for (const change of [
+      { place: elsewhere },
+      { ring: squareAround(79.0882, 21.1458, 1000) },
+      { ring: null, line: [[79, 21]] as [number, number][] },
+    ])
+      expect(dropStalePair(ex, { ...ex, ...change }), JSON.stringify(Object.keys(change))).toMatchObject({
+        before: null,
+        after: null,
+      })
   })
   // The name follows the place until the user types their own (C2 carry-in C).
   it('names the investigation after the place until the user edits the name', () => {

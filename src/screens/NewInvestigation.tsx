@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import { summarizeAoi } from '../geo/aoi.ts'
 import { useSearchParams } from '../lib/router.tsx'
 import { accentColor, fitAoi, removeAoiLayer, setAoiLayer } from '../map/aoiLayer.ts'
 import { flyToPlace } from '../map/camera.ts'
 import { useMapLayout, useMapStage } from '../map/MapStage.tsx'
 import { DatesStep } from '../new/DatesStep.tsx'
-import { draftFromParams, draftToAoi } from '../new/draft.ts'
+import { dropStalePair, draftFromParams, draftToAoi, type Draft } from '../new/draft.ts'
 import { OutlineStep } from '../new/OutlineStep.tsx'
 import { PlaceStep } from '../new/PlaceStep.tsx'
 import { ReviewStep } from '../new/ReviewStep.tsx'
@@ -14,7 +14,12 @@ import { Stepper } from '../new/Stepper.tsx'
 export default function NewInvestigation() {
   const params = useSearchParams()
   const [{ draft: initial, step: firstStep }] = useState(() => draftFromParams(params))
-  const [draft, setDraft] = useState(initial)
+  const [draft, setDraftRaw] = useState(initial)
+  // Stable: OutlineStep lists it as an effect dependency.
+  const setDraft = useCallback<Dispatch<SetStateAction<Draft>>>(
+    (u) => setDraftRaw((d) => dropStalePair(d, typeof u === 'function' ? u(d) : u)),
+    [],
+  )
   const [step, setStep] = useState<1 | 2 | 3 | 4>(firstStep)
   useMapLayout('side')
   const { map, tier, installLayers } = useMapStage()

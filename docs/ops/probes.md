@@ -35,3 +35,42 @@
 - One live request only. CelesTrak's page (https://celestrak.org/NORAD/documentation/gp-data-formats.php, read 2026-10-06) says new GP data is checked once every 2 hours; for some datasets since March 2026 (its example is `GROUP=active`) a repeat inside that window gets HTTP 403, "GP data has not updated since your last successful download ... Data is updated once every 2 hours"; and 50 HTTP 301/403/404 errors in 2 hours put the IP address in the firewall. The Worker's 2-hour cache window matches this. Whether `GROUP=resource` is enforced the same way was not tested (that would need a second request). The dev and preview smoke tests used a stubbed upstream.
 - Nominatim policy (https://operations.osmfoundation.org/policies/nominatim/, read 2026-10-06, no revision date on the page): "an absolute maximum of 1 request per second"; "Provide a valid HTTP Referer or User-Agent identifying the application (stock User-Agents as set by http libraries will not do)"; auto-complete "you must not implement such a service on the client side"; "Clearly display attribution as suitable for your medium"; "Results must be cached on your side". The requirement list does not ask for an email address.
 - App against the policy: search runs on submit only, at most 1 request per second with a cache (B5); the browser sends its own Referer (no Referrer-Policy override in `index.html`); the request adds only `Accept-Language`; the panel shows "Search by OpenStreetMap Nominatim" and the map shows "© OpenStreetMap contributors". No User-Agent or email is set for Nominatim; the Worker's CelesTrak request uses the fixed `User-Agent: GrahSaboot/1.0`.
+
+## P9: STAC search shape on real data (2026-10-07)
+
+Run 2026-10-07 against the real Earth Search STAC and the real AWS COGs, with the app's own request shape (`src/stac/search.ts` body, `limit: 100`, sort by datetime ascending, 10 pages at most, one search for the whole range). The place is the featured worked example (Navi Mumbai airport, a 2 km square).
+
+| Range | Items | Distinct dates | Pages | Time | Truncated | Last date returned |
+|---|---|---|---|---|---|---|
+| 2017-12-01 to 2025-12-31 (the worked example) | 1000 | 279 | 10 | 23 s | yes | 2021-11-28 |
+| 2024-01-01 to 2025-12-31 | 334 | 161 | 5 | 7.8 s | no | 2025-12-27 |
+| 2025-01-01 to 2025-12-31 | 180 | 88 | 3 | 4.0 s | no | 2025-12-27 |
+
+Findings:
+
+1. There are about 3.6 STAC items per date in this bbox, so 1000 items are only about 280 dates. The spec's "up to 10 pages" (design spec section on STAC search) was a guess made before this measurement.
+2. The search is sorted oldest first, so truncation silently drops the newest photos (2022 to 2025), which is what an "after" photo needs. The worked example's "after" would have been November 2021.
+3. The pages were fetched one after another, about 2 s each.
+4. In the browser the quality checks ran at about 12 COG requests per second at concurrency 4, and the workbench waited until every date in both outer quartiles was checked before it picked a default before/after, so a range of about 600 dates took minutes to show a photo.
+
+Ruling (task C5b):
+
+- Search in consecutive windows of at most 12 calendar months, at most 3 windows at a time, at most 5 pages (500 items) per window (`LIMITS.stacMaxPagesPerWindow`). Merge by item id, oldest first. `limited` is true only when a window used its 5 pages with a `next` link left. A failing primary endpoint still redoes the whole range on Planetary Computer.
+- The default before/after is picked as soon as each outer quartile has a checked CLEAR photo (or has nothing left to check). Because the runner checks both ends of the range first, that is the widest clear span.
+- The runner's default concurrency is 6 (the measurement below).
+- The worked example carries its known pair (22 Feb 2018 and 12 Dec 2025, real Sentinel-2B passes), so it opens on photos at once.
+
+Measured after the change (this VM, headless Chromium 153 through the dev server, the app's own `searchSentinel2`, `createRunner` and imagery worker, real services, one fresh browser context per run so the HTTP cache is cold; scratch script, not in the repo):
+
+- Windowed search of the worked example: 9 windows, 3142 items, 1076 distinct dates, 20.0 s, 20.1 s and 19.5 s in three runs (the old single search needed 23 s for 10 pages and got 279 dates). Each window on its own took 1.4 to 9.2 s. Three of the nine windows used all 5 pages: 2018-12 to 2019-11 (478 items kept, a 6th page left), 2019-12 to 2020-11 (500 items, ends 2020-11-08) and 2020-12 to 2021-11 (500 items, ends 2021-09-19). Five of the others hold 300 to 378 items and the last one (December 2025 only) holds 30. So the worked example still shows "Some passes are not shown"; its pair (windows 1 and 9) is not affected. A cap of 6 or 7 pages would cover the heavy windows at about 2 s a page.
+- Quality checks completed in the 30 s after the search ended (worked example, priority pair first, then the range from both ends in; checks plus the runner's own preview loads, no full frames):
+
+  | Concurrency | Runs | After 10 s | After 20 s | After 30 s |
+  |---|---|---|---|---|
+  | 4 | 3 | 8 | 20 | 32 (all three runs) |
+  | 6 | 3 | 12 | 30 | 48 (all three runs) |
+  | 8 | 1 | 16 | 32 | 48 |
+  | 12 | 1 | 12 | 24 | 48 |
+
+  6 is 1.5 times as fast as 4 at every point, so the runner keeps 6. 8 and 12 give no more at 30 s, which fits the browser's limit of 6 connections per host. A check takes about 3.7 s here whatever the concurrency, which is why the counts repeat exactly.
+- LIVE test (`LIVE=1 E2E_BROWSERS=chromium npx playwright test tests/e2e/live-example.spec.ts`, dev server, real services, same VM): passed, both photos (22 Feb 2018 and 12 Dec 2025) on screen 34.6 s after pressing "Open the workbench" (test total 36.3 s), no console errors. Roughly 20 s of that is the search; the rest is waiting for a free slot (the first 6 checks run first) and loading the two frames. The same journey on the production build (`vite preview` of `dist/`, scratch script, two runs) took 31.3 s and 31.3 s to both photos, no console errors.

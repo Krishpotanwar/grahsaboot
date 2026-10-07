@@ -31,6 +31,8 @@ export function ReviewStep({ draft, setDraft, onBack }: StepProps) {
         aoi,
         dateFrom: draft.dateFrom,
         dateTo: draft.dateTo,
+        before: draft.before,
+        after: draft.after,
       })
       await getStore().put(inv)
     } catch {

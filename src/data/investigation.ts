@@ -39,11 +39,12 @@ const uniqSorted = (xs: string[]) => [...new Set(xs)].sort()
 const cleanName = (name: string) => name.trim().slice(0, 120) || 'Untitled investigation'
 
 export function newInvestigation(
-  input: Pick<Investigation, 'name' | 'aoi' | 'dateFrom' | 'dateTo'>,
+  input: Pick<Investigation, 'name' | 'aoi' | 'dateFrom' | 'dateTo'> &
+    Partial<Pick<Investigation, 'before' | 'after'>>,
   now = new Date(),
   uuid: string = crypto.randomUUID(),
 ): Investigation {
-  return {
+  const inv: Investigation = {
     id: `local-${uuid}`,
     serverId: null,
     name: cleanName(input.name),
@@ -58,6 +59,11 @@ export function newInvestigation(
     createdAt: iso(now),
     updatedAt: iso(now),
   }
+  // A known pair (a worked example's) is applied, and pinned, only when both are in order and inside the dates; otherwise it is dropped, never an error.
+  const { before, after } = input
+  return before && after && before < after && before >= input.dateFrom && after <= input.dateTo
+    ? setBeforeAfter(inv, before, after, now)
+    : inv
 }
 
 export const renameInvestigation = (inv: Investigation, name: string, now = new Date()): Investigation => ({

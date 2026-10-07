@@ -58,6 +58,40 @@ describe('investigation model', () => {
     expect(renameInvestigation(inv, ' x'.repeat(100), T).name.length).toBe(120)
     expect(renameInvestigation(inv, '   ', T).name).toBe('Untitled investigation')
   })
+  it('applies a known before/after pair at creation and pins both', () => {
+    const inv = newInvestigation(
+      {
+        name: 'x',
+        aoi: AOI,
+        dateFrom: '2025-01-01',
+        dateTo: '2025-12-31',
+        before: '2025-01-01',
+        after: '2025-12-31',
+      },
+      T,
+      '00000000-0000-4000-8000-000000000001',
+    )
+    expect(inv).toMatchObject({
+      before: '2025-01-01', // the range's own first and last day are inside it
+      after: '2025-12-31',
+      pinned: ['2025-01-01', '2025-12-31'],
+    })
+  })
+  it.each([
+    ['reversed', '2025-12-20', '2025-01-10'],
+    ['the same day twice', '2025-06-01', '2025-06-01'],
+    ['before the range starts', '2024-12-31', '2025-06-01'],
+    ['after the range ends', '2025-06-01', '2026-01-01'],
+    ['only half given', '2025-06-01', null],
+    ['not given', null, null],
+  ])('ignores a pair that is %s, and does not throw', (_why, before, after) => {
+    const inv = newInvestigation(
+      { name: 'x', aoi: AOI, dateFrom: '2025-01-01', dateTo: '2025-12-31', before, after },
+      T,
+      '00000000-0000-4000-8000-000000000001',
+    )
+    expect(inv).toMatchObject({ before: null, after: null, pinned: [] })
+  })
   it('sets before/after in order and always pins them', () => {
     const inv = setBeforeAfter(base(), '2025-01-10', '2025-12-20', T)
     expect(inv.pinned).toEqual(['2025-01-10', '2025-12-20'])

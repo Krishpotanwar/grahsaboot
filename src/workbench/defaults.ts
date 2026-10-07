@@ -8,14 +8,19 @@ function fraction(date: string, from: string, to: string) {
   return (Date.parse(date) - t0) / Math.max(1, Date.parse(to) - t0)
 }
 
-export function quartilesDone(entries: DateEntry[], from: string, to: string): boolean {
-  return (
-    entries.length > 0 &&
-    entries.every((e) => {
-      const f = fraction(e.date, from, to)
-      return (f > 0.25 && f < 0.75) || e.status === 'checked' || e.status === 'error'
-    })
-  )
+/**
+ * Both outer quartiles can be picked from: each has a checked CLEAR photo, or no date left to wait for there.
+ * The runner checks both ends of the range first, so the first pair found this way is the widest clear span.
+ */
+export function canPickDefaults(entries: DateEntry[], from: string, to: string): boolean {
+  const ready = (outer: (f: number) => boolean) => {
+    const q = entries.filter((e) => outer(fraction(e.date, from, to)))
+    return (
+      q.some((e) => e.status === 'checked' && e.quality?.stats.label === 'CLEAR') ||
+      q.every((e) => e.status === 'checked' || e.status === 'error')
+    )
+  }
+  return entries.length > 0 && ready((f) => f <= 0.25) && ready((f) => f >= 0.75)
 }
 
 export function pickDefaults(

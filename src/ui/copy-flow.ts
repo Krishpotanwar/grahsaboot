@@ -63,7 +63,7 @@ export const flow = {
     allCloudy:
       'Every photo in these dates is obscured or does not cover your outline. Try other dates. Your notes are kept.',
     searchFailed: 'Could not reach the satellite catalogue. Check your connection and try again.',
-    limited: 'Search limited to 1,000 passes. Narrow the dates to see them all.',
+    limited: 'Some passes are not shown. Narrow the dates to see them all.',
     catalogueNote: 'The catalogue may omit a few passes.',
     before: 'Before',
     after: 'After',

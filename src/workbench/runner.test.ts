@@ -78,6 +78,29 @@ describe('createRunner', () => {
     ])
     expect(last!.entries.every((e) => e.status === 'checked')).toBe(true)
   })
+  it('runs 6 checks at once by default, and no more', async () => {
+    const MANY = Array.from({ length: 10 }, (_, i) => `2025-02-${String(i + 1).padStart(2, '0')}`)
+    const { held, open } = gate()
+    let live = 0
+    let peak = 0
+    const { d } = deps({
+      search: async () => ({ items: MANY.map(item), limited: false, source: 'sentinel-2-l2a' }),
+      select: () => MANY.map(cand),
+      quality: async () => {
+        peak = Math.max(peak, ++live)
+        await held
+        live--
+        return { stats: { label: 'OBSCURED', validFraction: 1 } } as never
+      },
+    })
+    const r = createRunner(d, input, () => {}) // the default concurrency
+    await r.start()
+    await settle()
+    expect(peak).toBe(6)
+    open()
+    await settle()
+    expect(live).toBe(0) // the other 4 ran after the first 6, so all 10 were checked
+  })
   it('honours priority dates and `only`', async () => {
     const { d, calls } = deps()
     const r = createRunner(

@@ -10,7 +10,8 @@ const desktop = [
 
 export default defineConfig({
   testDir: 'tests',
-  testMatch: live ? ['live/**/*.spec.ts'] : ['e2e/**/*.spec.ts'],
+  // The live worked-example test sits with the e2e specs but skips itself unless LIVE=1; LIVE mode must pick it up too.
+  testMatch: live ? ['live/**/*.spec.ts', 'e2e/live-example.spec.ts'] : ['e2e/**/*.spec.ts'],
   timeout: live ? 120_000 : 60_000,
   retries: 0,
   reporter: [['list']],

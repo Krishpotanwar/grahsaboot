@@ -68,6 +68,42 @@ async function without(names: ('any' | 'timeout')[], fn: () => Promise<void>) {
   }
 }
 
+const bounds = (init: RequestInit) =>
+  (JSON.parse(init.body as string).datetime as string).split('/') as [string, string]
+/** The windows a mock was asked for, as `from/to` days, oldest first. */
+const windowsOf = (f: { mock: { calls: unknown[][] } }) =>
+  f.mock.calls
+    .map((c) =>
+      (JSON.parse((c[1] as RequestInit).body as string).datetime as string).replace(/T[\d:]+Z/g, ''),
+    )
+    .sort()
+const empty = () => json({ features: [], links: [] })
+const three = { ...args, from: '2024-01-01', to: '2026-12-31' }
+const six = { ...args, from: '2020-01-01', to: '2025-12-31' }
+/** A STAC where every window has `pages[year]` pages of one item each; the last page has no next link. */
+const paged = (pages: Record<string, number>) => {
+  const seen: Record<string, number> = {}
+  return vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
+    const y = bounds(init)[0].slice(0, 4)
+    const n = (seen[y] = (seen[y] ?? 0) + 1)
+    return json({
+      features: [item(`${y}-${n}`, `${y}-01-${String(n).padStart(2, '0')}`)],
+      links:
+        n < pages[y]!
+          ? [
+              {
+                rel: 'next',
+                method: 'POST',
+                href: 'https://earth-search.aws.element84.com/v1/search',
+                merge: true,
+                body: { n },
+              },
+            ]
+          : [],
+    })
+  })
+}
+
 describe('searchSentinel2', () => {
   it('follows POST next links with their body', async () => {
     const fetchImpl = vi
@@ -203,7 +239,7 @@ describe('searchSentinel2', () => {
     await expect(searchSentinel2({ ...args, fetchImpl })).rejects.toMatchObject({ status: 400 })
     expect(fetchImpl).toHaveBeenCalledTimes(1)
   })
-  it('never walks past 10 pages, whatever maxPages says', async () => {
+  it('never walks past 5 pages in a window, whatever maxPages says', async () => {
     const fetchImpl = vi.fn().mockImplementation(async () =>
       json({
         features: [item('X', '2025-02-01')],
@@ -213,8 +249,140 @@ describe('searchSentinel2', () => {
       }),
     )
     const r = await searchSentinel2({ ...args, fetchImpl, maxPages: 50 })
-    expect(fetchImpl).toHaveBeenCalledTimes(10)
+    expect(fetchImpl).toHaveBeenCalledTimes(5)
     expect(r.limited).toBe(true)
+  })
+  it('splits a 3-year range into 3 yearly windows, one request each', async () => {
+    const fetchImpl = vi.fn().mockImplementation(async () => empty())
+    await searchSentinel2({ ...three, fetchImpl })
+    expect(fetchImpl).toHaveBeenCalledTimes(3)
+    expect(windowsOf(fetchImpl)).toEqual([
+      '2024-01-01/2024-12-31',
+      '2025-01-01/2025-12-31',
+      '2026-01-01/2026-12-31',
+    ])
+    expect(JSON.parse(fetchImpl.mock.calls[0]![1].body).datetime).toBe(
+      '2024-01-01T00:00:00Z/2024-12-31T23:59:59Z',
+    )
+  })
+  it.each([
+    ['one window up to 12 months', '2025-01-01', '2025-12-31', ['2025-01-01/2025-12-31']],
+    ['one window from a leap day to its anniversary', '2024-02-29', '2025-02-28', ['2024-02-29/2025-02-28']],
+    ['one window for a single day', '2025-06-01', '2025-06-01', ['2025-06-01/2025-06-01']],
+    [
+      'a second window for the 13th month',
+      '2025-01-01',
+      '2026-01-01',
+      ['2025-01-01/2025-12-31', '2026-01-01/2026-01-01'],
+    ],
+    [
+      'windows that follow the start day and end at `to`',
+      '2024-03-15',
+      '2026-06-10',
+      ['2024-03-15/2025-03-14', '2025-03-15/2026-03-14', '2026-03-15/2026-06-10'],
+    ],
+    [
+      'no gap or overlap across a missing 29 February',
+      '2024-02-29',
+      '2026-03-01',
+      ['2024-02-29/2025-02-28', '2025-03-01/2026-02-28', '2026-03-01/2026-03-01'],
+    ],
+    [
+      'the worked example',
+      '2017-12-01',
+      '2025-12-31',
+      [
+        '2017-12-01/2018-11-30',
+        '2018-12-01/2019-11-30',
+        '2019-12-01/2020-11-30',
+        '2020-12-01/2021-11-30',
+        '2021-12-01/2022-11-30',
+        '2022-12-01/2023-11-30',
+        '2023-12-01/2024-11-30',
+        '2024-12-01/2025-11-30',
+        '2025-12-01/2025-12-31',
+      ],
+    ],
+  ])('windows: %s', async (_name, from, to, expected) => {
+    const fetchImpl = vi.fn().mockImplementation(async () => empty())
+    await searchSentinel2({ ...args, from, to, fetchImpl })
+    expect(windowsOf(fetchImpl)).toEqual(expected)
+  })
+  it('merges the windows: deduped by id, oldest first, whatever order they answer in', async () => {
+    const byYear: Record<string, ReturnType<typeof item>[]> = {
+      '2024': [item('A', '2024-06-01'), item('DUP', '2024-12-31')],
+      '2025': [item('B', '2025-03-01'), item('B0', '2025-01-15'), item('DUP', '2024-12-31')], // a window is not always in order
+      '2026': [item('C', '2026-02-01')],
+    }
+    const wait: Record<string, number> = { '2024': 20, '2025': 10, '2026': 0 } // the oldest window answers last
+    const fetchImpl = vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
+      const y = bounds(init)[0].slice(0, 4)
+      await new Promise((r) => setTimeout(r, wait[y]))
+      return json({ features: byYear[y], links: [] })
+    })
+    const r = await searchSentinel2({ ...three, fetchImpl })
+    expect(r.items.map((i) => i.id)).toEqual(['A', 'DUP', 'B0', 'B', 'C'])
+    expect(r.limited).toBe(false)
+  })
+  it('searches at most 3 windows at once', async () => {
+    let live = 0
+    let peak = 0
+    const fetchImpl = vi.fn().mockImplementation(async () => {
+      peak = Math.max(peak, ++live)
+      await new Promise((r) => setTimeout(r, 5))
+      live--
+      return empty()
+    })
+    await searchSentinel2({ ...six, fetchImpl })
+    expect(fetchImpl).toHaveBeenCalledTimes(6)
+    expect(peak).toBe(3)
+  })
+  it('is limited only when a window hits its 5 pages with a next link left', async () => {
+    const exact = paged({ '2024': 1, '2025': 5, '2026': 1 }) // 5 pages and then no next link: complete
+    const a = await searchSentinel2({ ...three, fetchImpl: exact })
+    expect(exact).toHaveBeenCalledTimes(7)
+    expect(a.items).toHaveLength(7)
+    expect(a.limited).toBe(false)
+    const more = paged({ '2024': 1, '2025': 6, '2026': 1 }) // a 6th page exists but is not walked
+    const b = await searchSentinel2({ ...three, fetchImpl: more })
+    expect(more).toHaveBeenCalledTimes(7)
+    expect(b.items).toHaveLength(7)
+    expect(b.limited).toBe(true)
+  })
+  it('falls back to Planetary Computer for the whole range when one window fails', async () => {
+    const fetchImpl = vi.fn().mockImplementation(async (url: string, init: RequestInit) => {
+      const y = bounds(init)[0].slice(0, 4)
+      if (url.includes('planetarycomputer'))
+        return json({ features: [pcItem(`P${y}`, `${y}-03-01`)], links: [] })
+      return y === '2025' ? json({}, 502) : json({ features: [item(`E${y}`, `${y}-03-01`)], links: [] })
+    })
+    const r = await searchSentinel2({ ...three, fetchImpl })
+    expect(r.source).toBe('pc:sentinel-2-l2a')
+    expect(r.items.map((i) => i.id)).toEqual(['P2024', 'P2025', 'P2026']) // nothing from Earth Search is kept
+    const pc = fetchImpl.mock.calls.filter(([u]) => u.includes('planetarycomputer'))
+    expect(windowsOf({ mock: { calls: pc } })).toEqual([
+      '2024-01-01/2024-12-31',
+      '2025-01-01/2025-12-31',
+      '2026-01-01/2026-12-31',
+    ])
+    for (const c of pc) expect(JSON.parse(c[1].body).fields).toBeUndefined()
+  })
+  it('aborts every window and starts no new one', async () => {
+    const ac = new AbortController()
+    const fetchImpl = vi.fn().mockImplementation((_url: string, init: RequestInit) => stall(init))
+    const p = searchSentinel2({ ...six, fetchImpl, signal: ac.signal })
+    ac.abort()
+    await expect(p).rejects.toMatchObject({ name: 'AbortError' })
+    await new Promise((r) => setTimeout(r, 10))
+    expect(fetchImpl).toHaveBeenCalledTimes(3) // the other 3 windows never started, and there was no fallback
+  })
+  it('starts no new window after an abort, even when a fetch ignores its signal', async () => {
+    const ac = new AbortController()
+    const fetchImpl = vi.fn().mockImplementation(async () => (ac.abort(), empty()))
+    await expect(searchSentinel2({ ...six, fetchImpl, signal: ac.signal })).rejects.toMatchObject({
+      name: 'AbortError',
+    })
+    expect(fetchImpl).toHaveBeenCalledTimes(3)
   })
   it('still searches without AbortSignal.any (Safari < 17.4): caller signal alone, else the timeout alone', async () => {
     const fetchImpl = vi

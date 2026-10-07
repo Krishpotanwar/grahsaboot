@@ -16,6 +16,9 @@ export interface Draft {
   dateFrom: string
   dateTo: string
   name: string
+  /** A known pair of passes to open on; only a worked example has one. */
+  before?: string | null
+  after?: string | null
 }
 
 export const ymd = (d: Date) => d.toISOString().slice(0, 10)
@@ -52,6 +55,12 @@ export function draftToAoi(d: Draft): AoiInput | null {
 export const nameForPlace = (d: Draft, p: Place) =>
   !d.name || (d.place && d.name === placeLabel(d.place)) ? placeLabel(p) : d.name
 
+/** A worked example's before/after pair belongs to its own place and outline: change either and the pair goes. */
+export const dropStalePair = (prev: Draft, next: Draft): Draft =>
+  next.place === prev.place && next.ring === prev.ring && next.line === prev.line
+    ? next
+    : { ...next, before: null, after: null }
+
 export function emptyDraft(today = new Date()): Draft {
   return {
     place: null,
@@ -61,6 +70,8 @@ export function emptyDraft(today = new Date()): Draft {
     widthM: LIMITS.road.defaultWidthM,
     ...defaultDates(today),
     name: '',
+    before: null,
+    after: null,
   }
 }
 
@@ -81,6 +92,8 @@ export function draftFromParams(
         name: ex.name,
         dateFrom: ex.dateFrom,
         dateTo: ex.dateTo,
+        before: ex.before ?? null,
+        after: ex.after ?? null,
         kind: ex.aoi.kind,
         ring: ex.aoi.kind === 'site' ? ex.aoi.geometry.coordinates[0]! : null,
         line: ex.aoi.kind === 'road' ? ex.aoi.geometry.coordinates : null,
