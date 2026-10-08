@@ -1,6 +1,7 @@
 import { expect, type Page } from '@playwright/test'
+import { copy } from '../../src/ui/copy.ts'
 import { flow } from '../../src/ui/copy-flow.ts'
-import { itemId } from '../fixtures/scene.ts'
+import { FIXTURE_DATES, fixtureItem } from '../fixtures/scene.ts'
 
 export const CORS = { 'access-control-allow-origin': '*' }
 
@@ -51,6 +52,30 @@ export async function waitForPhotos(page: Page) {
   await expect(page.getByRole('img', { name: /^After photo/ })).toBeVisible({ timeout: 30_000 })
 }
 
+/**
+ * A saved investigation has finished loading. The workbench lays out in stages, and the panels beside the photos move down
+ * with each: the known days first, then the whole list, and the check of the date on show, whose text, Details and preview
+ * box add about 450 px. A click must wait for the last. So: both photos are on screen with their clear-view figures (their
+ * checks are in; `photos: false` where one is meant to fail), the timeline holds all `passes` passes (the fixture's, or more
+ * with `manyPasses`), the date on show has its result, and the "other passes" line is gone.
+ */
+export async function waitForSettled(page: Page, { passes = FIXTURE_DATES.length, photos = true } = {}) {
+  if (photos) {
+    await expect(page.getByRole('img', { name: /^Before photo.*% clear view/ })).toBeVisible({
+      timeout: 30_000,
+    })
+    await expect(page.getByRole('img', { name: /^After photo.*% clear view/ })).toBeVisible({
+      timeout: 30_000,
+    })
+  }
+  const slider = page.getByRole('slider', { name: flow.workbench.timelineLabel })
+  await expect(slider).toHaveAttribute('max', String(passes - 1), { timeout: 30_000 })
+  await expect(slider).not.toHaveAttribute('aria-valuetext', new RegExp(`, ${copy.common.loading}$`), {
+    timeout: 30_000,
+  })
+  await expect(page.getByText(flow.workbench.searchingMore)).toHaveCount(0)
+}
+
 export async function openFixtureRoad(page: Page) {
   await startAt(page)
   await outlineRoadByCoords(page)
@@ -59,8 +84,9 @@ export async function openFixtureRoad(page: Page) {
 
 /**
  * The fixture's search answers with `extra` more clear passes from 11 Jan on: copies of 10 Jan whose files are served under
- * their own dates, so every date has its own URL. `log` lists each picture request in the order it arrives. With `hold`, each
- * copy's first check request waits in `held` until `open()`, so the sweep stalls and the other dates stay queued.
+ * their own dates, so every date has its own URL. Like the fixture server, a search gets the copies its window holds: one day,
+ * that day's copy alone. `log` lists each picture request in the order it arrives. With `hold`, each copy's first check
+ * request waits in `held` until `open()`, so the sweep stalls and the other dates stay queued.
  */
 export async function manyPasses(page: Page, extra: number, hold = false) {
   const log: Array<{ date: string; file: 'TCI' | 'SCL' }> = []
@@ -69,15 +95,11 @@ export async function manyPasses(page: Page, extra: number, hold = false) {
   const last = `2025-01-${10 + extra}`
   await page.route('**/stac/search', async (route) => {
     const body = await (await route.fetch()).json()
-    const src = body.features.find((f: { id: string }) => f.id === itemId('2025-01-10'))
+    const [from = '', to = ''] = ((route.request().postDataJSON()?.datetime as string) ?? '').split('/')
     for (let i = 0; i < extra; i++) {
       const date = `2025-01-${String(11 + i).padStart(2, '0')}`
-      const f = structuredClone(src)
-      f.id = itemId(date)
-      f.properties.datetime = `${date}T05:30:00.000000Z`
-      for (const a of Object.values(f.assets) as Array<{ href: string }>)
-        a.href = a.href.replace('2025-01-10', date)
-      body.features.push(f)
+      if (`${date}T05:30:00Z` >= from && `${date}T05:30:00Z` <= to)
+        body.features.push(fixtureItem(new URL(route.request().url()).origin, { ...FIXTURE_DATES[0]!, date }))
     }
     await route.fulfill({
       status: 200,

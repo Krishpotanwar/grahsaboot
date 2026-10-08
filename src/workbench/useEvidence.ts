@@ -20,6 +20,7 @@ const vertices = (aoi: AoiInput): LonLat[] =>
 
 const SEARCHING: EvidenceState = {
   phase: 'searching',
+  more: false,
   limited: false,
   source: null,
   entries: [],

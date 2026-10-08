@@ -59,6 +59,7 @@ export const flow = {
   },
   workbench: {
     searching: 'Finding satellite passes',
+    searchingMore: 'Finding the other passes.',
     none: 'No Sentinel-2 photos cover this outline in these dates. Try a longer date range.',
     allCloudy:
       'Every photo in these dates is obscured or does not cover your outline. Try other dates. Your notes are kept.',

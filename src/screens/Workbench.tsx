@@ -63,11 +63,20 @@ export default function Workbench({ id }: { id: string }) {
   }, [beforeEntry?.invalid, afterEntry?.invalid])
 
   useEffect(() => {
-    if (!inv || inv.before || !canPickDefaults(entries, inv.dateFrom, inv.dateTo)) return
+    // Only from the whole list: the clearest early and late passes are in it, not in the first few found (`more`) nor in what is
+    // left of them when the search failed.
+    if (
+      !inv ||
+      inv.before ||
+      state.phase !== 'ready' ||
+      state.more ||
+      !canPickDefaults(entries, inv.dateFrom, inv.dateTo)
+    )
+      return
     const d = pickDefaults(entries, inv.dateFrom, inv.dateTo)
     // Once: `update` reads the latest record, so a run racing the first pick cannot overwrite it.
     if (d.before && d.after) update((i) => (i.before ? i : setBeforeAfter(i, d.before!, d.after!))) // a refusal sets `error`, shown below
-  }, [inv, entries, update])
+  }, [inv, entries, state.phase, state.more, update])
 
   useEffect(() => {
     if (state.phase !== 'ready' || !inv) return
@@ -164,6 +173,7 @@ export default function Workbench({ id }: { id: string }) {
   // With no pair to show, say plainly why there is none. A failed check is not "obscured", so any failure holds these back.
   const settled =
     state.phase === 'ready' &&
+    !state.more &&
     entries.length > 0 &&
     !(beforeEntry && afterEntry) &&
     entries.every((e) => e.status === 'checked')
@@ -208,6 +218,7 @@ export default function Workbench({ id }: { id: string }) {
         )}
         <div aria-live="polite" className="grid justify-items-start gap-2 text-sm text-fg-2">
           {state.phase === 'searching' && <p>{flow.workbench.searching}</p>}
+          {state.more && <p>{flow.workbench.searchingMore}</p>}
           {state.phase === 'error' && state.error === 'BAD_OUTLINE' && (
             <p className="text-bad">{flow.workbench.badOutline}</p>
           )}

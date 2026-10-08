@@ -2,7 +2,15 @@ import { expect, test, type Page } from '@playwright/test'
 import { fmtDate } from '../../src/lib/format.ts'
 import { copy } from '../../src/ui/copy.ts'
 import { flow } from '../../src/ui/copy-flow.ts'
-import { CORS, manyPasses, openFixtureRoad, openFixtureSite, openThenEdit, readStored } from './helpers.ts'
+import {
+  CORS,
+  manyPasses,
+  openFixtureRoad,
+  openFixtureSite,
+  openThenEdit,
+  readStored,
+  waitForSettled,
+} from './helpers.ts'
 
 const slider = (page: Page) => page.getByRole('slider', { name: flow.workbench.timelineLabel })
 const aside = (page: Page) => page.getByRole('complementary', { name: flow.workbench.timeline })
@@ -97,6 +105,7 @@ test('the 25th pin is refused next to the pin buttons, and nothing is added', as
   ].sort() // the limit: 24
   const id = await openThenEdit(page, { before: '2025-01-10', after: '2025-12-20', pinned })
   await page.goto(`/i/${id}?tier=0`)
+  await waitForSettled(page)
   await stepBack(page, 2)
   await expect(slider(page)).toHaveAttribute('aria-valuetext', '5 Mar 2025, Partly clear')
   const pin = aside(page).getByRole('button', { name: flow.workbench.pin })

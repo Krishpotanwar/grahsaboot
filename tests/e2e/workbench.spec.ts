@@ -1,9 +1,16 @@
 import AxeBuilder from '@axe-core/playwright'
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 import { copy } from '../../src/ui/copy.ts'
 import { flow } from '../../src/ui/copy-flow.ts'
 import { itemId } from '../fixtures/scene.ts'
-import { openFixtureRoad, openFixtureSite, openThenEdit, waitForPhotos } from './helpers.ts'
+import {
+  openFixtureRoad,
+  openFixtureSite,
+  openThenEdit,
+  readStored,
+  waitForPhotos,
+  waitForSettled,
+} from './helpers.ts'
 
 test('defaults to the clearest early and late passes and shows both photos', async ({ page }) => {
   await openFixtureSite(page)
@@ -162,6 +169,106 @@ test('a failed search says so, and Try again finds the passes', async ({ page })
   await waitForPhotos(page)
 })
 
+/** Holds every search of the whole range until the returned `release()`; a search for a single day is answered at once. */
+async function holdRange(page: Page) {
+  let release!: () => void
+  const held = new Promise<void>((r) => (release = r))
+  await page.route('**/stac/search', async (route) => {
+    const [from = '', to = ''] = ((route.request().postDataJSON()?.datetime as string) ?? '').split('/')
+    if (from.slice(0, 10) !== to.slice(0, 10)) await held
+    await route.continue()
+  })
+  return release
+}
+const timelineSlider = (page: Page) => page.getByRole('slider', { name: flow.workbench.timelineLabel })
+
+// The pair is saved, so its two days are searched alone: the photos come while the whole range is still being searched.
+test('a saved pair shows its photos while the other passes are still being found', async ({ page }) => {
+  const id = await openThenEdit(page, {
+    before: '2025-01-10',
+    after: '2025-12-20',
+    pinned: ['2025-01-10', '2025-12-20'],
+  })
+  const release = await holdRange(page)
+  await page.goto(`/i/${id}?tier=0`)
+  try {
+    await waitForPhotos(page)
+    await expect(page.getByText(flow.workbench.searchingMore)).toBeVisible()
+    await expect(page.getByText(flow.workbench.searching, { exact: true })).toHaveCount(0)
+    await expect(timelineSlider(page)).toHaveAttribute('max', '1') // the pair alone
+  } finally {
+    release()
+  }
+  await expect(page.getByText(flow.workbench.searchingMore)).toHaveCount(0)
+  await expect(timelineSlider(page)).toHaveAttribute('max', '3') // all four passes
+  await waitForPhotos(page)
+})
+
+// With no pair yet, the first passes found are only the pinned ones: they must not decide the pair, nor settle the page.
+test('the first passes found pick no pair; the whole list does', async ({ page }) => {
+  const id = await openThenEdit(page, { before: null, after: null, pinned: ['2025-03-05', '2025-12-20'] })
+  const release = await holdRange(page)
+  await page.goto(`/i/${id}?tier=0`)
+  const slider = timelineSlider(page)
+  try {
+    await expect(slider).toHaveAttribute('aria-valuetext', /20 Dec 2025, Clear/, { timeout: 30_000 })
+    await slider.focus()
+    await page.keyboard.press('ArrowLeft')
+    await expect(slider).toHaveAttribute('aria-valuetext', '5 Mar 2025, Partly clear') // both are checked: a pair could be picked
+    await page.waitForTimeout(300)
+    await expect(page.getByText(flow.workbench.searchingMore)).toBeVisible()
+    await expect(page.getByText('1 Jan 2025 to 31 Dec 2025')).toBeVisible() // no pair in the header line
+  } finally {
+    release()
+  }
+  // The clearest early and late passes of the whole list, not the 5 Mar that was pinned.
+  await expect(page.getByText(/^Site · 1\.00 km² · 10 Jan 2025 ↔ 20 Dec 2025$/)).toBeVisible()
+  await waitForPhotos(page)
+})
+
+// A failed search leaves only the passes found first (here the pins). They are not the whole list: no pair is picked from them.
+test('a failed search picks no pair from the first passes found; Try again picks it from the whole list', async ({
+  page,
+}) => {
+  const id = await openThenEdit(page, { before: null, after: null, pinned: ['2025-03-05', '2025-12-20'] })
+  const search = '**/stac/search'
+  await page.route(search, async (route) => {
+    const [from = '', to = ''] = ((route.request().postDataJSON()?.datetime as string) ?? '').split('/')
+    if (from.slice(0, 10) !== to.slice(0, 10)) return route.abort() // the whole range fails, a single day is answered
+    await route.continue()
+  })
+  await page.goto(`/i/${id}?tier=0`)
+  const slider = timelineSlider(page)
+  await expect(page.getByText(flow.workbench.searchFailed)).toBeVisible({ timeout: 30_000 })
+  await expect(slider).toHaveAttribute('aria-valuetext', /20 Dec 2025, Clear/)
+  await slider.focus()
+  await page.keyboard.press('ArrowLeft')
+  await expect(slider).toHaveAttribute('aria-valuetext', '5 Mar 2025, Partly clear') // both are checked: a pair could be picked
+  await page.waitForTimeout(300)
+  expect((await readStored(page, id)).before).toBeNull()
+  await page.unroute(search)
+  await page.getByRole('button', { name: copy.common.retry }).click()
+  await expect(page.getByText(/^Site · 1\.00 km² · 10 Jan 2025 ↔ 20 Dec 2025$/)).toBeVisible()
+})
+
+test('the first passes found do not say every photo is obscured', async ({ page }) => {
+  const id = await openThenEdit(page, { before: null, after: null, pinned: ['2025-06-15'] })
+  const release = await holdRange(page)
+  await page.goto(`/i/${id}?tier=0`)
+  try {
+    await expect(timelineSlider(page)).toHaveAttribute('aria-valuetext', '15 Jun 2025, Obscured', {
+      timeout: 30_000,
+    })
+    await page.waitForTimeout(300)
+    await expect(page.getByText(flow.workbench.searchingMore)).toBeVisible()
+    await expect(page.getByText(flow.workbench.allCloudy)).toHaveCount(0)
+  } finally {
+    release()
+  }
+  await waitForPhotos(page) // the whole list holds a clear pair
+  await expect(page.getByText(flow.workbench.allCloudy)).toHaveCount(0)
+})
+
 test('a photo that fails to load says so, and Try again loads it', async ({ page }) => {
   const id = await openThenEdit(page, {
     before: '2025-01-10',
@@ -171,6 +278,7 @@ test('a photo that fails to load says so, and Try again loads it', async ({ page
   const tci = '**/cog/2025-12-20/TCI.tif'
   await page.route(tci, (r) => r.abort())
   await page.goto(`/i/${id}?tier=0`)
+  await waitForSettled(page, { photos: false }) // the After photo is the one that fails
   await expect(page.getByText(flow.workbench.checkFailed)).toBeVisible({ timeout: 30_000 })
   await page.unroute(tci)
   await page.getByRole('button', { name: copy.common.retry }).click()

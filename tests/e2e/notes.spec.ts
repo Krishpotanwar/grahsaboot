@@ -1,6 +1,13 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
 import { flow } from '../../src/ui/copy-flow.ts'
-import { openFixtureRoad, openFixtureSite, openThenEdit, readStored, waitForPhotos } from './helpers.ts'
+import {
+  openFixtureRoad,
+  openFixtureSite,
+  openThenEdit,
+  readStored,
+  waitForPhotos,
+  waitForSettled,
+} from './helpers.ts'
 
 const notesOf = (page: Page) => page.getByRole('region', { name: flow.notes.title })
 const claimOf = (page: Page) => page.getByRole('region', { name: flow.claim.title })
@@ -69,6 +76,7 @@ test('add, edit and delete-with-undo a note; text stays text', async ({ page }) 
     'Roof visible from March',
   ])
   await page.reload()
+  await waitForSettled(page)
   await expect(
     page.getByRole('region', { name: flow.notes.title }).getByText('Roof visible from March'),
   ).toBeVisible()
@@ -93,6 +101,7 @@ test('claim is saved, shown and removable', async ({ page }) => {
     'Warehouse roof finished by December 2025',
   )
   await page.reload()
+  await waitForSettled(page)
   const saved = claimOf(page)
   await expect(saved.getByLabel(flow.claim.text, { exact: true })).toHaveValue(
     'Warehouse roof finished by December 2025',
@@ -107,6 +116,7 @@ test('claim is saved, shown and removable', async ({ page }) => {
   await expect(saved.getByRole('button', { name: flow.claim.remove })).toHaveCount(0)
   await untilStored(page, (s) => s.claim).toBeNull()
   await page.reload()
+  await waitForSettled(page)
   const removed = claimOf(page)
   await expect(removed.getByLabel(flow.claim.text, { exact: true })).toHaveValue('')
   await expect(removed.getByLabel(flow.claim.date)).toHaveValue('')
@@ -167,7 +177,7 @@ test('the 201st note is refused with a message, and what was typed is kept until
     pinned: ['2025-01-10', '2025-12-20'], // a pair is already chosen, so the workbench saves nothing on its own
   })
   await page.goto(`/i/${id}?tier=0`)
-  await waitForPhotos(page)
+  await waitForSettled(page)
   const panel = notesOf(page)
   const items = panel.getByRole('listitem')
   await expect(items).toHaveCount(200)
@@ -206,6 +216,7 @@ test('a note on a road section shows the section, and keeps it after a reload', 
   await expect(wholeRoad(page)).not.toContainText('km')
   await untilStored(page, (s) => (s.notes as unknown[]).length).toBe(2)
   await page.reload()
+  await waitForSettled(page)
   await expect(withSection(page)).toContainText('2.0–2.9 km')
   await expect(wholeRoad(page)).not.toContainText('km')
 })

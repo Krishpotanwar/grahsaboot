@@ -20,6 +20,8 @@ export interface DateEntry {
 }
 export interface EvidenceState {
   phase: 'searching' | 'ready' | 'error'
+  /** True from the first list (the known days, shown while the whole range is searched) until the whole list or a failure. */
+  more: boolean
   limited: boolean
   source: string | null
   entries: DateEntry[]
@@ -55,6 +57,9 @@ export function interleaveEnds(dates: string[]): string[] {
 /** Thumbnails that load unasked. The review screen's estimate (src/geo/estimate.ts) counts the same 12. */
 const EAGER_THUMBS = 12
 
+/** One-day searches in flight at once: the known days searched first (no more than this many) and the days of an `only` run. */
+const DAYS_AT_ONCE = 6
+
 /**
  * `concurrency` 6 is what a browser opens per HTTP/1.1 host, and the COG hosts are the bottleneck. Measured on the worked example
  * (docs/ops/probes.md, P9): 48 checks in 30 s at 6 against 32 at 4; 8 and 12 did no better than 6.
@@ -66,7 +71,14 @@ export function createRunner(
   concurrency = 6,
 ) {
   const ac = new AbortController()
-  let state: EvidenceState = { phase: 'searching', limited: false, source: null, entries: [], error: null }
+  let state: EvidenceState = {
+    phase: 'searching',
+    more: false,
+    limited: false,
+    source: null,
+    entries: [],
+    error: null,
+  }
   const emit = (patch: Partial<EvidenceState>) => {
     if (ac.signal.aborted) return
     state = { ...state, ...patch }
@@ -169,37 +181,93 @@ export function createRunner(
     }
   }
 
+  const newEntry = (c: DateCandidate): DateEntry => ({
+    date: c.date,
+    candidate: c,
+    quality: null,
+    thumb: null,
+    full: null,
+    invalid: null,
+    status: 'queued',
+    error: null,
+    thumbFailed: false,
+  })
+  const pick = (rs: SearchResult[]) =>
+    deps.select(
+      rs.flatMap((r) => r.items),
+      input.points,
+    )
+
+  /**
+   * Shows `cands` with `patch`. A date that already has an entry keeps it (object, quality, photos, status), a date the search no
+   * longer returns stays, and only the new dates are queued for a check: `priority` first, then both ends inward.
+   */
+  const show = (patch: Partial<EvidenceState>, cands: DateCandidate[]) => {
+    const have = new Set(state.entries.map((e) => e.date))
+    const fresh = cands.filter((c) => !have.has(c.date))
+    const entries = [...state.entries, ...fresh.map(newEntry)]
+    emit({ ...patch, entries: entries.sort((a, b) => a.date.localeCompare(b.date)) })
+    const isNew = new Set(fresh.map((c) => c.date))
+    const all = cands.map((c) => c.date)
+    for (const d of new Set([...input.priority.filter((d) => all.includes(d)), ...interleaveEnds(all)]))
+      if (isNew.has(d)) enqueue(check(d))
+  }
+
+  const searchDay = (d: string) => deps.search({ bbox: input.bbox, from: d, to: d, signal: ac.signal })
+  const inRange = (d: string) => d >= input.dateFrom && d <= input.dateTo
+
+  /** The days alone, `DAYS_AT_ONCE` at a time. One failed day fails the lot, and no new day starts after it. */
+  const searchDays = async (days: string[]) => {
+    const found: SearchResult[] = []
+    let next = 0
+    let failed = false
+    const worker = async () => {
+      while (!failed && next < days.length) {
+        const i = next++
+        found[i] = await searchDay(days[i]!).catch((e) => {
+          failed = true
+          throw e
+        })
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(DAYS_AT_ONCE, days.length) }, worker))
+    return found
+  }
+
   const start = async () => {
+    let over = false // the search of the range has ended: a list of the known days arriving now is stale
     try {
+      if (input.only) {
+        // Exactly the named days, never the range. A pinned date must not drop out unseen, hence all or nothing.
+        const named = [...new Set(input.only)].filter(inRange)
+        const found = await searchDays(named)
+        const cands = pick(found).filter((c) => named.includes(c.date))
+        return show({ phase: 'ready', more: false, limited: false, source: found[0]?.source ?? null }, cands)
+      }
+      // The known days (before, after, pins) are searched alone at the same time, and shown first if the range is still being searched.
+      const known = [...new Set(input.priority)].filter(inRange).slice(0, DAYS_AT_ONCE)
+      if (known.length)
+        void Promise.allSettled(known.map(searchDay))
+          .then((rs) => {
+            const ok = rs.flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []))
+            const cands = over || !ok.length ? [] : pick(ok)
+            if (cands.length)
+              show({ phase: 'ready', more: true, limited: false, source: ok[0]!.source }, cands)
+          })
+          // What can throw above is `select`. The search of the range runs it on these days' items too and reports a failure
+          // as `phase: 'error'`, so skipping this first list hides nothing.
+          .catch(() => {})
       const res = await deps.search({
         bbox: input.bbox,
         from: input.dateFrom,
         to: input.dateTo,
         signal: ac.signal,
       })
-      let cands = deps.select(res.items, input.points)
-      if (input.only) cands = cands.filter((c) => input.only!.includes(c.date))
-      emit({
-        phase: 'ready',
-        limited: res.limited,
-        source: res.source,
-        entries: cands.map((c) => ({
-          date: c.date,
-          candidate: c,
-          quality: null,
-          thumb: null,
-          full: null,
-          invalid: null,
-          status: 'queued',
-          error: null,
-          thumbFailed: false,
-        })),
-      })
-      const all = cands.map((c) => c.date)
-      const order = [...new Set([...input.priority.filter((d) => all.includes(d)), ...interleaveEnds(all)])]
-      for (const d of order) enqueue(check(d))
+      show({ phase: 'ready', more: false, limited: res.limited, source: res.source }, pick([res]))
     } catch (err) {
-      emit({ phase: 'error', error: (err as Error).message })
+      emit({ phase: 'error', more: false, error: (err as Error).message })
+    } finally {
+      over = true
     }
   }
 

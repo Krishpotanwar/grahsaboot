@@ -51,6 +51,11 @@ const gate = () => {
   const held = new Promise<void>((r) => (open = r))
   return { held, open }
 }
+/** Rejects the way a fetch does when `signal` aborts. */
+const whenAborted = (signal: AbortSignal) =>
+  new Promise<never>((_res, rej) =>
+    signal.addEventListener('abort', () => rej(new DOMException('Aborted', 'AbortError'))),
+  )
 
 describe('interleaveEnds', () => {
   it('orders from both ends inward', () => {
@@ -460,5 +465,375 @@ describe('createRunner', () => {
     b.requestFull('2025-12-20')
     await settle()
     expect(counts()).toEqual(before)
+  })
+})
+
+/**
+ * A search that answers a one-day call (`from === to`) at once with that day's pass, and the whole range with all of DATES.
+ * `ctl` steers it: the range waits on `full`, a day on `days`; a `bad` day fails, an `empty` day finds nothing, `failFull` fails the range.
+ * With `abortable` a search that is waiting also ends, as an abort, when the runner is disposed.
+ */
+function pairDeps() {
+  const searched: Array<[string, string]> = []
+  const opened = () => {
+    const g = gate()
+    g.open()
+    return g
+  }
+  const ctl = {
+    full: gate(),
+    days: opened(),
+    bad: new Set<string>(),
+    empty: new Set<string>(),
+    failFull: false,
+    abortable: false,
+    fullDates: DATES,
+  }
+  const { d, calls } = deps({
+    search: async (a) => {
+      searched.push([a.from, a.to])
+      const day = a.from === a.to
+      const held = (day ? ctl.days : ctl.full).held
+      await (ctl.abortable ? Promise.race([held, whenAborted(a.signal)]) : held)
+      if (day ? ctl.bad.has(a.from) : ctl.failFull) throw new Error(day ? 'STAC_500' : 'STAC_502')
+      const items = day ? (ctl.empty.has(a.from) ? [] : [item(a.from)]) : ctl.fullDates.map(item)
+      return { items, limited: false, source: 'sentinel-2-l2a' }
+    },
+    select: (items) => [...new Set(items.map((i) => i.date))].sort().map(cand),
+  })
+  return { d, calls, searched, ctl }
+}
+const PAIR = ['2025-01-10', '2025-12-20']
+const asked = (calls: string[]) => calls.filter((c) => c.startsWith('q:'))
+const daysOf = (searched: Array<[string, string]>) => searched.filter(([a, b]) => a === b).map(([a]) => a)
+const rangeOf = (searched: Array<[string, string]>) => searched.filter(([a, b]) => a !== b)
+const datesOf = (s: EvidenceState | null) => s!.entries.map((e) => e.date)
+
+describe('pair first', () => {
+  const withPair = { ...input, priority: PAIR }
+
+  it('shows the known days, and starts their checks, while the whole range is still being searched', async () => {
+    const { d, calls, searched, ctl } = pairDeps()
+    const states: EvidenceState[] = []
+    const run = createRunner(d, withPair, (s) => states.push(s), 1).start()
+    await settle()
+    const first = states.find((s) => s.entries.length)
+    expect(first).toMatchObject({ phase: 'ready', more: true, limited: false, source: 'sentinel-2-l2a' })
+    expect(datesOf(first!)).toEqual(PAIR)
+    expect(asked(calls)).toEqual(['q:2025-01-10', 'q:2025-12-20'])
+    expect(rangeOf(searched)).toEqual([['2025-01-01', '2025-12-31']])
+    ctl.full.open()
+    await run
+  })
+
+  it('keeps the early entries as they are when the whole list arrives, and checks no date twice', async () => {
+    const { d, calls, ctl } = pairDeps()
+    let last = null as EvidenceState | null
+    const run = createRunner(d, withPair, (s) => (last = s), 1).start()
+    await settle()
+    const early = last!.entries
+    expect(early.map((e) => [e.date, e.status])).toEqual([
+      ['2025-01-10', 'checked'],
+      ['2025-12-20', 'checked'],
+    ])
+    ctl.full.open()
+    await run
+    await settle()
+    expect(last).toMatchObject({ phase: 'ready', more: false, error: null })
+    expect(datesOf(last)).toEqual(DATES)
+    for (const e of early) expect(last!.entries.find((x) => x.date === e.date)).toBe(e) // the same object, quality and all
+    expect(last!.entries.every((e) => e.status === 'checked')).toBe(true)
+    expect(asked(calls)).toEqual(['q:2025-01-10', 'q:2025-12-20', 'q:2025-03-05', 'q:2025-06-15'])
+  })
+
+  it('loads a full frame for an early entry on request, and keeps it when the whole list arrives', async () => {
+    const { d, ctl } = pairDeps()
+    let last = null as EvidenceState | null
+    const r = createRunner(d, withPair, (s) => (last = s), 1)
+    const run = r.start()
+    await settle()
+    r.requestFull('2025-01-10')
+    await settle()
+    const early = last!.entries[0]!
+    expect(early).toMatchObject({ date: '2025-01-10', full: { level: 0 } })
+    ctl.full.open()
+    await run
+    await settle()
+    expect(last!.entries[0]).toBe(early)
+  })
+
+  it('keeps an early date the whole search did not return', async () => {
+    const { d, ctl } = pairDeps()
+    ctl.fullDates = DATES.slice(0, 3) // without 20 Dec
+    let last = null as EvidenceState | null
+    const run = createRunner(d, withPair, (s) => (last = s), 1).start()
+    await settle()
+    ctl.full.open()
+    await run
+    await settle()
+    expect(datesOf(last)).toEqual(DATES)
+    expect(last).toMatchObject({ phase: 'ready', more: false })
+  })
+
+  it.each([
+    ['fail', 'bad'],
+    ['find nothing', 'empty'],
+  ] as const)(
+    'ignores first-day searches that %s: no early list, no error, the whole list arrives',
+    async (_how, kind) => {
+      const { d, ctl } = pairDeps()
+      for (const day of PAIR) ctl[kind].add(day)
+      const states: EvidenceState[] = []
+      const run = createRunner(d, withPair, (s) => states.push(s), 1).start()
+      await settle()
+      expect(states).toEqual([])
+      ctl.full.open()
+      await run
+      await settle()
+      expect(states.some((s) => s.more || s.phase === 'error')).toBe(false)
+      expect(states.at(-1)).toMatchObject({ phase: 'ready', more: false })
+      expect(datesOf(states.at(-1)!)).toEqual(DATES)
+    },
+  )
+
+  it('shows the days that were found when another first-day search fails', async () => {
+    const { d, ctl } = pairDeps()
+    ctl.bad.add('2025-12-20')
+    let last = null as EvidenceState | null
+    const run = createRunner(d, withPair, (s) => (last = s), 1).start()
+    await settle()
+    expect(last).toMatchObject({ phase: 'ready', more: true })
+    expect(datesOf(last)).toEqual(['2025-01-10'])
+    ctl.full.open()
+    await run
+    await settle()
+    expect(datesOf(last)).toEqual(DATES)
+  })
+
+  it('drops the early list when the whole one has arrived first, or the whole search has failed', async () => {
+    for (const failFull of [false, true]) {
+      const { d, ctl } = pairDeps()
+      ctl.days = gate()
+      ctl.full.open()
+      ctl.failFull = failFull
+      const states: EvidenceState[] = []
+      await createRunner(d, withPair, (s) => states.push(s), 1).start()
+      await settle()
+      const n = states.length
+      ctl.days.open()
+      await settle()
+      expect(states.length).toBe(n) // the early list came too late and changed nothing
+      expect(states.some((s) => s.more)).toBe(false)
+      expect(states.at(-1)).toMatchObject(
+        failFull ? { phase: 'error', more: false } : { phase: 'ready', more: false },
+      )
+    }
+  })
+
+  it('keeps the early entries when the whole search fails; retry() searches again and merges', async () => {
+    const { d, calls, searched, ctl } = pairDeps()
+    ctl.failFull = true
+    const states: EvidenceState[] = []
+    const r = createRunner(d, withPair, (s) => states.push(s), 1)
+    const run = r.start()
+    await settle()
+    ctl.full.open()
+    await run
+    await settle()
+    const failed = states.at(-1)!
+    expect(failed).toMatchObject({ phase: 'error', error: 'STAC_502', more: false })
+    expect(datesOf(failed)).toEqual(PAIR)
+    expect(failed.entries.every((e) => e.quality)).toBe(true)
+    ctl.failFull = false
+    ctl.full = gate()
+    r.retry()
+    await settle()
+    expect(states.at(-1)).toMatchObject({ phase: 'ready', more: true, error: null })
+    ctl.full.open()
+    await settle()
+    const last = states.at(-1)!
+    expect(last).toMatchObject({ phase: 'ready', more: false, error: null })
+    expect(datesOf(last)).toEqual(DATES)
+    for (const e of failed.entries) expect(last.entries.find((x) => x.date === e.date)).toBe(e)
+    expect(daysOf(searched)).toEqual([...PAIR, ...PAIR])
+    expect(rangeOf(searched)).toHaveLength(2)
+    expect(asked(calls)).toEqual(['q:2025-01-10', 'q:2025-12-20', 'q:2025-03-05', 'q:2025-06-15'])
+  })
+
+  it.each([[[]], [['2024-12-31', '2026-01-01']]])(
+    'searches only the whole range when no known day lies inside it (%j)',
+    async (priority) => {
+      const { d, searched, ctl } = pairDeps()
+      ctl.full.open()
+      const states: EvidenceState[] = []
+      await createRunner(d, { ...input, priority }, (s) => states.push(s), 1).start()
+      expect(searched).toEqual([['2025-01-01', '2025-12-31']])
+      expect(states.some((s) => s.more)).toBe(false)
+    },
+  )
+
+  it('searches at most the first 6 distinct known days inside the range', async () => {
+    const { d, searched, ctl } = pairDeps()
+    ctl.full.open()
+    const feb = (n: number) => `2025-02-0${n}`
+    const priority = ['2025-02-01', '2025-02-01', '2024-12-31', ...[2, 3, 4, 5, 6, 7, 8].map(feb)]
+    await createRunner(d, { ...input, priority }, () => {}, 1).start()
+    expect(daysOf(searched)).toEqual([1, 2, 3, 4, 5, 6].map(feb))
+  })
+
+  it('skips the first list, and carries on, when `select` throws on it', async () => {
+    const { d, ctl } = pairDeps()
+    // It throws on the one answer per day of the first list only; the whole answer is fine and is what the page shows.
+    const select: RunnerDeps['select'] = (items, points) => {
+      if (items.length < DATES.length) throw new Error('BAD_ITEM')
+      return d.select(items, points)
+    }
+    const states: EvidenceState[] = []
+    const run = createRunner({ ...d, select }, withPair, (s) => states.push(s), 1).start()
+    await settle()
+    expect(states).toEqual([]) // nothing shown, and nothing wrong yet
+    ctl.full.open()
+    await run
+    expect(states.at(-1)).toMatchObject({ phase: 'ready', more: false, error: null })
+    expect(datesOf(states.at(-1)!)).toEqual(DATES)
+  })
+
+  it.each(['resolves', 'aborts'] as const)(
+    'shows and starts nothing when disposed while the first days are searched, and a search that %s',
+    async (how) => {
+      const { d, calls, ctl } = pairDeps()
+      ctl.days = gate()
+      ctl.abortable = how === 'aborts'
+      const onState = vi.fn()
+      const r = createRunner(d, withPair, onState, 1)
+      const run = r.start()
+      await settle()
+      r.dispose()
+      ctl.days.open() // the days end after the runner is gone, then the range
+      await settle()
+      ctl.full.open()
+      await run
+      await settle()
+      expect(onState).not.toHaveBeenCalled()
+      expect(calls).toEqual([]) // no check, no frame
+    },
+  )
+})
+
+describe('only', () => {
+  const only = { ...input, only: PAIR }
+
+  it('searches exactly the named days, never the whole range, and is never `more`', async () => {
+    const { d, searched, ctl } = pairDeps()
+    ctl.full.open()
+    const states: EvidenceState[] = []
+    // A day outside the dates and a repeated day are not searched.
+    const named = ['2025-01-10', '2024-12-31', '2025-12-20', '2025-01-10']
+    await createRunner(d, { ...input, only: named }, (s) => states.push(s), 1).start()
+    await settle()
+    expect(searched).toEqual([
+      ['2025-01-10', '2025-01-10'],
+      ['2025-12-20', '2025-12-20'],
+    ])
+    expect(states.every((s) => !s.more)).toBe(true)
+    expect(states.at(-1)).toMatchObject({ phase: 'ready', limited: false, source: 'sentinel-2-l2a' })
+    expect(datesOf(states.at(-1)!)).toEqual(PAIR)
+  })
+
+  it('gives no entry for a day whose search finds no scene', async () => {
+    const { d, ctl } = pairDeps()
+    ctl.full.open()
+    ctl.empty.add('2025-12-20')
+    let last = null as EvidenceState | null
+    await createRunner(d, only, (s) => (last = s), 1).start()
+    expect(last).toMatchObject({ phase: 'ready', more: false })
+    expect(datesOf(last)).toEqual(['2025-01-10'])
+  })
+
+  it('fails whole when any day fails, and retry() searches the days again', async () => {
+    const { d, searched, ctl } = pairDeps()
+    ctl.full.open()
+    ctl.bad.add('2025-12-20')
+    const states: EvidenceState[] = []
+    const r = createRunner(d, only, (s) => states.push(s), 1)
+    await r.start()
+    expect(states.at(-1)).toMatchObject({ phase: 'error', error: 'STAC_500', more: false, entries: [] })
+    ctl.bad.clear()
+    r.retry()
+    await settle()
+    expect(states.at(-1)).toMatchObject({ phase: 'ready', error: null, more: false })
+    expect(datesOf(states.at(-1)!)).toEqual(PAIR)
+    expect(daysOf(searched)).toHaveLength(4)
+    expect(rangeOf(searched)).toEqual([])
+  })
+
+  it('keeps 6 day searches in flight: when one ends the next starts, and never more than 6 at once', async () => {
+    const TEN = Array.from({ length: 10 }, (_, i) => `2025-02-${String(i + 1).padStart(2, '0')}`)
+    const gates = new Map<string, ReturnType<typeof gate>>() // one per search, made when it starts
+    let live = 0
+    let peak = 0
+    const { d } = deps({
+      search: async (a) => {
+        const g = gate()
+        gates.set(a.from, g)
+        peak = Math.max(peak, ++live)
+        await g.held
+        live--
+        return { items: [item(a.from)], limited: false, source: 'sentinel-2-l2a' }
+      },
+      select: (items) => items.map((i) => cand(i.date)),
+    })
+    let last = null as EvidenceState | null
+    const run = createRunner(d, { ...input, only: TEN }, (s) => (last = s), 1).start()
+    await settle()
+    expect([...gates.keys()]).toEqual(TEN.slice(0, 6)) // six start, in order; the other four wait
+    for (let done = 1; done <= 10; done++) {
+      gates.get(TEN[done - 1]!)!.open() // one search ends: exactly one more starts, until none is left
+      await settle()
+      expect([...gates.keys()]).toEqual(TEN.slice(0, Math.min(10, 6 + done)))
+      expect(live).toBe(Math.min(10, 6 + done) - done)
+    }
+    await run
+    expect(peak).toBe(6)
+    expect(datesOf(last)).toEqual(TEN)
+    expect(last).toMatchObject({ phase: 'ready', more: false })
+  })
+
+  it.each(['resolves', 'aborts'] as const)(
+    'shows and starts nothing when disposed while the named days are searched, and a search that %s',
+    async (how) => {
+      const { d, calls, ctl } = pairDeps()
+      ctl.days = gate()
+      ctl.abortable = how === 'aborts'
+      const onState = vi.fn()
+      const r = createRunner(d, only, onState, 1)
+      const run = r.start()
+      await settle()
+      r.dispose()
+      ctl.days.open() // the days end after the runner is gone
+      await run
+      await settle()
+      expect(onState).not.toHaveBeenCalled()
+      expect(calls).toEqual([]) // no check, no frame
+    },
+  )
+
+  it('with no days named, searches nothing and is ready with no entries and no checks', async () => {
+    const { d, calls, searched, ctl } = pairDeps()
+    ctl.full.open()
+    let last = null as EvidenceState | null
+    await createRunner(d, { ...input, only: [] }, (s) => (last = s), 1).start()
+    await settle()
+    expect(searched).toEqual([])
+    expect(last).toMatchObject({ phase: 'ready', more: false, entries: [] })
+    expect(calls).toEqual([])
+  })
+
+  it('still checks the named days in priority order', async () => {
+    const { d, calls, ctl } = pairDeps()
+    ctl.full.open()
+    await createRunner(d, { ...only, priority: ['2025-12-20'] }, () => {}, 1).start()
+    await settle()
+    expect(asked(calls)).toEqual(['q:2025-12-20', 'q:2025-01-10'])
   })
 })
