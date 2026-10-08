@@ -56,12 +56,31 @@ export function removeAoiLayer(map: MlMap) {
   if (map.getSource('gs-aoi')) map.removeSource('gs-aoi')
 }
 
+/**
+ * Callers run this in React effects, where a throw takes the whole page down (a blank screen). MapLibre throws "Invalid LngLat
+ * object: (NaN, NaN)" when its camera has gone NaN, which a busy machine did to the globe projection now and then; so a fit that
+ * fails puts the camera on the outline's centre instead, and if even that fails the map stays where it is.
+ */
 export function fitAoi(map: MlMap, bbox: Bbox, reducedMotion: boolean) {
-  map.fitBounds(
-    [
-      [bbox[0], bbox[1]],
-      [bbox[2], bbox[3]],
-    ],
-    { padding: 48, maxZoom: 16, duration: reducedMotion ? 0 : 2500 },
-  )
+  try {
+    map.fitBounds(
+      [
+        [bbox[0], bbox[1]],
+        [bbox[2], bbox[3]],
+      ],
+      { padding: 48, maxZoom: 16, duration: reducedMotion ? 0 : 2500 },
+    )
+  } catch {
+    try {
+      map.stop()
+      map.jumpTo({
+        center: [(bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2],
+        zoom: 14,
+        pitch: 0,
+        bearing: 0,
+      })
+    } catch {
+      // The outline is still drawn; the camera just stays where it is.
+    }
+  }
 }

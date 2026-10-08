@@ -1,8 +1,12 @@
 import { useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import { setBeforeAfter, togglePin } from '../data/investigation.ts'
 import { useInvestigation } from '../data/useInvestigation.ts'
+import { rgbaToPngDataUrl } from '../lib/canvas.ts'
 import { fmtDate } from '../lib/format.ts'
 import { Link } from '../lib/router.tsx'
+import { useRested } from '../lib/useRested.ts'
+import { accentColor, fitAoi, removeAoiLayer, setAoiLayer } from '../map/aoiLayer.ts'
+import { removeFrameLayer, setFrameLayer } from '../map/frameLayer.ts'
 import { useMapLayout, useMapStage } from '../map/MapStage.tsx'
 import { copy } from '../ui/copy.ts'
 import { flow } from '../ui/copy-flow.ts'
@@ -33,8 +37,9 @@ const slot = (e: DateEntry | undefined): Slot =>
 
 export default function Workbench({ id }: { id: string }) {
   const { inv, update, error } = useInvestigation(id)
-  const { tier } = useMapStage()
-  useMapLayout('hidden')
+  const { map, tier, layout, installLayers } = useMapStage()
+  const [mapOpen, setMapOpen] = useState(false)
+  useMapLayout(mapOpen && tier > 0 ? 'mini' : 'hidden')
   // Fixed at mount: a tier downgrade, a resize or a rotation must not rebuild the grid and restart the search and checks.
   const [maxSide] = useState(() =>
     matchMedia('(min-width: 1024px)').matches ? (tier >= 2 ? 1024 : 768) : 512,
@@ -92,6 +97,42 @@ export default function Workbench({ id }: { id: string }) {
     return () => clearTimeout(t)
   }, [current, wantCheck, wantThumb, requestCheck, requestThumb])
 
+  // Mini map: the outline, and the photo of the date the slider rests on. Never `current`: a fast slider (about 1,100 passes)
+  // would ask for a full frame and encode a PNG at every step.
+  const aoi = inv?.aoi
+  useEffect(
+    () =>
+      map && aoi
+        ? installLayers('aoi', (m) => setAoiLayer(m, aoi, accentColor()), removeAoiLayer)
+        : undefined,
+    [map, aoi, installLayers],
+  )
+  const mapDate = useRested(current, 250)
+  const shown = mapDate ? byDate.get(mapDate) : undefined
+  useEffect(() => {
+    if (mapOpen && tier > 0 && shown && isUsable(shown) && !shown.full) requestFull(shown.date)
+  }, [mapOpen, tier, shown, requestFull])
+  const frameUrl = useMemo(
+    () =>
+      mapOpen && tier > 0 && shown?.full && grid
+        ? rgbaToPngDataUrl(shown.full.display.rgba, grid.width, grid.height)
+        : null,
+    [mapOpen, tier, shown?.full, grid],
+  )
+  useEffect(
+    () =>
+      map && grid
+        ? installLayers('frame', (m) => setFrameLayer(m, frameUrl, grid), removeFrameLayer)
+        : undefined,
+    [map, grid, frameUrl, installLayers],
+  )
+  // Once the stage has the corner box (a layout later than `mapOpen`), so the fit is to that size and not to the hidden map's.
+  useEffect(() => {
+    if (!map || layout !== 'mini' || !summary) return
+    map.resize()
+    fitAoi(map, summary.bbox, matchMedia('(prefers-reduced-motion: reduce)').matches)
+  }, [map, layout, summary])
+
   // The road grid's columns: the pinned dates, which always include before and after.
   const pinnedEntries = useMemo(() => {
     const pins = new Set(inv?.pinned)
@@ -148,6 +189,11 @@ export default function Workbench({ id }: { id: string }) {
             <h1 className="mt-1 break-words text-2xl font-semibold tracking-[-0.02em]">{inv.name}</h1>
             <p className="mt-1 font-mono text-[0.75rem] text-fg-2 num">{meta}</p>
           </div>
+          {tier > 0 && (
+            <Button aria-pressed={mapOpen} className="ml-auto" onClick={() => setMapOpen((o) => !o)}>
+              {mapOpen ? flow.workbench.hideMap : flow.workbench.showMap}
+            </Button>
+          )}
           <Link
             to={`/i/${inv.id}/report`}
             className="inline-flex h-11 items-center rounded-[6px] border border-control px-4"

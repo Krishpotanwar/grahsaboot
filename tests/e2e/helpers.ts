@@ -1,5 +1,8 @@
 import { expect, type Page } from '@playwright/test'
 import { flow } from '../../src/ui/copy-flow.ts'
+import { itemId } from '../fixtures/scene.ts'
+
+export const CORS = { 'access-control-allow-origin': '*' }
 
 export async function startAt(page: Page, query = 'tier=0&lat=21.1458&lon=79.0882&name=Nagpur') {
   await page.goto(`/new?${query}`)
@@ -52,6 +55,64 @@ export async function openFixtureRoad(page: Page) {
   await startAt(page)
   await outlineRoadByCoords(page)
   await finishDatesAndOpen(page, '2025-01-01', '2025-12-31')
+}
+
+/**
+ * The fixture's search answers with `extra` more clear passes from 11 Jan on: copies of 10 Jan whose files are served under
+ * their own dates, so every date has its own URL. `log` lists each picture request in the order it arrives. With `hold`, each
+ * copy's first check request waits in `held` until `open()`, so the sweep stalls and the other dates stay queued.
+ */
+export async function manyPasses(page: Page, extra: number, hold = false) {
+  const log: Array<{ date: string; file: 'TCI' | 'SCL' }> = []
+  const held: Array<() => void> = []
+  const seen = new Set<string>()
+  const last = `2025-01-${10 + extra}`
+  await page.route('**/stac/search', async (route) => {
+    const body = await (await route.fetch()).json()
+    const src = body.features.find((f: { id: string }) => f.id === itemId('2025-01-10'))
+    for (let i = 0; i < extra; i++) {
+      const date = `2025-01-${String(11 + i).padStart(2, '0')}`
+      const f = structuredClone(src)
+      f.id = itemId(date)
+      f.properties.datetime = `${date}T05:30:00.000000Z`
+      for (const a of Object.values(f.assets) as Array<{ href: string }>)
+        a.href = a.href.replace('2025-01-10', date)
+      body.features.push(f)
+    }
+    await route.fulfill({
+      status: 200,
+      headers: { ...CORS, 'content-type': 'application/geo+json' },
+      json: body,
+    })
+  })
+  await page.route(/\/cog\/2025-\d\d-\d\d\/(TCI|SCL)\.tif$/, async (route) => {
+    const url = route.request().url()
+    const m = /\/cog\/(2025-\d\d-\d\d)\/(TCI|SCL)\.tif$/.exec(url)!
+    const date = m[1]!
+    const file = m[2] as 'TCI' | 'SCL'
+    log.push({ date, file })
+    if (date <= '2025-01-10' || date > last) return route.continue()
+    if (hold && file === 'SCL' && !seen.has(date)) {
+      seen.add(date)
+      await new Promise<void>((release) => held.push(release))
+    }
+    await route.fulfill({ response: await route.fetch({ url: url.replace(date, '2025-01-10') }) })
+  })
+  return {
+    log,
+    held,
+    open: () => {
+      hold = false
+      for (const release of held) release()
+    },
+    dates: [
+      '2025-01-10',
+      ...Array.from({ length: extra }, (_, i) => `2025-01-${String(11 + i).padStart(2, '0')}`),
+      '2025-03-05',
+      '2025-06-15',
+      '2025-12-20',
+    ],
+  }
 }
 
 /** The investigation this page's own IndexedDB holds. */

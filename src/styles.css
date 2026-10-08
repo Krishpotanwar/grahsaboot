@@ -171,6 +171,10 @@
   overflow: hidden;
   z-index: 25;
 }
+/* The mini map floats over the page's bottom corner: leave its height and both gutters below the content, so the last controls can scroll up from under it. */
+body:has(.map-stage[data-layout='mini']) main {
+  padding-bottom: 17rem;
+}
 @media (min-width: 1024px) {
   .map-stage[data-layout='globe'],
   .map-stage[data-layout='hidden'] {

@@ -1,26 +1,31 @@
 import type { Map as MlMap } from 'maplibre-gl'
 import type { Place } from '../search/nominatim.ts'
 
+/** One caller runs this in a React effect, where a throw blanks the page: a camera MapLibre cannot move is left where it is. */
 export function flyToPlace(map: MlMap, p: Place, reducedMotion: boolean) {
   const duration = reducedMotion ? 0 : 4000
-  if (p.bbox && p.bbox[2] - p.bbox[0] < 5) {
-    map.fitBounds(
-      [
-        [p.bbox[0], p.bbox[1]],
-        [p.bbox[2], p.bbox[3]],
-      ],
-      { padding: 48, maxZoom: 14, duration, pitch: 50, bearing: -12 },
-    )
-  } else {
-    map.flyTo({
-      center: [p.lon, p.lat],
-      zoom: 13,
-      pitch: 55,
-      bearing: -12,
-      duration,
-      curve: 1.4,
-      essential: true,
-    })
+  try {
+    if (p.bbox && p.bbox[2] - p.bbox[0] < 5) {
+      map.fitBounds(
+        [
+          [p.bbox[0], p.bbox[1]],
+          [p.bbox[2], p.bbox[3]],
+        ],
+        { padding: 48, maxZoom: 14, duration, pitch: 50, bearing: -12 },
+      )
+    } else {
+      map.flyTo({
+        center: [p.lon, p.lat],
+        zoom: 13,
+        pitch: 55,
+        bearing: -12,
+        duration,
+        curve: 1.4,
+        essential: true,
+      })
+    }
+  } catch {
+    // The map stays where it is; the place is still chosen.
   }
 }
 
