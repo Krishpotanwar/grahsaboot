@@ -72,7 +72,7 @@ New and changed modules: `src/map/{readable,contextLayer}.ts`, `src/context/{reg
 - **Honest limits.** Said where the view is offered, in the size note and on `/limits`; nothing claims to show houses.
 - **Tiers.** T0 (no WebGL): none of this exists and the coordinate forms keep working.
 - **Budgets (provisional until P11/P16 replace them with measurements).** From switching on to the picture on the map <= 15 s on the worked example (build VM, real services, cold cache); <= 12 MB at level 0 (<= 6 MB at level 1 above 10 km); 0 long tasks over 50 ms; <= 80 MB extra memory; one load in flight per map; entry JS <= 150 KB gzip.
-- **A11y.** The switch is a labelled control with a live status line; Undo/Finish and the switch have 44 px targets and keyboard operation; contrast of the patched maps is unit-tested (roads and building outlines >= 3:1, label text >= 4.5:1 against its halo).
+- **A11y.** The switch is a labelled control with a live status line; Undo/Finish and the switch have 44 px targets and keyboard operation; contrast of the patched maps is unit-tested (roads and building outlines >= 3:1, label text >= 4.5:1 against its halo). The five behaviour rules of design review D6 apply (reserved two-line status slot, one live region, focus never moves on its own, zero fade under reduced motion, layouts per breakpoint).
 - **Reversible.** `VITE_CONTEXT_IMAGERY=0` removes the switch at build time; the readable-map patch has one on/off constant.
 - Copy only in `src/ui/copy-flow.ts` (the verdict-word test scans it). Existing roles, names and e2e behaviour stay unless a task names them.
 
@@ -127,7 +127,7 @@ New and changed modules: `src/map/{readable,contextLayer}.ts`, `src/context/{reg
 
 **Files:** Create `src/new/SizeNote.tsx` (+ a pure `sizeNote(summary)` in `src/new/sizeNote.ts`, tested); Modify `src/new/OutlineStep.tsx`, `src/ui/copy-flow.ts`; Test `tests/e2e/size-note.spec.ts`.
 
-**Behaviour:** site: when the polygon closes or is edited, pixels = `areaKm2 * 10_000` (100 m2 per pixel); road: when the line is finished and its width is set, pixels across = `widthM / 10`, and the length. It warns and never blocks; below the 1,000 m2 floor the existing `too_small` refusal is shown INSTEAD of the note. Thresholds and words are an open item to settle with the owner (about 1 ha for a site and about 20 m for a corridor were suggested); the three example sentences are in the design doc.
+**Behaviour:** site: when the polygon closes or is edited, pixels = `areaKm2 * 10_000` (100 m2 per pixel); road: when the line is finished and its width is set, pixels across = `widthM / 10`, and the length. It warns and never blocks; below the 1,000 m2 floor the existing `too_small` refusal is shown INSTEAD of the note. Thresholds and words are an open item to settle with the owner (about 1 ha for a site and about 20 m for a corridor were suggested); the three example sentences are in the design doc. Design review D8: the Review step repeats the same `sizeNote()` sentence under its size line ONLY for the "will not show" case; normal sites see nothing extra there.
 
 - [ ] **Step 1: Failing tests:** the arithmetic at the boundaries (just above the floor, at the threshold, large), the road case, that the refusal replaces the note, that the note never disables Next, that the words come from `copy-flow` (verdict-word test).
 - [ ] **Step 2: Implement; e2e:** a big site, a small site, a narrow corridor at 390 px and 1440 px, both themes, axe.
@@ -149,7 +149,7 @@ The owner looks at the P11 renders of the worked example and one village (z15-z1
 **Interfaces:**
 - `regionFor(view: Bbox, maxKm = 12): { bbox: Bbox; clamped: boolean }`, `gridFor(region, maxSide = 1024): DisplayGrid` (reuses `makeDisplayGrid`, `padFrac = 0`), `levelFor(region): 0 | 1` (P11).
 - `rankScenes(items: S2Item[], region: Bbox, now: Date): { pick: S2Item; ageDays: number; widened: boolean } | null`: region coverage >= 90 % first, then lowest cloud over the region, then newest; base window 75 days, extended to 150 then 240 days only while no candidate reaches 80 % clear; never older than 240 days.
-- `loadContext(deps: { search; client: ImageryClient; now?: Date }, region, signal: AbortSignal): Promise<ContextResult>` where `ContextResult` is `{ ok: true, image: ContextImage } | { ok: false, reason: 'NO_SCENES' | 'ALL_CLOUDY' | 'OFFLINE' | 'ABORTED' }`; `ALL_CLOUDY` still carries the clearest image, flagged. The loader makes one search and one scene read, uses `coarsenBbox` for the search, and no read after abort.
+- `loadContext(deps: { search; client: ImageryClient; now?: Date; onStage?: (s: 'searching' | 'checking' | 'reading') => void }, region, signal: AbortSignal): Promise<ContextResult>` where `ContextResult` is `{ ok: true, image: ContextImage } | { ok: false, reason: 'NO_SCENES' | 'ALL_CLOUDY' | 'OFFLINE' | 'ABORTED' }`; `ALL_CLOUDY` still carries the clearest image, flagged. The loader makes one search and one scene read, uses `coarsenBbox` for the search, and no read after abort.
 
 - [ ] **Step 1: Tests first** (pure, deterministic): `regionFor` clamps to 12 km, keeps the centre, flags `clamped`; `levelFor` switches at 10 km; `rankScenes`: coverage before cloud before recency, the window steps (75 -> 150 -> 240) and the cap, never returns an older scene, stable for equal scores, null when nothing qualifies; `loadContext` with a fake client and search: one read, abort resolves `ABORTED` and stops, all-cloudy returns the clearest flagged, none returns `NO_SCENES`, offline returns `OFFLINE`, the search receives the coarsened bbox.
 - [ ] **Step 2: Implement** to green; if P11 says the read must leave the main thread, use the imagery worker's existing `frame` op (same tests, different host).
@@ -165,7 +165,7 @@ The owner looks at the P11 renders of the worked example and one village (z15-z1
 
 **Interfaces:**
 - `setContextLayer(map, image: ContextImage | null)`: adds/updates image source `gs-context` and a raster layer placed per P12(b) (below the first road layer if that works; else the hide-and-restore overlay with an exact-restore unit test), using the route P12(a) found; `removeContextLayer(map)`. Idempotent; installed through `installLayers('context', ...)` so it survives a theme switch; drawn with default linear resampling, no sharpening.
-- `<ContextToggle region onImage />`: a labelled "Map | Satellite" control in a row ABOVE the map at every width (never floating over the drawing area), a live status line, "Update for this view" (re-plans from the current viewport, clamped) and "Cancel" while loading; default Map; states as in the design doc (off, loading, on, older scene, all cloudy, nothing usable, offline).
+- `<ContextToggle region onImage />`: a one-row toolbar directly under the step title and before "Kind of place" (design review D2; the map is a fixed stage, so "above the map" has no home): a segmented radio control "Map | Satellite · about N MB" in the viewer's view-tab pattern, one status slot under it with "Update for this view" (re-plans from the current viewport, clamped) and "Cancel" while loading; default Map; states as in the design doc, amended by D3 (loading shows three stage words: "Searching for recent photos", "Checking for clouds", "Reading the photo", from a loader stage callback, never byte figures), D4 (while off the slot reads "A recent 10 m photo behind the map: roads and large buildings show, houses do not.") and D7 (ON + view wider than 12 km: the picture stays, the radios stay usable, only Update is disabled with "Zoom in to your place to update the satellite view."). Tokens and rules: D5 and D6 in the design review record below.
 
 - [ ] **Step 1: Tests first.** Unit: layer order; idempotent installs; removal leaves no source or layer; the allowlist guard; the attribution lists the Copernicus credit when on. e2e (tier 2, fixture imagery): switching on adds `gs-context` within the budget and the status line names date and age; off removes it; a theme switch keeps it; leaving the step removes it and aborts the read (no request after unmount); all-cloudy fixture shows the explanation; nothing-usable and offline show their lines; the choice is remembered; axe in both themes with the view on; the controls row never overlaps the drawing area at 390 px and 1440 px.
 - [ ] **Step 2: Implement** `contextLayer.ts`, the toggle, the OutlineStep integration (region = the current viewport bbox clamped, planned when the switch turns on and on "Update"), copy, config flag.
@@ -444,6 +444,115 @@ None.
 - Parallelization: 1 lane, 0 parallel / 1 sequential
 - Lake Score: 0/2 (the best options scored 9/10)
 
+## Design review record (/plan-design-review, 2026-10-10)
+
+Target: this plan (UI scope: the outline step). Mode: OPERATE (app UI). DESIGN.md: none (gap, see NOT in scope); calibrated against `docs/design/README.md` (V1, approved 2026-10-06), `src/ui/kit.tsx` and the viewer's view-tab pattern. Mockups: none generated (no image-service key is configured and sending the brief out was not authorised); the approved sketch `docs/designs/phase-e-outline-sketch.png` is the visual reference, with its placement superseded by D2 below. Outside voices skipped (no subagents; Codex not installed). Decision numbers D1-D8 are this review's own; D1 was scope and approved no remedy.
+
+### Ratings
+
+| Pass | Before | After | Decision |
+|---|---|---|---|
+| Step 0 initial impression | 6/10 | | |
+| 1 Information architecture | 6 | 9 | D2 |
+| 2 Interaction states | 7 | 9 | D3 |
+| 3 Journey and emotional arc | 7 | 9 | D4 |
+| 4 AI slop risk | 9 | 9 | none: no hard rejection; flat, no cards, icons, gradients or coloured borders |
+| 5 Design system alignment | 6 | 9 | D5 |
+| 6 Responsive and accessibility | 7 | 9 | D6 |
+| 7 Unresolved decisions | | | D7, D8 resolved; 0 deferred |
+| Overall (lowest rated pass) | 6/10 | 9/10 | 7 decisions |
+
+Why not 10: the size-note thresholds and words are still an open item (E1b); no rendered mockup exists for the toolbar and its states; the stage words and zoom-out sentence are untested with real users.
+
+### Screen structure (outline step; supersedes the sketch's placement)
+
+```
+>= 1024 px: panel 45 % left | map stage 55 % right       < 1024 px: map top 50 dvh, panel below (scrolls)
+ 1 title "What are we looking at?"                         same order in both:
+ 2 [ Map | Satellite · about N MB ]   <- D2 toolbar          title, toolbar, status slot, kind, width,
+   status slot (2 lines reserved)     <- D3 / D4 / D7        hint + Undo/Finish/Draw again,
+ 3 Kind of place (2 radios)                                  coordinates, summary + size note, Back/Next
+ 4 [road width]  5 hint + Undo / Finish / Draw again
+ 6 > Enter by coordinates   7 summary + size note (live)   8 Back | Next
+ nothing overlays the map except MapLibre's own controls
+```
+
+### Storyboard (Pass 3)
+
+| Step | User does | User feels | Plan specifies |
+|---|---|---|---|
+| 1 | Arrives from the place search | "Is that my place?" | readable map, fly-in, loading and failure lines (E1) |
+| 2 | Sees the toolbar | curious, unsure what it gives | D4: one line while off sets the expectation |
+| 3 | Turns satellite on | impatient | D3: three stage words, Cancel |
+| 4 | The picture arrives | relief, or "it is blurry" | label with date, age, 10 m, "not evidence" (design doc) |
+| 5 | Draws the outline | focused | hint, Undo / Finish (E1) |
+| 6 | Closes the outline | reassured or warned | size note, never blocks (E1b) |
+| 7 | Next, then Review | confident | D8: the "will not show" case is repeated on Review |
+
+Time horizons: 5 seconds, a readable map and one obvious toolbar; 5 minutes, draw and continue; long term, trust from honest limits.
+
+### Interaction states
+
+| Feature | LOADING | EMPTY | ERROR | SUCCESS | PARTIAL |
+|---|---|---|---|---|---|
+| Satellite view | three stage words, Cancel (D3) | off: one expectation line (D4); nothing usable: "No recent photo covers this area. The map still works." | offline / failed: `role=alert` + Try again; map keeps working | status line: date, age, 10 m, "not evidence" | older scene: age shown; all cloudy: clearest photo flagged; zoomed out while on: picture kept, Update disabled (D7) |
+| Size note | n/a (derived, instant) | no outline: "No outline yet." | refusal replaces the note (existing `too_small`) | "will show" in `text-fg-2` | "will not show" in `text-warn`, repeated on Review (D8) |
+| Map | "Loading the map" | n/a | "The map could not load. Enter coordinates instead." | map ready | tiles still arriving: drawing already works |
+
+### Decisions made (each individually approved)
+
+- **D2 placement:** a one-row toolbar directly under the step title, before "Kind of place"; no map-corner control, no overlay.
+- **D3 loading:** three stage words from a loader stage callback ("Searching for recent photos", "Checking for clouds", "Reading the photo"); no byte figures (the imagery client cannot report progress).
+- **D4 expectation:** while the switch is off the status slot reads "A recent 10 m photo behind the map: roads and large buildings show, houses do not."
+- **D5 tokens:** segmented control = the viewer's view-tab pattern (`EvidenceViewer.tsx:140-160`: `fieldset` + sr-only legend "Basemap", radios, `h-11`, checked `bg-fg text-bg`, accent focus ring), labels "Map" and "Satellite · about N MB"; one status slot `<p role="status" class="text-sm text-fg-2">`, failures `text-bad` + `role="alert"` + Try again `Button`; Update and Cancel are `Button size="sm"`; precedence in the slot: map failed > map loading > satellite state; size note inside the existing live summary block (`OutlineStep.tsx:118-137`), `text-fg-2` when it will show, `text-warn` when it will not; no cards, icons or coloured borders.
+- **D6 behaviour rules:** (1) the status slot reserves two lines, so nothing below it shifts; (2) one polite live region, `role=alert` only for failures; (3) focus never moves on its own and returns to the Map radio after Cancel; (4) `raster-fade-duration` 0 under `prefers-reduced-motion`; (5) layouts as in the structure diagram, toolbar first after the title, nothing overlays the map.
+- **D7 zoomed out while ON:** the picture stays and the Map | Satellite radios stay usable; only "Update for this view" is disabled, with "Zoom in to your place to update the satellite view." (D18's disabled state applies to turning it on.)
+- **D8 Review step:** the same `sizeNote()` sentence is repeated under the Review size line only for the "will not show" case.
+
+### NOT in scope (design)
+
+- A DESIGN.md: `docs/design/README.md`, the mockups and `src/ui/kit.tsx` act as the system; run `/design-consultation` after P1a/P1b if a formal file is wanted.
+- Regenerating mockups for the toolbar (no image-service key).
+- A map-corner layer control (rejected at D2).
+- A separate 768 px layout: the app switches layout at 1024 px.
+- Photo zoom/pan UI: behind The Gate.
+
+### What already exists (reuse)
+
+- Viewer view tabs (radio segmented control), `Button`, `Panel`, `Skeleton`, the `role="status"` blocks (`OutlineStep.tsx:156`, `NotesPanel.tsx:140`), `text-fg-2` / `text-warn` / `text-bad`, the live summary block, the `too_small` refusal copy, `prefers-reduced-motion` handling (`styles.css:110`).
+
+### Implementation Tasks (design)
+
+- [ ] **T9 (P2, human: ~0.5 day / CC: ~20 min)**: ContextToggle markup per D2, D5, D6 (toolbar under the title, radio group, one status slot, Button sm). Surfaced by: Pass 1, 5, 6. Files: `src/new/ContextToggle.tsx`, `src/new/OutlineStep.tsx`, `src/ui/copy-flow.ts`. Verify: `context-view.spec.ts` + axe at 390 and 1440 px, both themes.
+- [ ] **T10 (P2, human: ~0.25 day / CC: ~10 min)**: loader stage callback and the three strings (D3). Surfaced by: Pass 2. Files: `src/context/load.ts`. Verify: unit test of the stage order.
+- [ ] **T11 (P3, human: ~0.25 day / CC: ~10 min)**: off-state line, zoomed-out-while-on state, Review-step repeat (D4, D7, D8). Surfaced by: Pass 3, 7. Files: `ContextToggle.tsx`, `src/new/ReviewStep.tsx`, `src/new/sizeNote.ts`. Verify: e2e for each state.
+
+### Completion summary (design)
+
+```
++====================================================================+
+|         DESIGN PLAN REVIEW: COMPLETION SUMMARY                     |
++====================================================================+
+| System Audit         | no DESIGN.md; UI scope: outline step        |
+| Step 0               | 6/10; all 7 passes                          |
+| Pass 1  (Info Arch)  | 6/10 -> 9/10 after fixes                    |
+| Pass 2  (States)     | 7/10 -> 9/10 after fixes                    |
+| Pass 3  (Journey)    | 7/10 -> 9/10 after fixes                    |
+| Pass 4  (AI Slop)    | 9/10 -> 9/10 after fixes                    |
+| Pass 5  (Design Sys) | 6/10 -> 9/10 after fixes                    |
+| Pass 6  (Responsive) | 7/10 -> 9/10 after fixes                    |
+| Pass 7  (Decisions)  | 2 resolved, 0 deferred                      |
++--------------------------------------------------------------------+
+| NOT in scope         | written (5 items)                           |
+| What already exists  | written                                     |
+| TODOS.md updates     | 0 items proposed                            |
+| Approved Mockups     | 0 generated, 0 approved                     |
+| Decisions made       | 7 added to plan                             |
+| Decisions deferred   | 0                                           |
+| Overall design score | 6/10 -> 9/10                                |
++====================================================================+
+```
+
 ## GSTACK REVIEW REPORT
 
 | Review | Trigger | Why | Runs | Status | Findings |
@@ -451,10 +560,10 @@ None.
 | CEO Review | `/plan-ceo-review` | Scope & strategy | 0 | not run | n/a |
 | Outside Review | codex (not installed), `/plan-eng-review` step | Independent 2nd opinion | 1 | skipped | no coverage (owner asked for no more subagents) |
 | Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | ISSUES OPEN | 21 issues, 0 critical gaps |
-| Design Review | `/plan-design-review` | UI/UX gaps | 0 | not run | n/a |
+| Design Review | `/plan-design-review` | UI/UX gaps | 1 | CLEAR | score: 6/10 -> 9/10, 7 decisions |
 | DX Review | `/plan-devex-review` | Developer experience gaps | 0 | not run | n/a |
 
-- **OUTSIDE COVERAGE:** codex, plan-review, skipped: Codex is not installed and the native Claude fallback was not run because the owner asked for no more subagents. No findings, no substituted coverage.
-- **VERDICT:** no review CLEAR, eng review required: 21 issues mapped to accepted amendments A-1..A-14, 0 unresolved decisions, 0 critical gaps; the amendments are applied when the tasks are implemented.
+- **OUTSIDE COVERAGE:** codex, plan-review, skipped; design outside voices skipped too (no subagents, Codex not installed). No findings and no substituted coverage.
+- **VERDICT:** DESIGN CLEARED (9/10, 0 unresolved); eng review required: 21 issues mapped to accepted amendments A-1..A-14, 0 unresolved decisions, 0 critical gaps.
 
 NO UNRESOLVED DECISIONS
