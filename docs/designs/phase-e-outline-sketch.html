@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GrahSaboot Phase E (approach B): outline step sketch</title>
+<style>
+  /* Intentionally rough: system fonts, thin gray borders, no colour. A sketch, not a mockup. */
+  * { box-sizing: border-box; }
+  body { font: 14px/1.4 system-ui, sans-serif; margin: 0; padding: 20px; color: #222; background: #fff; }
+  h1 { font-size: 16px; margin: 0 0 4px; }
+  p.note { margin: 0 0 16px; color: #555; }
+  .row { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
+  .frame { border: 1px solid #999; border-radius: 6px; padding: 10px; background: #fafafa; }
+  .frame h2 { font-size: 13px; margin: 0 0 8px; color: #555; font-weight: 600; }
+  .stepper { display: flex; gap: 8px; margin-bottom: 8px; font-size: 12px; color: #777; }
+  .stepper b { color: #222; border-bottom: 2px solid #222; }
+  .screen { display: grid; grid-template-columns: 1fr 260px; gap: 10px; width: 760px; }
+  .map { position: relative; height: 330px; border: 1px solid #999; background:
+      repeating-linear-gradient(0deg, #eee 0 1px, transparent 1px 40px),
+      repeating-linear-gradient(90deg, #eee 0 1px, transparent 1px 40px), #f4f4f4; }
+  .map.sat { background:
+      repeating-linear-gradient(35deg, #d9d9d9 0 14px, #cfcfcf 14px 28px), #ccc; }
+  .poly { position: absolute; left: 150px; top: 110px; width: 230px; height: 130px; border: 2px dashed #222; }
+  .corner { position: absolute; width: 9px; height: 9px; border: 2px solid #222; background: #fff; }
+  .road { position: absolute; background: #bbb; }
+  .map.sat .road { background: #fff; outline: 1px solid #666; } /* hybrid overlay: white roads with a dark halo over the photo */
+  .label { position: absolute; font-size: 11px; color: #333; background: #fffc; padding: 0 3px; }
+  .left { min-width: 0; }
+  /* decided in review: the switch and its status sit in a row ABOVE the map at every width, never floating over the drawing area */
+  .ctl { position: static; width: auto; border: 1px solid #999; background: #fff; padding: 6px; font-size: 12px; margin-bottom: 6px; }
+  .seg { display: inline-flex; border: 1px solid #666; border-radius: 4px; overflow: hidden; margin-bottom: 4px; }
+  .seg span { padding: 4px 12px; min-height: 28px; }
+  .seg span.on { background: #222; color: #fff; }
+  .status { color: #444; }
+  .btn { display: inline-block; border: 1px solid #666; border-radius: 4px; padding: 5px 10px; margin: 4px 4px 0 0; background: #fff; }
+  .btn.primary { background: #222; color: #fff; }
+  .hint { position: absolute; left: 8px; bottom: 8px; right: 8px; border: 1px solid #999; background: #fff; padding: 6px; font-size: 12px; }
+  .side { border: 1px solid #999; padding: 8px; background: #fff; font-size: 12px; }
+  .side h3 { margin: 0 0 6px; font-size: 13px; }
+  .warn { border: 1px solid #666; padding: 6px; margin-top: 8px; }
+  .small { font-size: 12px; color: #444; }
+  .card { width: 330px; border: 1px solid #999; padding: 8px; background: #fff; font-size: 12px; margin-bottom: 10px; }
+  .attr { position: absolute; right: 6px; bottom: 54px; font-size: 10px; border: 1px solid #aaa; background: #fff; border-radius: 10px; padding: 0 6px; }
+</style>
+</head>
+<body>
+<h1>Phase E, approach B: the outline step with a readable map and a Satellite view</h1>
+<p class="note">Rough sketch. Approved as good enough by the owner (2026-10-09); the switch row above the map at every width was decided in the design review. On a phone the side panel stacks under the map and the controls keep 44 px targets. Order of attention: the map, the switch, the hint, then the size note.</p>
+
+<div class="row">
+
+  <!-- State 1: default. Map view, readable (roads, buildings and labels now contrast with the background). The switch sits ON the map so it is next to what it changes. -->
+  <div class="frame">
+    <h2>1. Map view (the default everywhere; satellite is opt-in) &mdash; the readable map</h2>
+    <div class="stepper"><span>1 Place</span><b>2 Outline</b><span>3 Dates</span><span>4 Review</span></div>
+    <div class="screen">
+      <div class="left">
+        <div class="ctl">
+          <div class="seg"><span class="on">Map</span><span>Satellite</span></div>
+          <div class="status" role="status">Satellite view is off (about 8 MB when on). Turn it on to see a recent photo behind the map.</div>
+        </div>
+      <div class="map">
+        <div class="road" style="left:0;top:170px;width:100%;height:6px"></div>
+        <div class="road" style="left:300px;top:0;width:5px;height:100%"></div>
+        <div class="label" style="left:20px;top:150px">Wardha Road</div>
+        <div class="label" style="left:310px;top:20px">Mihan</div>
+        <div class="poly"></div>
+        <div class="corner" style="left:145px;top:105px"></div><div class="corner" style="left:376px;top:105px"></div>
+        <div class="corner" style="left:376px;top:236px"></div><div class="corner" style="left:145px;top:236px"></div>
+        <div class="attr">&#9432;</div> <!-- attribution starts collapsed; one click away -->
+        <div class="hint">Click each corner of your site. Click the first corner again, double-click or press Enter to finish.
+          <span class="btn">Undo last corner</span><span class="btn">Finish</span></div>
+      </div>
+      </div>
+      <div class="side">
+        <h3>Your outline</h3>
+        <div>Site &middot; 0.42 km&sup2;</div>
+        <div class="small">About 4,200 pixels at 10 m.</div>
+        <!-- Size note (new): says what 10 m can show for THIS shape, at the moment it matters. Warns, never blocks (the hard floor stays 1,000 m&sup2;). -->
+        <div class="warn small">Large buildings, roads and land clearing will show at this size.</div>
+        <div style="margin-top:10px"><span class="btn primary">Next</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- State 2: Satellite on. Same screen; the photo sits under roads and labels, labelled as context. -->
+  <div class="frame">
+    <h2>2. Satellite view on &mdash; recent photo under roads and labels (outline step only)</h2>
+    <div class="stepper"><span>1 Place</span><b>2 Outline</b><span>3 Dates</span><span>4 Review</span></div>
+    <div class="screen">
+      <div class="left">
+        <div class="ctl">
+          <div class="seg"><span>Map</span><span class="on">Satellite</span></div>
+          <div class="status" role="status">Satellite view &middot; Sentinel-2 &middot; 14 Sep 2026 &middot; 10 m &middot; for finding your place, not evidence.</div>
+          <span class="btn">Update for this view</span>
+        </div>
+      <div class="map sat">
+        <div class="road" style="left:0;top:170px;width:100%;height:5px"></div>
+        <div class="road" style="left:300px;top:0;width:4px;height:100%"></div>
+        <div class="label" style="left:20px;top:150px">Wardha Road</div>
+        <div class="label" style="left:310px;top:20px">Mihan</div>
+        <div class="poly"></div>
+        <div class="corner" style="left:145px;top:105px"></div><div class="corner" style="left:376px;top:105px"></div>
+        <div class="corner" style="left:376px;top:236px"></div><div class="corner" style="left:145px;top:236px"></div>
+        <div class="attr">&#9432;</div>
+        <div class="hint">Click each corner of your site. Click the first corner again, double-click or press Enter to finish.
+          <span class="btn">Undo last corner</span><span class="btn">Finish</span></div>
+      </div>
+      </div>
+      <div class="side">
+        <h3>Your outline</h3>
+        <div>Site &middot; 0.42 km&sup2;</div>
+        <div class="small">About 4,200 pixels at 10 m.</div>
+        <div class="warn small">Large buildings, roads and land clearing will show at this size.</div>
+        <div style="margin-top:10px"><span class="btn primary">Next</span></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="row" style="margin-top:20px">
+  <!-- States 3-5: what the switch says when something is not simple. Every one is a text line in the live region, never a spinner without words. -->
+  <div class="frame">
+    <h2>3. Satellite states (status line under the switch)</h2>
+    <div class="card"><b>Loading</b><br>Finding the clearest recent photo&hellip; about 3 of 8 MB. <span class="btn">Cancel</span></div>
+    <div class="card"><b>Older scene</b><br>Satellite view &middot; Sentinel-2 &middot; 12 Mar 2026 (7 months ago) &middot; 10 m &middot; newer photos were cloudy.</div>
+    <div class="card"><b>All cloudy</b><br>Every recent photo of this area is cloudy. Showing the clearest one (14 Aug 2026, 62% clear). Try Update later, or use the map.</div>
+    <div class="card"><b>Nothing usable</b><br>No recent photo covers this area. The map still works; draw on it as usual.</div>
+    <div class="card"><b>Offline</b><br>Could not reach the photo service. The map still works. <span class="btn">Try again</span></div>
+  </div>
+
+  <div class="frame">
+    <h2>4. Size note under the outline (warn, never block)</h2>
+    <div class="card"><b>0.42 km&sup2;</b> &middot; about 4,200 pixels<br>Large buildings, roads and land clearing will show at this size.</div>
+    <div class="card"><b>0.015 km&sup2;</b> &middot; about 150 pixels<br>Single buildings and narrow lanes will not show; expect &ldquo;not enough clear view&rdquo;. You can still continue.</div>
+    <div class="card"><b>Road corridor, 12 m wide</b> &middot; about 1 pixel across<br>At 10 m a narrow road is mixed with what is beside it. Wide clearing and long stretches show better.</div>
+    <div class="small">Below 1,000 m&sup2; the existing refusal stays: &ldquo;too small to see from orbit&rdquo;.</div>
+  </div>
+
+  <div class="frame">
+    <h2>5. Map failed to load</h2>
+    <div class="card"><b>The map could not load.</b> Enter coordinates instead.<br>(the coordinates section opens by itself)</div>
+    <h2 style="margin-top:14px">6. Map loading</h2>
+    <div class="card">Loading the map&hellip;</div>
+  </div>
+</div>
+</body>
+</html>
