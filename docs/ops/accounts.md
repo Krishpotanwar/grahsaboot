@@ -18,6 +18,7 @@ Do these steps only when the owner decides to activate accounts.
    - Authentication → Sign In / Providers → Google: paste the client ID and secret, then enable.
    - URL Configuration: Site URL = app URL; Additional redirect URLs = the preview/prod URLs `/**`.
    - In **dev only**: also add `http://127.0.0.1:5173/**` and `http://localhost:5173/**`. Production never trusts localhost.
+   - Keep "Allow anonymous sign-ins" **off** in both projects: an anonymous user has the role `authenticated` and would pass every owner policy.
    - Disable Email signups in **prod**.
    - In **dev only**: enable Email with "Confirm email" off, so the automated smoke user can sign in with a password.
 4. Create a personal access token, then on this VM run `npx supabase login`.
