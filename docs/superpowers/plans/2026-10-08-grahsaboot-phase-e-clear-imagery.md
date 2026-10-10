@@ -366,6 +366,8 @@ Approval readiness: PASS. Checked: R1 (D18 = A, 2026-10-09), R2 (D19 = C, 2026-1
 - **A-12 (tests):** `tests/fixtures/server.ts` style gains ordered real ids (`landuse_residential`, `water`, `building`, `highway_minor`, `highway_name_minor`, `labels`) over an inline GeoJSON source.
 - **A-13 (tests):** added cases: quality selection (>= 80 %, fallback to the clearest, all three fail -> `FAILED`); abort on switch-off / theme switch / Back during the load; double toggle or Update twice keeps one load in flight; rebuilt map while on; Worker disposed after leaving; the attribution lists the Copernicus credit only while the view is on.
 - **A-14 (C11 carry-in, D19 = C):** `frameLayer.ts` moves to `updateImage({ image })` before the CSP generator; `data:` never enters `connect-src`. Recorded in `task-C11-addendum.md`.
+- **A-15 (E3, re-run F7):** the toolbar shares the existing `tier > 0` guard (`OutlineStep.tsx:93`) and is also hidden when `mapFailed`; at tier 0 or a failed map the coordinates details stay the only path.
+- **A-16 (tests, re-run):** proof for the design-review decisions: loader stage order (unit), the off-state line, ON + view wider than 12 km keeps the picture and disables only Update (e2e), the Review-step repeat only for the "will not show" case, no layout shift of the "Kind of place" fieldset across states (e2e bounding box), focus returns to the Map radio after Cancel, `raster-fade-duration` 0 under reduced motion (unit), toolbar absent at tier 0 and on a failed map.
 
 ## NOT in scope
 
@@ -431,9 +433,9 @@ None.
 ## Completion summary
 
 - Step 0: Scope Challenge: scope accepted as-is (structure: original arrangement, D17)
-- Architecture Review: 6 issues found
+- Architecture Review: 7 issues found (6 + 1 on the re-run)
 - Code Quality Review: 5 issues found
-- Test Review: diagram produced, 7 gaps identified
+- Test Review: diagram produced, 13 gaps identified (7 + 6 on the re-run)
 - Performance Review: 3 issues found
 - NOT in scope: written
 - What already exists: written
@@ -553,17 +555,30 @@ Time horizons: 5 seconds, a readable map and one obvious toolbar; 5 minutes, dra
 +====================================================================+
 ```
 
+## Engineering review re-run (2026-10-10, after the design review)
+
+Why: the design review (decisions D2-D8) amended the plan after the engineering review. Target, scope record and structure answer are unchanged: reused D17 (original arrangement), D18 (disable turning ON above 12 km) and D19 (C11 carry-in); no new choice is open. Outside voice skipped again (no subagents, Codex not installed). Checked against the code: `OutlineStep.tsx:93` (`tier > 0` guard), `OutlineStep.tsx:118-137` (live summary block), `ReviewStep.tsx:47-55` (size row), `EvidenceViewer.tsx:140-160` (radio-tab pattern), `MapStage.tsx` (`installLayers`).
+
+| # | Sev / conf | Where | Finding | Disposition |
+|---|---|---|---|---|
+| F7 | P3 / 7 | `src/new/OutlineStep.tsx:93` `{tier > 0 && (` | the design review's precedence rule (map failed > map loading > satellite) covers the status text, not the control: a toolbar over a failed or absent map has nothing to switch | accepted, A-15 |
+| T-A | P3 / 8 | plan test list | the design decisions D3, D4, D7, D8 and D6's rules have no tests yet (6 gaps, listed in A-16) | accepted as required proof of approved behaviour, A-16 |
+
+Section 1 (architecture): the `onStage` callback is one optional function argument to `loadContext`; no new boundary. Section 2 (code quality): `sizeNote()` gains its second verified caller (`ReviewStep.tsx:47` area row exists; `OutlineStep.tsx` proposed), so the pure helper is the right shape; nothing to extract. Section 3: the six new proofs above. Section 4: nothing new (the reserved status slot is static layout, no runtime cost).
+
+Approval readiness: PASS. Reused exact answers D17, D18, D19; F7 and T-A are mechanics of behaviour approved at D2-D8 and D18. No remedy pending, no critical gaps.
+
 ## GSTACK REVIEW REPORT
 
 | Review | Trigger | Why | Runs | Status | Findings |
 |--------|---------|-----|------|--------|----------|
 | CEO Review | `/plan-ceo-review` | Scope & strategy | 0 | not run | n/a |
 | Outside Review | codex (not installed), `/plan-eng-review` step | Independent 2nd opinion | 1 | skipped | no coverage (owner asked for no more subagents) |
-| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | ISSUES OPEN | 21 issues, 0 critical gaps |
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 2 | ISSUES OPEN | 28 issues, 0 critical gaps |
 | Design Review | `/plan-design-review` | UI/UX gaps | 1 | CLEAR | score: 6/10 -> 9/10, 7 decisions |
 | DX Review | `/plan-devex-review` | Developer experience gaps | 0 | not run | n/a |
 
 - **OUTSIDE COVERAGE:** codex, plan-review, skipped; design outside voices skipped too (no subagents, Codex not installed). No findings and no substituted coverage.
-- **VERDICT:** DESIGN CLEARED (9/10, 0 unresolved); eng review required: 21 issues mapped to accepted amendments A-1..A-14, 0 unresolved decisions, 0 critical gaps.
+- **VERDICT:** DESIGN CLEARED (9/10, 0 unresolved); eng review required: 28 issues over two runs mapped to accepted amendments A-1..A-16, 0 unresolved decisions, 0 critical gaps (the engineering log can only read CLEAR with zero issues; these are mapped work, not open decisions).
 
 NO UNRESOLVED DECISIONS
