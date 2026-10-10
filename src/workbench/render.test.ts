@@ -260,7 +260,9 @@ describe('NotesPanel', () => {
     const inv = withNotes(200, (i) => ({ date: i % 2 ? day(i) : null }))
     const t0 = performance.now()
     const html = notes(inv)
-    expect(performance.now() - t0).toBeLessThan(100)
+    // A wall-clock bound only catches an accidental O(n^2); it sits well above the ~30 ms this takes alone, because the
+    // database tests run beside it in `npm run check` (the real-browser budget is the notes e2e).
+    expect(performance.now() - t0).toBeLessThan(500)
     const ul = list(html)
     expect(ul.match(/<li\b/g)).toHaveLength(200)
     expect(ul.match(/<button\b/g)).toHaveLength(400) // Edit and Delete on each note
