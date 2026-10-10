@@ -13,6 +13,7 @@ const GlobeScreen = lazy(() => import('./screens/GlobeScreen.tsx'))
 const KitScreen = lazy(() => import('./screens/KitScreen.tsx'))
 const NewInvestigation = lazy(() => import('./screens/NewInvestigation.tsx'))
 const Workbench = lazy(() => import('./screens/Workbench.tsx'))
+const Report = lazy(() => import('./screens/Report.tsx'))
 
 export function screenFor(r: Route): ReactNode {
   switch (r.name) {
@@ -27,7 +28,7 @@ export function screenFor(r: Route): ReactNode {
     case 'investigation':
       return <Workbench key={r.id} id={r.id} />
     case 'report':
-      return <NotFound text={copy.soon} />
+      return <Report key={r.id} id={r.id} />
     case 'kit':
       return config.testMode ? <KitScreen /> : <NotFound />
     default:

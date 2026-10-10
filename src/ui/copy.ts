@@ -33,11 +33,6 @@ export const copy = {
   },
   titles: { new: 'New investigation', investigation: 'Investigation', report: 'Evidence report' },
   notFound: { title: 'Page not found', body: 'That address does not exist.', home: 'Go to the globe' },
-  // ponytail: prototype stand-in for the Phase C workbench routes; delete when /new, /i/:id and reports exist.
-  soon: {
-    title: 'Investigations are not in this prototype yet',
-    body: 'This prototype has the live globe, place search and satellite passes. Drawing an outline, comparing dated photos and making a report come in the next version.',
-  },
   map: {
     label: 'Map. Use the search box to move it.',
     staticNotice:
@@ -97,7 +92,6 @@ export const copy = {
         'Photos cannot show quality, payments, contracts or who did the work.',
         'The next-pass time is an estimate from orbit data. A pass is not a guaranteed usable photo.',
         'Verified means the pictures match the public source file at the time of checking. It does not prove any claim about a project.',
-        'Signed-in accounts can save 50 investigations and verify 600 frames per day.',
       ],
     },
     privacy: {
