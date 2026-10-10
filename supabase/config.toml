@@ -1,0 +1,3 @@
+# Minimal on purpose: the local Supabase stack is not used (database tests run on PGlite, see tests/db/harness.ts).
+# D7 adds the [functions.*] sections for verify and delete-account.
+project_id = "grahsaboot"

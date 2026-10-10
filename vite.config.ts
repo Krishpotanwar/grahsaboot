@@ -26,5 +26,7 @@ export default defineConfig({
     include: ['src/**/*.test.ts', 'tests/unit/**/*.test.ts', 'tests/db/**/*.test.ts', 'worker/**/*.test.ts'],
     environment: 'node',
     testTimeout: 30000,
+    // The first PostGIS start in each tests/db file takes several seconds (tests/db/harness.ts).
+    hookTimeout: 60000,
   },
 })

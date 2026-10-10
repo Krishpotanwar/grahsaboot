@@ -17,6 +17,7 @@
     "fmt": "prettier --write .",
     "probe": "tsx scripts/probe-cog.ts",
     "tle:snapshot": "tsx scripts/tle-snapshot.ts",
+    "env:check": "tsx scripts/check-env.ts",
     "deploy": "npm run check && wrangler deploy",
     "e2e": "playwright test",
     "e2e:live": "LIVE=1 playwright test"
