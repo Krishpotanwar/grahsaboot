@@ -30,7 +30,7 @@ export function missingEnv(dev: Record<string, string>, local: Record<string, st
   return [...out, ...misplaced]
 }
 
-const readEnv = (path: string): Record<string, string> =>
+export const readEnv = (path: string): Record<string, string> =>
   existsSync(path)
     ? Object.fromEntries(
         readFileSync(path, 'utf8')

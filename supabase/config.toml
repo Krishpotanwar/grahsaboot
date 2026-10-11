@@ -1,3 +1,13 @@
 # Minimal on purpose: the local Supabase stack is not used (database tests run on PGlite, see tests/db/harness.ts).
-# D7 adds the [functions.*] sections for verify and delete-account.
 project_id = "grahsaboot"
+
+# Both functions need the caller's JWT, and check it again themselves (auth.getUser), so a platform that stopped verifying it
+# would still not let an anonymous caller in. import_map names the shared supabase/functions/deno.json explicitly: without it the
+# CLI looks for a deno.json inside the function's own folder (or the deprecated supabase/functions/import_map.json), and neither exists.
+[functions.verify]
+verify_jwt = true
+import_map = "./functions/deno.json"
+
+[functions.delete-account]
+verify_jwt = true
+import_map = "./functions/deno.json"
