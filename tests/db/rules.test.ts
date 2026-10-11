@@ -166,6 +166,42 @@ describe('limits and freezing', () => {
         [inv!.id],
       ),
     ).rejects.toThrow('GS:LIMIT_NOTES')
+    // The browser saves by upsert on the note id: a note that already exists is not a new note, so a full investigation can be
+    // saved again (otherwise it could never be saved once it holds 200).
+    const [first] = await db.super(
+      `select id from public.annotations where investigation_id = $1 order by body limit 1`,
+      [inv!.id],
+    )
+    await expect(
+      db.as(
+        USER_A,
+        `insert into public.annotations (id, investigation_id, kind, body) values ($1, $2, 'unsure', 'edited')
+         on conflict (investigation_id, id) do update set body = excluded.body returning body`,
+        [first!.id, inv!.id],
+      ),
+    ).resolves.toEqual([{ body: 'edited' }])
+  })
+  it('lets two accounts save a note under the same note id: ids are unique per investigation', async () => {
+    const [a] = await insSite(SQUARE)
+    const [b] = await db.as(
+      USER_B,
+      `insert into public.investigations (name, kind, geom, date_from, date_to) values ('b', 'site', $1, '2025-01-01', '2025-12-31') returning id`,
+      [ewktPolygon(SQUARE)],
+    )
+    // One browser, two Google accounts: the copy's note ids are the same for both.
+    const id = '00000000-0000-4000-8000-0000000000c1'
+    const put = (who: string, inv: unknown, body: string) =>
+      db.as(
+        who,
+        `insert into public.annotations (id, investigation_id, kind, body) values ($1, $2, 'unsure', $3)
+         on conflict (investigation_id, id) do update set body = excluded.body returning body`,
+        [id, inv, body],
+      )
+    await expect(put(USER_A, a!.id, 'a')).resolves.toEqual([{ body: 'a' }])
+    await expect(put(USER_B, b!.id, 'b')).resolves.toEqual([{ body: 'b' }])
+    // and neither overwrote the other
+    const bodies = await db.super(`select body from public.annotations where id = $1 order by body`, [id])
+    expect(bodies).toEqual([{ body: 'a' }, { body: 'b' }])
   })
   it('caps frames at 50 per investigation', async () => {
     const [inv] = await insSite(SQUARE)

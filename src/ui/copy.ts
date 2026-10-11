@@ -103,8 +103,6 @@ export const copy = {
         'Map tiles come from OpenFreeMap, NASA GIBS and AWS; those requests reveal your IP address and the area you are viewing.',
         'Satellite photos are read directly from public Sentinel-2 files on Amazon Web Services. Those requests reveal an approximate area, never your name or email.',
         'Satellite positions come through our server from CelesTrak; nothing about you is sent.',
-        'If you sign in to save, we store your Google name and email, your outlines, dates, notes and claims, and a log of actions with IDs only.',
-        'You can delete any investigation, or your whole account, at any time. Saved data is removed 12 months after your last sign-in.',
       ],
     },
   },

@@ -52,7 +52,9 @@ create table public.frames (
 create index frames_owner_verified on public.frames (owner, verified_at);
 
 create table public.annotations (
-  id uuid primary key default gen_random_uuid(),
+  -- The browser makes note ids, and a copy of an investigation can be saved by two accounts: unique per investigation, not
+  -- globally, so a second account's notes never collide with the first's.
+  id uuid not null default gen_random_uuid(),
   investigation_id uuid not null references public.investigations (id) on delete cascade,
   owner uuid not null default auth.uid() references auth.users (id) on delete cascade,
   kind text not null check (kind in ('change', 'no_clear_change', 'unsure')),
@@ -60,7 +62,8 @@ create table public.annotations (
   frame_date date,
   section_idx smallint check (section_idx is null or section_idx between 0 and 10),
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  primary key (investigation_id, id)
 );
 create index annotations_investigation on public.annotations (investigation_id);
 

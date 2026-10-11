@@ -1,9 +1,12 @@
 node_modules/
 dist/
+dist-accounts*/
+dist-e2e/
 .wrangler/
 .env
 .env.*
 !.env.e2e
+!.env.accounts
 !.env.example
 supabase/.temp/
 supabase/.branches/

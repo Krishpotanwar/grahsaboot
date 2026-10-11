@@ -1,6 +1,6 @@
 # GrahSaboot
 
-**Satellite proof for any place.** *Grah* (ग्रह) means planet and *Saboot* (सबूत) means proof.
+**Satellite proof for any place.** _Grah_ (ग्रह) means planet and _Saboot_ (सबूत) means proof.
 
 GrahSaboot turns a place and a set of dates into dated, cloud-checked satellite evidence from free Sentinel-2 imagery. The goal is to let anyone check what was visible from above, for example whether a road or building really appeared where and when it was claimed, at no cost.
 
@@ -22,14 +22,15 @@ GrahSaboot turns a place and a set of dates into dated, cloud-checked satellite 
 - **Next pass.** For the place you picked, the panel estimates the next daytime pass that will photograph it. That satellite's row and track turn orange.
 - **It works on any device.** The app checks the device and picks a level:
 
-  | Tier | When | What you get |
-  |---|---|---|
-  | T0 | No WebGL2, or a software GPU | No 3D map. Search and the satellite list still work. |
-  | T1 | Data saver, slow network, or 2 GB of RAM or less | Flat 2D map. Satellites are listed in the panel. |
-  | T2 | 4 cores or fewer, or less than 4 GB of RAM | Globe with satellite markers, tracks and swaths |
-  | T3 | Everything else | Everything in T2, plus 3D terrain |
+  | Tier | When                                             | What you get                                         |
+  | ---- | ------------------------------------------------ | ---------------------------------------------------- |
+  | T0   | No WebGL2, or a software GPU                     | No 3D map. Search and the satellite list still work. |
+  | T1   | Data saver, slow network, or 2 GB of RAM or less | Flat 2D map. Satellites are listed in the panel.     |
+  | T2   | 4 cores or fewer, or less than 4 GB of RAM       | Globe with satellite markers, tracks and swaths      |
+  | T3   | Everything else                                  | Everything in T2, plus 3D terrain                    |
 
   On T1 and T2 you can choose "Switch to full".
+
 - **Accessible.** Every screen is tested with axe against WCAG 2.2 AA in both themes. Reduced motion is respected.
 
 ![Next pass over a searched place](docs/screenshots/next-pass.png)
@@ -66,16 +67,16 @@ flowchart LR
 
 ## Tech stack
 
-| Area | Choice |
-|---|---|
-| App | React 19.3, TypeScript 7, Vite 8 |
-| Styling | Tailwind CSS 4.3, Geist and Geist Mono fonts, Base UI 1.8, Phosphor icons |
-| Map | MapLibre GL 6.12 (globe projection), terra-draw 1.36 (outlines, Phase C) |
-| Orbits | satellite.js 7.1 (SGP4) |
-| Imagery | geotiff 3.0, proj4 2.22 |
-| Edge | Cloudflare Workers (static assets plus `/api/tle`), wrangler 4.147 |
-| Tests | Vitest 5 (unit), Playwright 1.63 with axe-core (end-to-end and accessibility) |
-| Later | Supabase (Postgres, PostGIS, Google sign-in, a Deno `verify` function) in Phase D |
+| Area    | Choice                                                                            |
+| ------- | --------------------------------------------------------------------------------- |
+| App     | React 19.3, TypeScript 7, Vite 8                                                  |
+| Styling | Tailwind CSS 4.3, Geist and Geist Mono fonts, Base UI 1.8, Phosphor icons         |
+| Map     | MapLibre GL 6.12 (globe projection), terra-draw 1.36 (outlines, Phase C)          |
+| Orbits  | satellite.js 7.1 (SGP4)                                                           |
+| Imagery | geotiff 3.0, proj4 2.22                                                           |
+| Edge    | Cloudflare Workers (static assets plus `/api/tle`), wrangler 4.147                |
+| Tests   | Vitest 5 (unit), Playwright 1.63 with axe-core (end-to-end and accessibility)     |
+| Later   | Supabase (Postgres, PostGIS, Google sign-in, a Deno `verify` function) in Phase D |
 
 ## Run it locally
 
@@ -90,16 +91,16 @@ npm run dev          # http://localhost:5173
 
 No environment variables are needed. Every service URL has a public default in `src/config.ts`, and you can override any of them with a `VITE_*` variable such as `VITE_NOMINATIM_URL` or `VITE_TLE_URL`.
 
-| Script | What it does |
-|---|---|
-| `npm run dev` | Development server |
-| `npm run build` | Production build into `dist/` |
-| `npm run preview` | Serves the production build locally |
-| `npm run check` | Type check, unit tests and build, all together |
-| `npm run e2e` | Playwright tests against fixture data. Pick browsers with `E2E_BROWSERS=chromium,firefox`. |
-| `npm run e2e:live` | Playwright tests against the real services |
-| `npm run deploy` | Runs `npm run check`, then `wrangler deploy` |
-| `npm run tle:snapshot` | Refreshes `public/tle-snapshot.json` from CelesTrak. At most once every 2 hours. |
+| Script                 | What it does                                                                               |
+| ---------------------- | ------------------------------------------------------------------------------------------ |
+| `npm run dev`          | Development server                                                                         |
+| `npm run build`        | Production build into `dist/`                                                              |
+| `npm run preview`      | Serves the production build locally                                                        |
+| `npm run check`        | Type check, unit tests and build, all together                                             |
+| `npm run e2e`          | Playwright tests against fixture data. Pick browsers with `E2E_BROWSERS=chromium,firefox`. |
+| `npm run e2e:live`     | Playwright tests against the real services                                                 |
+| `npm run deploy`       | Runs `npm run check`, then `wrangler deploy`                                               |
+| `npm run tle:snapshot` | Refreshes `public/tle-snapshot.json` from CelesTrak. At most once every 2 hours.           |
 
 ## Deploy
 
@@ -109,7 +110,7 @@ The app is hosted on **Cloudflare Workers**, on the free plan. It is not on Verc
 npm run deploy         # runs npm run check (type check, unit tests, production build), then wrangler deploy
 ```
 
-`npm run e2e` leaves a test build in `dist/`. `npm run deploy` rebuilds it as part of the check, so the test build never ships.
+`npm run e2e` builds into `dist-e2e/` and `dist-accounts-e2e/`, never into `dist/`, so a test build cannot be deployed by mistake. `npm run deploy` rebuilds `dist/` as part of the check.
 
 Pushing to GitHub does not deploy anything; you deploy by running `npm run deploy`.
 
@@ -143,12 +144,12 @@ docs/                 design mockups, plans, research, probes
 
 ## Roadmap
 
-| Phase | Status | Delivers |
-|---|---|---|
-| A: Foundation | Done | Toolchain, geometry, the evidence engine (COG reads, SHA-256 frames, `scl-v2` cloud stats, reprojection, difference), STAC clients, imagery worker |
-| B: Shell and globe | Done, live | Design system, router and shell, globe with device tiers, place search, live satellites and next pass |
-| C: Workbench | Next | New-investigation flow, workbench (swipe, side by side, difference), timeline, road sections, notes, report export |
-| D: Accounts | Planned | Google sign-in, saving, server re-verification of every frame, privacy controls |
+| Phase              | Status     | Delivers                                                                                                                                           |
+| ------------------ | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A: Foundation      | Done       | Toolchain, geometry, the evidence engine (COG reads, SHA-256 frames, `scl-v2` cloud stats, reprojection, difference), STAC clients, imagery worker |
+| B: Shell and globe | Done, live | Design system, router and shell, globe with device tiers, place search, live satellites and next pass                                              |
+| C: Workbench       | Next       | New-investigation flow, workbench (swipe, side by side, difference), timeline, road sections, notes, report export                                 |
+| D: Accounts        | Planned    | Google sign-in, saving, server re-verification of every frame, privacy controls                                                                    |
 
 ## Limits and honesty
 
@@ -174,6 +175,7 @@ docs/                 design mockups, plans, research, probes
 ## How it was built
 
 Krish Potanwar planned and built this prototype on 5–6 October 2026, working with Claude Code:
+
 - Claude Opus planned and reviewed;
 - Claude Sonnet agents implemented each task, and every task was reviewed before the next one started;
 - the prompts were spoken, in English and Hinglish, with Wispr Flow.

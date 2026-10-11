@@ -69,6 +69,8 @@ create trigger gs_investigations_limit before insert on public.investigations fo
 create or replace function public.gs_limit_notes() returns trigger
 language plpgsql set search_path = '' as $$
 begin
+  -- Saving a note again (the browser upserts by note id) never counts against the cap: a full investigation must stay saveable.
+  if exists (select 1 from public.annotations where id = new.id and investigation_id = new.investigation_id) then return new; end if;
   if (select count(*) from public.annotations where investigation_id = new.investigation_id) >= 200 then raise exception 'GS:LIMIT_NOTES'; end if;
   return new;
 end $$;

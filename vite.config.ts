@@ -25,6 +25,8 @@ export default defineConfig({
   test: {
     include: ['src/**/*.test.ts', 'tests/unit/**/*.test.ts', 'tests/db/**/*.test.ts', 'worker/**/*.test.ts'],
     environment: 'node',
+    // Accounts are off in every unit test, whatever a developer's env files hold (src/accounts/enabled.ts reads it).
+    env: { VITE_ACCOUNTS: '0' },
     testTimeout: 30000,
     // The first PostGIS start in each tests/db file takes several seconds (tests/db/harness.ts).
     hookTimeout: 60000,

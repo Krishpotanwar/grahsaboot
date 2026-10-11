@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { loadAccounts } from '../accounts/enabled.ts'
 import { InvestigationError, type Investigation } from './investigation.ts'
+import { openInvestigation } from './open.ts'
 import { getStore } from './store.ts'
+
+// Null in a build without accounts: a non-local id is then not found, exactly as before accounts existed.
+const load = loadAccounts
+const remote = load ? (id: string) => load().then((m) => m.loadRemoteInvestigation(id)) : null
 
 export function useInvestigation(id: string): {
   inv: Investigation | null | undefined
@@ -16,20 +22,18 @@ export function useInvestigation(id: string): {
     latest.current = null
     setInv(undefined)
     setError(null)
-    getStore()
-      .get(id)
-      .then(
-        (v) => {
-          if (!live) return
-          latest.current = v ?? null
-          setInv(v ?? null)
-        },
-        () => {
-          if (!live) return
-          setInv(null)
-          setError('STORE_FAILED')
-        },
-      )
+    openInvestigation(id, getStore(), remote).then(
+      (v) => {
+        if (!live) return
+        latest.current = v ?? null
+        setInv(v ?? null)
+      },
+      () => {
+        if (!live) return
+        setInv(null)
+        setError('STORE_FAILED')
+      },
+    )
     return () => {
       live = false
     }

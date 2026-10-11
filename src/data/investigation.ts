@@ -16,6 +16,18 @@ export interface Claim {
   date: string | null
   criterion: string
 }
+/**
+ * What the server's check of one frame found. `itemId` and `clientSha256` say which file and which pixels the browser sent,
+ * so a record never speaks for another item or for different pixels.
+ */
+export interface FrameVerification {
+  status: 'verified' | 'mismatch'
+  verifiedAt: string
+  frameId: string
+  serverSha256: string
+  clientSha256: string
+  itemId: string
+}
 export interface Investigation {
   id: string
   serverId: string | null
@@ -28,6 +40,13 @@ export interface Investigation {
   pinned: string[]
   notes: Note[]
   claim: Claim | null
+  /** The server's check per frame, keyed by verificationKey(). Absent until a save has verified something. */
+  verification?: Record<string, FrameVerification>
+  /**
+   * The note ids this copy has synced with its server row: the ones it was loaded with or last saved. A save deletes from the
+   * server only the notes it knew and no longer has, so a note written on another device is never removed by a stale copy.
+   */
+  serverNoteIds?: string[]
   createdAt: string
   updatedAt: string
 }
@@ -86,8 +105,17 @@ export function setBeforeAfter(
 
 export function togglePin(inv: Investigation, date: string, now = new Date()): Investigation {
   if (date === inv.before || date === inv.after) return inv
-  if (inv.pinned.includes(date))
-    return { ...inv, pinned: inv.pinned.filter((d) => d !== date), updatedAt: iso(now) }
+  if (inv.pinned.includes(date)) {
+    // The server drops an unpinned date's frames on the next verify, so this copy must not go on saying they are checked.
+    const { verification, ...rest } = inv
+    const kept = Object.entries(verification ?? {}).filter(([k]) => !k.startsWith(`${date}:`))
+    return {
+      ...rest,
+      ...(verification ? { verification: Object.fromEntries(kept) } : {}),
+      pinned: inv.pinned.filter((d) => d !== date),
+      updatedAt: iso(now),
+    }
+  }
   if (inv.pinned.length >= LIMITS.pinnedDates) throw new InvestigationError('TOO_MANY_PINS')
   return { ...inv, pinned: uniqSorted([...inv.pinned, date]), updatedAt: iso(now) }
 }
@@ -163,4 +191,52 @@ export function setClaim(inv: Investigation, claim: Claim | null, now = new Date
     claim: claim ? { text: claim.text.trim(), date: claim.date, criterion: claim.criterion.trim() } : null,
     updatedAt: iso(now),
   }
+}
+
+export const verificationKey = (date: string, asset: 'visual' | 'scl', level: number) =>
+  `${date}:${asset}:${level}`
+
+export const setVerification = (
+  inv: Investigation,
+  v: Record<string, FrameVerification>,
+  now = new Date(),
+): Investigation => ({ ...inv, verification: { ...inv.verification, ...v }, updatedAt: iso(now) })
+
+/**
+ * A different server row has none of the old row's frames and notes, so its records and synced note ids would claim things
+ * that do not exist there.
+ */
+export function setServerId(inv: Investigation, id: string, now = new Date()): Investigation {
+  const { verification, serverNoteIds, ...rest } = inv
+  const same = id === inv.serverId
+  return {
+    ...rest,
+    ...(verification && same ? { verification } : {}),
+    ...(serverNoteIds && same ? { serverNoteIds } : {}),
+    serverId: id,
+    updatedAt: iso(now),
+  }
+}
+
+export const setServerNoteIds = (inv: Investigation, ids: string[], now = new Date()): Investigation => ({
+  ...inv,
+  serverNoteIds: ids,
+  updatedAt: iso(now),
+})
+
+/**
+ * The record that speaks for the photo on screen, or null. It must be for this item. A "verified" record counts only for the
+ * pixels the browser holds now (the server's hash is the hash of those pixels); a mismatch for this item always shows.
+ */
+export function verificationFor(
+  inv: Investigation,
+  date: string,
+  asset: 'visual' | 'scl',
+  level: number,
+  sha256: string,
+  itemId: string,
+): FrameVerification | null {
+  const v = inv.verification?.[verificationKey(date, asset, level)]
+  if (!v || v.itemId !== itemId) return null
+  return v.status === 'mismatch' || v.serverSha256 === sha256 ? v : null
 }

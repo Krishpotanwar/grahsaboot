@@ -1,37 +1,37 @@
-import { readFileSync } from 'node:fs'
-import { gzipSync } from 'node:zlib'
+import { readdirSync, readFileSync } from 'node:fs'
+import { join, relative } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { BUDGET_KB, bundleProblems, entrySizes, type Files } from './bundle-rules.ts'
 
-// Budget for the JS the browser fetches before the first render: index.html's module script plus its modulepreloads, gzipped.
-const BUDGET_KB = 150
-const dist = new URL('../dist/', import.meta.url)
+// `tsx scripts/check-bundle.ts` checks dist/ (the dormant build); `--accounts` checks dist-accounts/ (the flag-on build).
+// The rules are in bundle-rules.ts so tests/unit/bundle-rules.test.ts runs them on synthetic builds.
+const accounts = process.argv.includes('--accounts')
+const release = process.env.GS_ACCOUNTS_RELEASE === '1'
+const name = accounts ? 'dist-accounts' : 'dist'
+const dir = fileURLToPath(new URL(`../${name}/`, import.meta.url))
 const fail = (msg: string): never => {
   console.error(`check-bundle: ${msg}`)
   return process.exit(1)
 }
-const read = (path: string) => {
-  try {
-    return readFileSync(new URL(path, dist))
-  } catch {
-    return fail(`cannot read dist/${path}. Run "npm run build" first.`)
-  }
-}
 const kb = (bytes: number) => (bytes / 1024).toFixed(1)
 
-const html = read('index.html').toString('utf8')
-const attr = (tag: string, name: string) => new RegExp(`\\s${name}="([^"]*)"`).exec(tag)?.[1]
-const urls = (el: 'script' | 'link', key: string, value: string, from: string) =>
-  (html.match(new RegExp(`<${el}\\b[^>]*>`, 'g')) ?? [])
-    .filter((tag) => attr(tag, key) === value)
-    .flatMap((tag) => attr(tag, from) ?? [])
-const entries = urls('script', 'type', 'module', 'src')
-if (!entries.length) fail('dist/index.html lists no <script type="module" src="...">.')
-
-let total = 0
-for (const url of new Set([...entries, ...urls('link', 'rel', 'modulepreload', 'href')])) {
-  const path = url.replace(/^\//, '')
-  const bytes = gzipSync(read(path)).length
-  total += bytes
-  console.log(`  ${path}  ${kb(bytes)} KB gzip`)
+const files: Files = {}
+try {
+  for (const e of readdirSync(dir, { recursive: true, withFileTypes: true }))
+    if (e.isFile()) {
+      const path = relative(dir, join(e.parentPath, e.name))
+      files[path] = readFileSync(join(dir, path))
+    }
+} catch {
+  fail(`cannot read ${name}/. Run "npm run ${accounts ? 'build:accounts' : 'build'}" first.`)
 }
+
+console.log(
+  `${name}/${release && !accounts ? ' (GS_ACCOUNTS_RELEASE=1: held to the accounts build rules)' : ''}`,
+)
+for (const e of entrySizes(files)) console.log(`  ${e.path}  ${kb(e.gzip)} KB gzip`)
+const total = entrySizes(files).reduce((n, e) => n + e.gzip, 0)
 console.log(`entry JS: ${kb(total)} KB gzip (budget ${BUDGET_KB} KB)`)
-if (total > BUDGET_KB * 1024) fail(`entry JS is ${kb(total)} KB gzip, over the ${BUDGET_KB} KB budget.`)
+
+const problems = bundleProblems(files, { accounts, release })
+if (problems.length) fail(`${name}/ fails:\n  - ${problems.join('\n  - ')}`)

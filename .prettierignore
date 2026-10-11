@@ -1,4 +1,6 @@
 dist
+dist-accounts*
+dist-e2e
 node_modules
 docs
 .superpowers

@@ -21,8 +21,6 @@ export const config = {
     'VITE_TERRAIN_TILES',
     'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png',
   ),
-  supabaseUrl: pick('VITE_SUPABASE_URL', ''),
-  supabaseKey: pick('VITE_SUPABASE_PUBLISHABLE_KEY', ''),
   /** Test hooks and localhost data hosts are allowed outside production builds or when explicitly enabled for e2e. */
   testMode: env.MODE !== 'production' || env.VITE_TEST_HOOKS === '1',
 } as const
