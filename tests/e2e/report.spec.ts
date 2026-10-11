@@ -3,7 +3,14 @@ import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Download, type Page } from '@playwright/test'
 import { copy } from '../../src/ui/copy.ts'
 import { flow } from '../../src/ui/copy-flow.ts'
-import { manyPasses, openFixtureRoad, openFixtureSite, openThenEdit, waitForPhotos } from './helpers.ts'
+import {
+  manyPasses,
+  openClaim,
+  openFixtureRoad,
+  openFixtureSite,
+  openThenEdit,
+  waitForPhotos,
+} from './helpers.ts'
 
 const CREDIT = 'Contains modified Copernicus Sentinel data 2025'
 const PAIR = { before: '2025-01-10', after: '2025-12-20', pinned: ['2025-01-10', '2025-12-20'] }
@@ -357,7 +364,7 @@ test('the report screen passes axe in both themes, with a note and a claim in th
   const notes = page.getByRole('region', { name: flow.notes.title })
   await notes.getByLabel(flow.notes.what).fill('Roof visible from March')
   await notes.getByRole('button', { name: flow.notes.add }).click()
-  const claim = page.getByRole('region', { name: flow.claim.title })
+  const claim = await openClaim(page)
   await claim.getByLabel(flow.claim.text, { exact: true }).fill('Roof finished by March')
   await claim.getByRole('button', { name: flow.claim.save }).click()
   await expect(claim.getByRole('button', { name: flow.claim.remove })).toBeVisible()

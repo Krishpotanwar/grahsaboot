@@ -1,3 +1,4 @@
+import { CaretDown } from '@phosphor-icons/react'
 import { forwardRef, useId, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode } from 'react'
 import type { QualityLabel } from '../evidence/types.ts'
 import { copy } from './copy.ts'
@@ -70,6 +71,65 @@ export function Panel({
         </header>
       )}
       <div className="p-4">{children}</div>
+    </section>
+  )
+}
+
+/** A multi-line text box (approved mockups 02, 03): 66 px at least, 14 px text, the control border like every other field. */
+export const TEXTAREA =
+  'min-h-[66px] rounded-[6px] border border-control bg-bg px-3.5 py-[11px] text-sm leading-[1.45] text-fg focus:border-accent'
+
+/**
+ * A flat section of a side column (approved mockup 02): a 1 px rule under it and a 17 px title with an optional mono count on
+ * the right. With `collapsible` the header is a disclosure row (native `<details>`); `help` is then one line under the title
+ * until the section is opened. The region keeps the title as its name.
+ */
+export function Section({
+  title,
+  count,
+  help,
+  collapsible = false,
+  defaultOpen = false,
+  children,
+}: {
+  title: string
+  count?: string
+  help?: string
+  collapsible?: boolean
+  defaultOpen?: boolean
+  children: ReactNode
+}) {
+  const head = (
+    <>
+      <span className="grid min-w-0 gap-1.5">
+        <h2 className="text-[1.0625rem] font-semibold leading-snug tracking-[-0.01em]">{title}</h2>
+        {help && (
+          <span
+            className={`block text-[0.8125rem] leading-[1.45] text-fg-2 ${collapsible ? 'truncate group-open:overflow-visible group-open:whitespace-normal' : ''}`}
+          >
+            {help}
+          </span>
+        )}
+      </span>
+      {count && <span className="shrink-0 font-mono text-xs text-fg-2 num">{count}</span>}
+    </>
+  )
+  return (
+    <section aria-label={title} className="border-b border-line px-4 py-5 lg:px-6">
+      {collapsible ? (
+        <details open={defaultOpen} className="group">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 [&::-webkit-details-marker]:hidden">
+            {head}
+            <CaretDown aria-hidden size={18} className="shrink-0 text-fg-2 group-open:rotate-180" />
+          </summary>
+          <div className="pt-3.5">{children}</div>
+        </details>
+      ) : (
+        <>
+          <div className="mb-3.5 flex items-baseline justify-between gap-3">{head}</div>
+          {children}
+        </>
+      )}
     </section>
   )
 }

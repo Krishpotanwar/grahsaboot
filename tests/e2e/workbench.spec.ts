@@ -4,6 +4,7 @@ import { copy } from '../../src/ui/copy.ts'
 import { flow } from '../../src/ui/copy-flow.ts'
 import { itemId } from '../fixtures/scene.ts'
 import {
+  openClaim,
   openFixtureRoad,
   openFixtureSite,
   openThenEdit,
@@ -17,7 +18,10 @@ test('defaults to the clearest early and late passes and shows both photos', asy
   await expect(page).toHaveTitle(`${copy.titles.investigation} · ${copy.app.name}`)
   await expect(page.getByRole('img', { name: /^Before photo, 10 Jan 2025/ })).toBeVisible({ timeout: 30_000 })
   await expect(page.getByRole('img', { name: /^After photo, 20 Dec 2025/ })).toBeVisible()
-  await expect(page.getByText(/10 Jan 2025 · Sentinel-2 · 10 m · 100% clear view/)).toBeVisible()
+  // Under each photo: its date, satellite (from the item id) and resolution, then its clear view and that it is not saved.
+  await expect(page.getByText('10 Jan 2025 · Sentinel-2B · 10 m', { exact: true })).toBeVisible()
+  await expect(page.getByText('20 Dec 2025 · Sentinel-2B · 10 m', { exact: true })).toBeVisible()
+  await expect(page.getByText('100% clear view', { exact: true })).toHaveCount(2)
   // The header line and the credit follow the photos on screen.
   await expect(page.getByText(/^Site · 1\.00 km² · 10 Jan 2025 ↔ 20 Dec 2025$/)).toBeVisible()
   await expect(page.getByText(copy.attribution.sentinelYears([2025]))).toBeVisible()
@@ -310,7 +314,7 @@ test('the workbench passes axe in every view, in both themes, with a note and a 
   await notes.getByLabel(flow.notes.what).fill('Roof visible from March')
   await notes.getByRole('button', { name: flow.notes.add }).click()
   await expect(notes.getByText('Roof visible from March')).toBeVisible()
-  const claim = page.getByRole('region', { name: flow.claim.title })
+  const claim = await openClaim(page)
   await claim.getByLabel(flow.claim.text, { exact: true }).fill('Roof finished by March')
   await claim.getByRole('button', { name: flow.claim.save }).click()
   await expect(claim.getByRole('button', { name: flow.claim.remove })).toBeVisible()
@@ -352,5 +356,244 @@ test('the road workbench, with its section grid and the Details open, passes axe
       .analyze()
     expect(results.violations, JSON.stringify(results.violations, null, 2)).toEqual([])
     await page.getByRole('button', { name: copy.nav.themeToggle }).click()
+  }
+})
+
+const sitePage = async (page: Page, width = 1440, height = 900) => {
+  await page.setViewportSize({ width, height })
+  await openFixtureSite(page)
+  await waitForPhotos(page)
+}
+
+test('the title block has the status beside the Report button, and stacks on a phone', async ({ page }) => {
+  await sitePage(page)
+  const head = page.locator('header').filter({ has: page.getByRole('heading', { level: 1 }) })
+  const title = head.getByRole('heading', { level: 1 })
+  const status = head.getByText(flow.workbench.notSaved, { exact: true })
+  const report = head.getByRole('link', { name: flow.workbench.report })
+  const [t, s, r] = [title, status, report].map((l) => l.boundingBox())
+  const [tb, sb, rb] = (await Promise.all([t, s, r])).map((b) => b!)
+  expect(await title.evaluate((el) => getComputedStyle(el).fontSize)).toBe('30px')
+  expect(sb.x + sb.width).toBeLessThanOrEqual(rb.x) // left of the button, on its line
+  expect(Math.abs(sb.y + sb.height / 2 - (rb.y + rb.height / 2))).toBeLessThan(6)
+  expect(sb.x).toBeGreaterThan(tb.x + 300) // on the right, not above the title
+  expect(rb.height).toBeGreaterThanOrEqual(44)
+  // The primary button: filled with the text colour, in the page colour.
+  expect(await report.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgb(244, 244, 245)')
+  // The status is plain text, not a bracketed micro label.
+  await expect(head).not.toContainText('[ ')
+
+  await page.setViewportSize({ width: 390, height: 844 })
+  const [phoneTitle, phoneMeta, phoneStatus, phoneReport] = (
+    await Promise.all([
+      title.boundingBox(),
+      head.locator('p').boundingBox(),
+      status.boundingBox(),
+      report.boundingBox(),
+    ])
+  ).map((b) => b!)
+  expect(phoneMeta.y).toBeGreaterThanOrEqual(phoneTitle.y + phoneTitle.height)
+  expect(phoneStatus.y).toBeGreaterThanOrEqual(phoneMeta.y + phoneMeta.height)
+  expect(phoneReport.y).toBeGreaterThanOrEqual(phoneMeta.y + phoneMeta.height)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+})
+
+test('the three views are a row of tabs of real radios: 54 px tall, an icon each, arrow keys between them', async ({
+  page,
+}) => {
+  await sitePage(page)
+  const radios = page.getByRole('radio', { name: /^(Swipe|Side by side|Difference)$/ })
+  await expect(radios).toHaveCount(3)
+  for (const r of await radios.all()) {
+    expect((await r.boundingBox())!.height).toBeGreaterThanOrEqual(54)
+    await expect(r.locator('xpath=following-sibling::span').locator('svg')).toHaveCount(1)
+  }
+  const swipe = page.getByRole('radio', { name: flow.workbench.modes.swipe })
+  await expect(swipe).toBeChecked()
+  // The chosen tab is underlined with 2 px.
+  const label = swipe.locator('xpath=following-sibling::span')
+  expect(await label.evaluate((el) => getComputedStyle(el).borderBottomWidth)).toBe('2px')
+  await swipe.focus()
+  await page.keyboard.press('ArrowRight')
+  await expect(page.getByRole('radio', { name: flow.workbench.modes.side })).toBeChecked()
+  await page.keyboard.press('ArrowRight')
+  await expect(page.getByRole('radio', { name: flow.workbench.modes.diff })).toBeChecked()
+  await expect(page.getByRole('group', { name: flow.workbench.view })).toBeVisible()
+})
+
+test('every photo has its date chip, a scale bar to scale and a north arrow, all outside the pointer and the page reader', async ({
+  page,
+}) => {
+  await sitePage(page)
+  const chip = (text: string) => page.locator('span.uppercase', { hasText: text })
+  // Swipe: BEFORE at the left corner, AFTER at the right.
+  const before = chip(`${flow.workbench.before} · 10 Jan 2025`)
+  const after = chip(`${flow.workbench.after} · 20 Dec 2025`)
+  await expect(before).toBeVisible()
+  await expect(after).toBeVisible()
+  const photo = (await page.getByRole('slider', { name: flow.workbench.swipeLabel }).boundingBox())!
+  const [bb, ab] = [(await before.boundingBox())!, (await after.boundingBox())!]
+  expect(bb.x - photo.x).toBeLessThan(24)
+  expect(photo.x + photo.width - (ab.x + ab.width)).toBeLessThan(24)
+  expect(bb.y - photo.y).toBeLessThan(24)
+  // Decoration: a chip does not take the pointer and is not read out (the caption and the photo's name say the same).
+  for (const el of [before, after]) {
+    expect(await el.evaluate((e) => getComputedStyle(e.parentElement!).pointerEvents)).toBe('none')
+    expect(await el.evaluate((e) => !!e.closest('[aria-hidden="true"]'))).toBe(true)
+    expect(await el.evaluate((e) => getComputedStyle(e).textTransform)).toBe('uppercase')
+  }
+  // The fixture is a 1 km square: with its margins a 1.2 km photo, whose scale bar is 200 m, a sixth of its width.
+  const scale = page.locator('span', { hasText: /^200 m$/ }).first()
+  await expect(scale).toBeVisible()
+  const bar = (await scale.locator('span').boundingBox())!
+  expect(bar.width / photo.width).toBeGreaterThan(0.15)
+  expect(bar.width / photo.width).toBeLessThan(0.18)
+  await expect(page.getByText(flow.workbench.north)).toBeVisible()
+  // The handle stays whole inside the photo at both ends of the swipe.
+  const handle = page.locator('div.rounded-full[aria-hidden="true"]')
+  for (const v of ['0', '100']) {
+    await page.getByRole('slider', { name: flow.workbench.swipeLabel }).fill(v)
+    const h = (await handle.boundingBox())!
+    expect(h.x).toBeGreaterThanOrEqual(photo.x)
+    expect(h.x + h.width).toBeLessThanOrEqual(photo.x + photo.width + 0.5)
+    expect(h.width).toBeGreaterThanOrEqual(38)
+  }
+  // Side by side: each photo its own chip, scale bar and north arrow.
+  await page.getByRole('radio', { name: flow.workbench.modes.side }).check()
+  await expect(chip(`${flow.workbench.before} · 10 Jan 2025`)).toBeVisible()
+  await expect(chip(`${flow.workbench.after} · 20 Dec 2025`)).toBeVisible()
+  await expect(page.getByText(flow.workbench.north)).toHaveCount(2)
+  await expect(page.locator('span', { hasText: /^200 m$/ })).toHaveCount(2)
+  // Difference: one chip, and the two dates stay in the captions.
+  await page.getByRole('radio', { name: flow.workbench.modes.diff }).check()
+  await expect(chip(flow.workbench.diffChip)).toBeVisible()
+  await expect(page.getByText('10 Jan 2025 · Sentinel-2B · 10 m', { exact: true })).toBeVisible()
+  await expect(page.getByText('20 Dec 2025 · Sentinel-2B · 10 m', { exact: true })).toBeVisible()
+})
+
+test('a road numbers its sections along the line on the photos, and the numbers go with the outline', async ({
+  page,
+}) => {
+  await openFixtureRoad(page)
+  await waitForPhotos(page)
+  const numbers = page.locator('span', { hasText: /^0[12]$/ })
+  // Swipe draws the outline on both photos: two sections, two photos.
+  await expect(numbers).toHaveCount(4)
+  expect(await numbers.first().evaluate((e) => !!e.closest('[aria-hidden="true"]'))).toBe(true)
+  await page.getByRole('checkbox', { name: flow.workbench.outlineToggle }).uncheck()
+  await expect(numbers).toHaveCount(0)
+})
+
+test('a site has no section numbers', async ({ page }) => {
+  await sitePage(page)
+  await expect(page.locator('span', { hasText: /^0[12]$/ })).toHaveCount(0)
+})
+
+// The timeline (and on a phone the viewer too) used to arrive 20-30 s after the page opened and push the notes down by their
+// own height. Their places are held while the search runs, so the notes are where they will stay. The timeline's own size changes
+// when it is redrawn (P1b): this is the test that fails when its placeholder is not made to match.
+for (const [name, width, height, limit, open] of [
+  ['a site on a desktop', 1440, 900, 120, openFixtureSite],
+  ['a road on a desktop', 1440, 900, 120, openFixtureRoad],
+  ['a site on a phone', 390, 844, 200, openFixtureSite],
+  ['a road on a phone', 390, 844, 200, openFixtureRoad],
+] as const) {
+  test(`the notes do not move when the passes arrive: ${name}`, async ({ page }) => {
+    await page.setViewportSize({ width, height })
+    const release = await holdRange(page)
+    try {
+      await open(page)
+      const add = page
+        .getByRole('region', { name: flow.notes.title })
+        .getByRole('button', { name: flow.notes.add })
+      await expect(add).toBeVisible()
+      await expect(page.getByText(flow.workbench.searching)).toBeVisible()
+      await page.waitForTimeout(300) // the places are laid out
+      const held = (await add.boundingBox())!.y
+      release()
+      // The moment the timeline is there, and again once its date is checked and the photos are in.
+      await expect(timelineSlider(page)).toBeVisible({ timeout: 30_000 })
+      const first = (await add.boundingBox())!.y
+      expect(Math.abs(first - held), `when the timeline arrived: ${first} against ${held}`).toBeLessThan(
+        limit,
+      )
+      await waitForSettled(page)
+      const settled = (await add.boundingBox())!.y
+      expect(Math.abs(settled - held), `settled: ${settled} against ${held}`).toBeLessThan(limit)
+    } finally {
+      release()
+    }
+  })
+}
+
+test('while the search runs the viewer says so in its own box, and nothing is left saying it afterwards', async ({
+  page,
+}) => {
+  const release = await holdRange(page)
+  try {
+    await openFixtureSite(page)
+    await expect(page.getByText(flow.workbench.searching)).toBeVisible()
+    // Its place is held: the tabs are there but not usable, the photo box is a placeholder with no photo in it.
+    await expect(page.getByRole('radio', { name: flow.workbench.modes.swipe })).toBeDisabled()
+    await expect(page.getByRole('checkbox', { name: flow.workbench.outlineToggle })).toBeDisabled()
+    await expect(page.getByRole('img', { name: /photo/ })).toHaveCount(0)
+    await expect(timelineSlider(page)).toHaveCount(0)
+  } finally {
+    release()
+  }
+  await waitForPhotos(page)
+  await expect(page.getByText(flow.workbench.searching)).toHaveCount(0)
+  await expect(page.getByRole('radio', { name: flow.workbench.modes.swipe })).toBeEnabled()
+})
+
+test('the swipe date chips do not run into each other on a phone', async ({ page }) => {
+  await sitePage(page, 390, 844)
+  await page.getByRole('radio', { name: flow.workbench.modes.swipe }).check()
+  const chip = (t: string) => page.locator('span.uppercase', { hasText: t })
+  const b = (await chip(`${flow.workbench.before} · 10 Jan 2025`).boundingBox())!
+  const a = (await chip(`${flow.workbench.after} · 20 Dec 2025`).boundingBox())!
+  expect(b.x + b.width).toBeLessThanOrEqual(a.x)
+})
+
+test('each view tab stays on one line at 360 px', async ({ page }) => {
+  await sitePage(page, 360, 740)
+  for (const m of ['swipe', 'side', 'diff'] as const) {
+    const tab = page
+      .getByRole('radio', { name: flow.workbench.modes[m] })
+      .locator('xpath=following-sibling::span')
+    const lines = await tab.evaluate((el) => {
+      const r = document.createRange()
+      r.selectNodeContents(el.lastChild!) // the label text; the icon (hidden on a phone) comes first
+      return new Set([...r.getClientRects()].map((b) => Math.round(b.top))).size
+    })
+    expect(lines, flow.workbench.modes[m]).toBe(1)
+  }
+})
+
+test('only the chosen view tab has the accent underline', async ({ page }) => {
+  await sitePage(page)
+  const under = (m: 'swipe' | 'side') =>
+    page
+      .getByRole('radio', { name: flow.workbench.modes[m] })
+      .locator('xpath=following-sibling::span')
+      .evaluate((el) => getComputedStyle(el).borderBottomColor)
+  expect(await under('swipe')).not.toBe('rgba(0, 0, 0, 0)')
+  expect(await under('side')).toBe('rgba(0, 0, 0, 0)')
+})
+
+test('the held places pass axe in both themes while the search runs', async ({ page }) => {
+  const release = await holdRange(page)
+  try {
+    await openFixtureRoad(page)
+    await expect(page.getByText(flow.workbench.searching)).toBeVisible()
+    for (let i = 0; i < 2; i++) {
+      const r = await new AxeBuilder({ page })
+        .withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'])
+        .analyze()
+      expect(r.violations, JSON.stringify(r.violations, null, 2)).toEqual([])
+      await page.getByRole('button', { name: copy.nav.themeToggle }).click()
+    }
+  } finally {
+    release()
   }
 })

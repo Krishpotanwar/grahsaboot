@@ -3,7 +3,7 @@ import type { QualityStats } from '../evidence/types.ts'
 import { fmtDate } from '../lib/format.ts'
 import { copy } from '../ui/copy.ts'
 import { flow } from '../ui/copy-flow.ts'
-import { Panel, QualityGlyph } from '../ui/kit.tsx'
+import { Panel, QualityGlyph, Skeleton } from '../ui/kit.tsx'
 import { moveFocusByDate } from './grid-nav.ts'
 import type { DateEntry, EntryStatus } from './runner.ts'
 import { waitingWord } from './Timeline.tsx'
@@ -158,5 +158,20 @@ export function SectionGrid({
         </table>
       </div>
     </Panel>
+  )
+}
+
+/** The grid's place while the pair is not chosen (no date is pinned before it): its panel, the header row and one row per section. */
+export function GridSkeleton({ rows }: { rows: number }) {
+  return (
+    <div aria-hidden className="border border-line bg-panel">
+      <div className="h-10 border-b border-line" />
+      <div className="grid gap-px p-4">
+        <Skeleton className="h-[92px]" />
+        {Array.from({ length: rows }, (_, i) => (
+          <Skeleton key={i} className="h-11" />
+        ))}
+      </div>
+    </div>
   )
 }

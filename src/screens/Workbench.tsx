@@ -1,4 +1,6 @@
-import { useEffect, useLayoutEffect, useMemo, useState } from 'react'
+import { X } from '@phosphor-icons/react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { setBeforeAfter, togglePin } from '../data/investigation.ts'
 import { useInvestigation } from '../data/useInvestigation.ts'
 import { rgbaToPngDataUrl } from '../lib/canvas.ts'
@@ -10,14 +12,14 @@ import { removeFrameLayer, setFrameLayer } from '../map/frameLayer.ts'
 import { useMapLayout, useMapStage } from '../map/MapStage.tsx'
 import { copy } from '../ui/copy.ts'
 import { flow } from '../ui/copy-flow.ts'
-import { Button, MicroLabel, Skeleton } from '../ui/kit.tsx'
+import { Button, Skeleton } from '../ui/kit.tsx'
 import { ClaimPanel } from '../workbench/ClaimPanel.tsx'
 import { canPickDefaults, isUsable, pickDefaults } from '../workbench/defaults.ts'
-import { EvidenceViewer, type Slot } from '../workbench/EvidenceViewer.tsx'
+import { EvidenceViewer, MapTool, type Slot } from '../workbench/EvidenceViewer.tsx'
 import { NotesPanel } from '../workbench/NotesPanel.tsx'
 import type { DateEntry } from '../workbench/runner.ts'
-import { SectionGrid } from '../workbench/SectionGrid.tsx'
-import { Timeline } from '../workbench/Timeline.tsx'
+import { GridSkeleton, SectionGrid } from '../workbench/SectionGrid.tsx'
+import { Timeline, TimelineSkeleton } from '../workbench/Timeline.tsx'
 import { useEvidence } from '../workbench/useEvidence.ts'
 import NotFound from './NotFound.tsx'
 
@@ -37,8 +39,10 @@ const slot = (e: DateEntry | undefined): Slot =>
 
 export default function Workbench({ id }: { id: string }) {
   const { inv, update, error } = useInvestigation(id)
-  const { map, tier, layout, installLayers } = useMapStage()
+  const { map, tier, layout, stage, installLayers } = useMapStage()
   const [mapOpen, setMapOpen] = useState(false)
+  // One identity for the life of the page: the viewer is memoised and must not render again for a slider step.
+  const toggleMap = useCallback(() => setMapOpen((o) => !o), [])
   useMapLayout(mapOpen && tier > 0 ? 'mini' : 'hidden')
   // Fixed at mount: a tier downgrade, a resize or a rotation must not rebuild the grid and restart the search and checks.
   const [maxSide] = useState(() =>
@@ -190,101 +194,165 @@ export default function Workbench({ id }: { id: string }) {
       ? flow.workbench.meta.road(summary.lengthKm ?? 0, inv.aoi.widthM, dates)
       : flow.workbench.meta.site(summary.areaKm2, dates)
 
+  // No pass found yet: hold the places of the viewer and of the timeline (and a road's grid), so that what is below them, on a phone
+  // the whole side column, is not pushed down 20-30 s later when they arrive.
+  const searching = state.phase === 'searching' && entries.length === 0
+  const showViewer = grid && !allCloudy && !notEnoughClear && (searching || entries.length > 0)
+  // Nothing is pinned until the pair is: the grid's place stays held while a pair can still come (the sweep is running).
+  const road = summary?.kind === 'road' && summary.parts.length > 1 ? summary.parts : null
+  const gridPending =
+    !!road &&
+    !inv.before &&
+    (searching || entries.some((e) => e.status === 'queued' || e.status === 'checking'))
+
   return (
-    <div className="grid min-h-[calc(100dvh-64px)] gap-px bg-line lg:grid-cols-[minmax(0,1fr)_420px]">
-      <div className="grid content-start gap-4 bg-bg p-4 lg:p-6">
-        <header className="flex flex-wrap items-center justify-between gap-3">
-          <div className="min-w-0">
-            <MicroLabel>{flow.workbench.notSaved}</MicroLabel>
-            <h1 className="mt-1 break-words text-2xl font-semibold tracking-[-0.02em]">{inv.name}</h1>
-            <p className="mt-1 font-mono text-[0.75rem] text-fg-2 num">{meta}</p>
-          </div>
-          {tier > 0 && (
-            <Button aria-pressed={mapOpen} className="ml-auto" onClick={() => setMapOpen((o) => !o)}>
-              {mapOpen ? flow.workbench.hideMap : flow.workbench.showMap}
-            </Button>
-          )}
+    <div className="min-h-[calc(100dvh-64px)]">
+      <header className="flex flex-col gap-4 border-b border-line px-4 pb-5 pt-5 sm:flex-row sm:items-end sm:justify-between lg:px-8">
+        <div className="min-w-0">
+          <h1 className="break-words text-[1.875rem] font-[650] leading-[1.15] tracking-[-0.025em]">
+            {inv.name}
+          </h1>
+          <p className="mt-2 font-mono text-[0.8125rem] uppercase leading-snug tracking-[0.04em] text-fg-2 num">
+            {meta}
+          </p>
+        </div>
+        {/* A row that takes one more control without wrapping: the status sits first, the buttons after it. */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          <span className="mr-2 inline-flex items-center gap-2 font-mono text-[0.8125rem] text-fg-2">
+            <span aria-hidden className="h-[7px] w-[7px] rounded-full border-[1.5px] border-fg-2" />
+            {flow.workbench.notSaved}
+          </span>
           <Link
             to={`/i/${inv.id}/report`}
-            className="inline-flex h-11 items-center rounded-[6px] border border-control px-4"
+            className="inline-flex h-11 select-none items-center justify-center rounded-[6px] bg-fg px-4 text-[0.9375rem] font-medium text-bg transition-transform duration-100 hover:opacity-90 active:scale-[0.98]"
           >
             {flow.workbench.report}
           </Link>
-        </header>
-        {error && !pinError && !noteError && !claimError && (
-          <p role="alert" className="text-sm text-bad">
-            {flow.workbench.errors[error] ?? error}
-          </p>
-        )}
-        <div aria-live="polite" className="grid justify-items-start gap-2 text-sm text-fg-2">
-          {state.phase === 'searching' && <p>{flow.workbench.searching}</p>}
-          {state.more && <p>{flow.workbench.searchingMore}</p>}
-          {state.phase === 'error' && state.error === 'BAD_OUTLINE' && (
-            <p className="text-bad">{flow.workbench.badOutline}</p>
-          )}
-          {state.phase === 'error' && state.error !== 'BAD_OUTLINE' && (
-            <>
-              <p className="text-bad">{flow.workbench.searchFailed}</p>
-              <Button onClick={() => retry()}>{copy.common.retry}</Button>
-            </>
-          )}
-          {state.phase === 'ready' && entries.length === 0 && <p>{flow.workbench.none}</p>}
-          {allCloudy && <p>{flow.workbench.allCloudy}</p>}
-          {notEnoughClear && <p>{flow.workbench.notEnoughClear}</p>}
-          {state.limited && <p>{flow.workbench.limited}</p>}
         </div>
-        {grid && !allCloudy && !notEnoughClear && entries.length > 0 && (
-          <EvidenceViewer
-            before={beforeSlot}
-            after={afterSlot}
-            grid={grid}
-            invalid={invalid}
-            aoi={inv.aoi}
-            onRetry={retry}
-          />
-        )}
-        <p className="text-sm text-fg-2">
-          {flow.workbench.disclaimer} {flow.workbench.catalogueNote}
-        </p>
-      </div>
-      <aside
-        className="grid min-w-0 content-start gap-6 bg-bg p-4 lg:p-6"
-        aria-label={flow.workbench.timeline}
-      >
-        <Timeline
-          entries={entries}
-          from={inv.dateFrom}
-          to={inv.dateTo}
-          current={current}
-          before={inv.before}
-          after={inv.after}
-          pinned={inv.pinned}
-          thumbGrid={thumbGrid}
-          sections={summary?.kind === 'road' ? summary.parts : undefined}
-          error={pinError}
-          onSelect={setCurrent}
-          onBefore={(d) => update((i) => setBeforeAfter(i, d, i.after!))}
-          onAfter={(d) => update((i) => setBeforeAfter(i, i.before!, d))}
-          onPin={(d) => update((i) => togglePin(i, d))}
-          onRetry={retry}
-        />
-        {summary?.kind === 'road' && (
-          <SectionGrid
-            entries={pinnedEntries}
-            parts={summary.parts}
+      </header>
+      <div className="grid lg:grid-cols-[minmax(0,1fr)_440px]">
+        <div className="grid min-w-0 content-start gap-3 px-4 pb-5 pt-3 lg:px-8">
+          {error && !pinError && !noteError && !claimError && (
+            <p role="alert" className="text-sm text-bad">
+              {flow.workbench.errors[error] ?? error}
+            </p>
+          )}
+          {/* A live region has to be in the page before its words are: empty, it takes no room. */}
+          <div aria-live="polite" className="grid justify-items-start gap-2 text-sm text-fg-2 empty:sr-only">
+            {state.phase === 'searching' && !searching && <p>{flow.workbench.searching}</p>}
+            {state.more && <p>{flow.workbench.searchingMore}</p>}
+            {state.phase === 'error' && state.error === 'BAD_OUTLINE' && (
+              <p className="text-bad">{flow.workbench.badOutline}</p>
+            )}
+            {state.phase === 'error' && state.error !== 'BAD_OUTLINE' && (
+              <>
+                <p className="text-bad">{flow.workbench.searchFailed}</p>
+                <Button onClick={() => retry()}>{copy.common.retry}</Button>
+              </>
+            )}
+            {state.phase === 'ready' && entries.length === 0 && <p>{flow.workbench.none}</p>}
+            {allCloudy && <p>{flow.workbench.allCloudy}</p>}
+            {notEnoughClear && <p>{flow.workbench.notEnoughClear}</p>}
+            {state.limited && <p>{flow.workbench.limited}</p>}
+          </div>
+          {!showViewer && tier > 0 && (
+            // No viewer to hold it (nothing found, all obscured, one clear photo): the tool stays where the viewer's row would be.
+            <div className="flex justify-end">
+              <MapTool open={mapOpen} onToggle={toggleMap} />
+            </div>
+          )}
+          {showViewer && (
+            <EvidenceViewer
+              before={beforeSlot}
+              after={afterSlot}
+              grid={grid}
+              invalid={invalid}
+              aoi={inv.aoi}
+              sections={road ?? undefined}
+              searching={searching}
+              mapOpen={mapOpen}
+              onToggleMap={tier > 0 ? toggleMap : undefined}
+              onRetry={retry}
+            />
+          )}
+          <p className="text-sm text-fg-2">
+            {flow.workbench.disclaimer} {flow.workbench.catalogueNote}
+          </p>
+        </div>
+        <aside
+          className="min-w-0 border-t border-line lg:border-l lg:border-t-0"
+          aria-label={flow.workbench.timeline}
+        >
+          {(searching || entries.length > 0) && (
+            <div className="grid gap-6 border-b border-line px-4 py-5 lg:px-6">
+              {searching ? (
+                <TimelineSkeleton
+                  thumbGrid={thumbGrid}
+                  sections={summary?.kind === 'road' ? summary.parts.length : 0}
+                />
+              ) : (
+                <Timeline
+                  entries={entries}
+                  from={inv.dateFrom}
+                  to={inv.dateTo}
+                  current={current}
+                  before={inv.before}
+                  after={inv.after}
+                  pinned={inv.pinned}
+                  thumbGrid={thumbGrid}
+                  sections={summary?.kind === 'road' ? summary.parts : undefined}
+                  error={pinError}
+                  onSelect={setCurrent}
+                  onBefore={(d) => update((i) => setBeforeAfter(i, d, i.after!))}
+                  onAfter={(d) => update((i) => setBeforeAfter(i, i.before!, d))}
+                  onPin={(d) => update((i) => togglePin(i, d))}
+                  onRetry={retry}
+                />
+              )}
+              {gridPending && road ? (
+                <GridSkeleton rows={road.length} />
+              ) : (
+                summary?.kind === 'road' && (
+                  <SectionGrid
+                    entries={pinnedEntries}
+                    parts={summary.parts}
+                    current={current}
+                    onSelect={setCurrent}
+                  />
+                )
+              )}
+            </div>
+          )}
+          <NotesPanel
+            inv={inv}
+            parts={summary?.parts ?? NO_PARTS}
             current={current}
-            onSelect={setCurrent}
+            update={update}
+            error={noteError}
           />
+          <ClaimPanel inv={inv} update={update} error={claimError} />
+        </aside>
+      </div>
+      {/* In the stage, so it sits inside the panel and on top of the canvas (the page itself is under the stage). */}
+      {mapOpen &&
+        tier > 0 &&
+        stage &&
+        createPortal(
+          <button
+            type="button"
+            aria-label={flow.workbench.hideMap}
+            title={flow.workbench.hideMap}
+            onClick={() => {
+              // This button is about to unmount: keyboard focus goes to the map tool in the page, not to <body>.
+              document.getElementById('gs-map-tool')?.focus()
+              toggleMap()
+            }}
+            className="glass absolute right-2 top-2 z-[3] grid h-11 w-11 place-items-center rounded-[6px] text-fg active:scale-[0.98]"
+          >
+            <X size={20} weight="bold" aria-hidden />
+          </button>,
+          stage,
         )}
-        <NotesPanel
-          inv={inv}
-          parts={summary?.parts ?? NO_PARTS}
-          current={current}
-          update={update}
-          error={noteError}
-        />
-        <ClaimPanel inv={inv} update={update} error={claimError} />
-      </aside>
     </div>
   )
 }

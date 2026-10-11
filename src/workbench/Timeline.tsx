@@ -92,6 +92,8 @@ export function Timeline({
   )
   const cur = entries[idx]!
   const q = cur.quality
+  // Its check is on its way: hold the places of what the result brings (a sentence, Details, the preview), so the notes below do not move.
+  const pending = !q && cur.status !== 'error'
   return (
     <Panel title={`${flow.workbench.timeline} · ${flow.workbench.passes(entries.length)}`}>
       <div className="relative isolate h-10 border-b border-line" aria-hidden>
@@ -126,10 +128,12 @@ export function Timeline({
             cur.status !== 'error' && <span className="text-sm text-fg-2">{waitingWord(cur)}</span>
           )}
         </div>
-        {q && (
+        {q ? (
           <p className="text-sm text-fg-2">
             {copy.quality[q.stats.label].help} {pct(q.stats.clearFraction)}%.
           </p>
+        ) : (
+          pending && <Skeleton className="h-10" />
         )}
         {cur.status === 'error' && (
           <div className="flex flex-wrap items-center gap-3 text-sm text-bad">
@@ -157,6 +161,7 @@ export function Timeline({
             })}
           </ul>
         )}
+        {pending && <Skeleton className="h-11" />}
         {q && (
           <details>
             <summary className="cursor-pointer py-3 text-sm font-medium">{copy.common.details}</summary>
@@ -178,7 +183,7 @@ export function Timeline({
           </details>
         )}
         {thumbGrid &&
-          isUsable(cur) &&
+          (isUsable(cur) || pending) &&
           (cur.thumb ? (
             <FrameCanvas
               rgba={cur.thumb.display.rgba}
@@ -221,5 +226,48 @@ export function Timeline({
         <p className="text-xs text-fg-2">{flow.workbench.legend}</p>
       </div>
     </Panel>
+  )
+}
+
+/**
+ * What the side column holds while the search for passes is on: the size the Timeline will have (its date row, the sentence,
+ * Details and the preview of the date on show, and a road's sections), so the notes below it do not move when it arrives. The
+ * no-jump e2e test fails when the two drift apart: change this with the Timeline.
+ */
+export function TimelineSkeleton({
+  thumbGrid,
+  sections,
+}: {
+  thumbGrid: DisplayGrid | null
+  /** How many sections a road has (a site: 0). */
+  sections: number
+}) {
+  return (
+    <div aria-hidden className="border border-line bg-panel">
+      <div className="h-10 border-b border-line" />
+      <div className="p-4">
+        <div className="grid h-10 items-center border-b border-line">
+          <Skeleton className="h-2" />
+        </div>
+        <div className="mt-3 grid h-11 items-center">
+          <Skeleton className="h-1.5" />
+        </div>
+        <div className="mt-4 grid gap-3">
+          <div className="grid h-6 items-center">
+            <Skeleton className="h-4 w-28" />
+          </div>
+          <Skeleton className="h-10" />
+          {sections > 0 && <div style={{ height: sections * 24 - 4 }} />}
+          <Skeleton className="h-11" />
+          {thumbGrid && (
+            <div style={{ aspectRatio: `${thumbGrid.width} / ${thumbGrid.height}` }}>
+              <Skeleton className="h-full w-full" />
+            </div>
+          )}
+          <div className="h-8" />
+          <div className="h-4 max-[400px]:h-8" />
+        </div>
+      </div>
+    </div>
   )
 }

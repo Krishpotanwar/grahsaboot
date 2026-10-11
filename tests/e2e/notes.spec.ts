@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
 import { flow } from '../../src/ui/copy-flow.ts'
 import {
+  openClaim,
   openFixtureRoad,
   openFixtureSite,
   openThenEdit,
@@ -32,9 +33,8 @@ const untilStored = <T>(page: Page, pick: (stored: Record<string, unknown>) => T
 
 /**
  * Opens the fixture site or road and waits until the page has settled: both photos are on screen, so the timeline (and, for a
- * road, its grid) has arrived above the notes and moved them down, and the workbench has made its own first pick of before
- * and after. A click must not land while the panel is still moving, and a save clears the message of an earlier refusal, so a
- * test that waits for a refusal's message must not race that automatic save.
+ * road, its grid) has arrived above the notes, and the workbench has made its own first pick of before and after. A save
+ * clears the message of an earlier refusal, so a test that waits for a refusal's message must not race that automatic save.
  */
 async function openSettled(page: Page, open = openFixtureSite) {
   await open(page)
@@ -92,7 +92,7 @@ test('empty notes are refused with a message', async ({ page }) => {
 
 test('claim is saved, shown and removable', async ({ page }) => {
   await openSettled(page)
-  const panel = page.getByRole('region', { name: flow.claim.title })
+  const panel = await openClaim(page)
   await panel.getByLabel(flow.claim.text, { exact: true }).fill('Warehouse roof finished by December 2025')
   await panel.getByLabel(flow.claim.date).fill('2025-12-31')
   await panel.getByLabel(flow.claim.criterion).fill('A new bright roof inside the outline')
@@ -103,6 +103,8 @@ test('claim is saved, shown and removable', async ({ page }) => {
   await page.reload()
   await waitForSettled(page)
   const saved = claimOf(page)
+  // A claim that exists is on show without a click.
+  await expect(saved.locator('details')).toHaveJSProperty('open', true)
   await expect(saved.getByLabel(flow.claim.text, { exact: true })).toHaveValue(
     'Warehouse roof finished by December 2025',
   )
@@ -122,6 +124,27 @@ test('claim is saved, shown and removable', async ({ page }) => {
   await expect(removed.getByLabel(flow.claim.date)).toHaveValue('')
   await expect(removed.getByLabel(flow.claim.criterion)).toHaveValue('')
   await expect(removed.getByRole('button', { name: flow.claim.remove })).toHaveCount(0)
+})
+
+test('the claim is a closed row until it is opened, and it stays open once there is one', async ({
+  page,
+}) => {
+  await openSettled(page)
+  const panel = claimOf(page)
+  const details = panel.locator('details')
+  // One line of help beside the title; the fields are not on screen yet.
+  await expect(details).toHaveJSProperty('open', false)
+  await expect(panel.getByText(flow.claim.help)).toBeVisible()
+  await expect(panel.getByLabel(flow.claim.text, { exact: true })).toBeHidden()
+  await panel.locator('summary').click()
+  await expect(panel.getByLabel(flow.claim.text, { exact: true })).toBeVisible()
+  await expect(panel.getByRole('button', { name: flow.claim.save })).toBeDisabled() // nothing to save yet
+  // Saving or removing never folds it up under the user's hand.
+  await panel.getByLabel(flow.claim.text, { exact: true }).fill('Roof finished by March')
+  await panel.getByRole('button', { name: flow.claim.save }).click()
+  await panel.getByRole('button', { name: flow.claim.remove }).click()
+  await expect(details).toHaveJSProperty('open', true)
+  await expect(panel.getByLabel(flow.claim.text, { exact: true })).toBeVisible()
 })
 
 test('a refused note keeps what was typed, and the next good one clears the message', async ({ page }) => {
@@ -289,7 +312,7 @@ test('an edit that is refused keeps the editor open and the note as it was', asy
 
 test('a claim that is too long is refused with a message and not saved', async ({ page }) => {
   await openSettled(page)
-  const panel = claimOf(page)
+  const panel = await openClaim(page)
   const criterion = panel.getByLabel(flow.claim.criterion)
   // The field stops typing at 500 characters; only a script can get past it, and the claim is refused all the same.
   await criterion.evaluate((el) => el.removeAttribute('maxlength'))

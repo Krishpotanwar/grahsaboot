@@ -53,11 +53,12 @@ export async function waitForPhotos(page: Page) {
 }
 
 /**
- * A saved investigation has finished loading. The workbench lays out in stages, and the panels beside the photos move down
- * with each: the known days first, then the whole list, and the check of the date on show, whose text, Details and preview
- * box add about 450 px. A click must wait for the last. So: both photos are on screen with their clear-view figures (their
- * checks are in; `photos: false` where one is meant to fail), the timeline holds all `passes` passes (the fixture's, or more
- * with `manyPasses`), the date on show has its result, and the "other passes" line is gone.
+ * A saved investigation has finished loading. The workbench fills in by stages: the known days first, then the whole list,
+ * and the check of the date on show with its text, Details and preview. The places of the timeline, the road grid and the
+ * viewer are held while the search runs, so the panels beside the photos no longer jump (see "the notes do not move" in
+ * workbench.spec.ts), but a click should still wait for the last stage. So: both photos are on screen with their clear-view
+ * figures (their checks are in; `photos: false` where one is meant to fail), the timeline holds all `passes` passes (the
+ * fixture's, or more with `manyPasses`), the date on show has its result, and the "other passes" line is gone.
  */
 export async function waitForSettled(page: Page, { passes = FIXTURE_DATES.length, photos = true } = {}) {
   if (photos) {
@@ -135,6 +136,15 @@ export async function manyPasses(page: Page, extra: number, hold = false) {
       '2025-12-20',
     ],
   }
+}
+
+/** The claim's region with its disclosure open (it starts closed until there is a claim): its fields are only there to type in once open. */
+export async function openClaim(page: Page) {
+  const claim = page.getByRole('region', { name: flow.claim.title })
+  const details = claim.locator('details')
+  if (!(await details.evaluate((d: HTMLDetailsElement) => d.open))) await claim.locator('summary').click()
+  await expect(details).toHaveJSProperty('open', true)
+  return claim
 }
 
 /** The investigation this page's own IndexedDB holds. */

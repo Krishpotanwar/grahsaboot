@@ -11,7 +11,7 @@ import {
 import { LIMITS } from '../geo/limits.ts'
 import { fmtDate } from '../lib/format.ts'
 import { flow } from '../ui/copy-flow.ts'
-import { Button, Panel } from '../ui/kit.tsx'
+import { Button, Section, TEXTAREA } from '../ui/kit.tsx'
 
 const KINDS: NoteKind[] = ['change', 'no_clear_change', 'unsure']
 
@@ -65,22 +65,27 @@ export const NotesPanel = memo(function NotesPanel({ inv, parts, current, update
   }
 
   return (
-    <Panel title={flow.notes.title}>
+    <Section title={flow.notes.title}>
       <div className="grid gap-4">
-        <fieldset className="grid gap-1">
-          <legend className="mb-1 text-sm font-medium">{flow.notes.kindLegend}</legend>
-          {KINDS.map((k) => (
-            <label key={k} className="flex min-h-11 items-center gap-3">
-              <input
-                type="radio"
-                name="note-kind"
-                checked={kind === k}
-                onChange={() => setKind(k)}
-                className="accent-[var(--gs-accent)]"
-              />
-              {flow.notes.kinds[k]}
-            </label>
-          ))}
+        {/* Three real radios in one group; only their look is a row of chips. The legend is for screen readers. */}
+        <fieldset>
+          <legend className="sr-only">{flow.notes.kindLegend}</legend>
+          <div className="flex flex-wrap gap-x-2">
+            {KINDS.map((k) => (
+              <label key={k} className="relative inline-flex h-11 items-center">
+                <input
+                  type="radio"
+                  name="note-kind"
+                  checked={kind === k}
+                  onChange={() => setKind(k)}
+                  className="peer absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                />
+                <span className="inline-flex h-[34px] cursor-pointer items-center rounded-[6px] border border-control px-3 text-[0.8125rem] peer-checked:border-fg peer-checked:bg-fg peer-checked:text-bg peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent">
+                  {flow.notes.kinds[k]}
+                </span>
+              </label>
+            ))}
+          </div>
         </fieldset>
         <div className="grid gap-2">
           <label htmlFor="note-body" className="text-sm font-medium">
@@ -92,32 +97,37 @@ export const NotesPanel = memo(function NotesPanel({ inv, parts, current, update
             maxLength={LIMITS.notes.maxChars}
             rows={3}
             onChange={(e) => setBody(e.target.value)}
-            className="rounded-[6px] border border-control bg-bg p-3 text-fg focus:border-accent"
+            className={TEXTAREA}
             aria-describedby="note-count"
           />
           <p id="note-count" className="text-right font-mono text-[0.75rem] text-fg-2 num">
             {flow.notes.count(body.length)}
           </p>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="grid gap-2 text-sm font-medium">
+        {/* One wrapping row, so Add note takes the right end of the last line however many selects there are. */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.8125rem] text-fg-2">
+          <span>
+            {flow.notes.yourNote}
+            <span aria-hidden> ·</span>
+          </span>
+          <label className="inline-flex items-center gap-2 text-xs">
             {flow.notes.forDate}
             <select
               value={tied && current ? current : ''}
               onChange={(e) => setTied(e.target.value !== '')}
-              className="h-11 rounded-[6px] border border-control bg-bg px-2 text-fg"
+              className="h-11 rounded-[6px] border border-control bg-bg px-2 text-[0.8125rem] text-fg"
             >
               {current && <option value={current}>{fmtDate(current)}</option>}
               <option value="">{flow.notes.anyDate}</option>
             </select>
           </label>
           {parts.length > 1 && (
-            <label className="grid gap-2 text-sm font-medium">
+            <label className="inline-flex items-center gap-2 text-xs">
               {flow.notes.forSection}
               <select
                 value={section}
                 onChange={(e) => setSection(e.target.value)}
-                className="h-11 rounded-[6px] border border-control bg-bg px-2 text-fg"
+                className="h-11 rounded-[6px] border border-control bg-bg px-2 text-[0.8125rem] text-fg"
               >
                 <option value="">{flow.notes.anySection}</option>
                 {parts.map((p) => (
@@ -128,11 +138,11 @@ export const NotesPanel = memo(function NotesPanel({ inv, parts, current, update
               </select>
             </label>
           )}
+          <Button variant="primary" className="ml-auto" onClick={add}>
+            {flow.notes.add}
+          </Button>
         </div>
         {refusal('add')}
-        <Button variant="primary" onClick={add}>
-          {flow.notes.add}
-        </Button>
 
         {lastDeleted && (
           <>
@@ -177,7 +187,7 @@ export const NotesPanel = memo(function NotesPanel({ inv, parts, current, update
                         maxLength={LIMITS.notes.maxChars}
                         rows={3}
                         onChange={(e) => setEditing({ id: n.id, body: e.target.value })}
-                        className="rounded-[6px] border border-control bg-bg p-3 text-fg"
+                        className={TEXTAREA}
                       />
                       {refusal(n.id)}
                       <div className="flex gap-2">
@@ -234,6 +244,6 @@ export const NotesPanel = memo(function NotesPanel({ inv, parts, current, update
           </ul>
         )}
       </div>
-    </Panel>
+    </Section>
   )
 })

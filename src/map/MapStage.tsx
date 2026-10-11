@@ -21,6 +21,8 @@ interface MapStageValue {
   map: MlMap | null
   tier: Tier
   layout: Layout
+  /** The stage's element, for a screen that puts a control inside it (the workbench's close button on the mini map). */
+  stage: HTMLDivElement | null
   setLayout(l: Layout): void
   setTierOverride(t: Tier | null): void
   installLayers(id: string, install: (m: MlMap) => void, uninstall: (m: MlMap) => void): () => void
@@ -50,6 +52,7 @@ export function MapStageProvider({ children }: { children: ReactNode }) {
   const [tier, setTier] = useState<Tier>(() => overrideTier() ?? chooseTier(readSignals()))
   const [map, setMap] = useState<MlMap | null>(null)
   const [layout, setLayout] = useState<Layout>('hidden')
+  const [stage, setStage] = useState<HTMLDivElement | null>(null)
   const [theme] = useTheme()
   const appliedTheme = useRef(currentTheme())
 
@@ -116,6 +119,20 @@ export function MapStageProvider({ children }: { children: ReactNode }) {
     return () => cancelAnimationFrame(id)
   }, [layout, map])
 
+  // MapLibre starts a compact attribution open until the first drag. The mini map is 360 px wide: there it starts as the "i"
+  // button, one click from the text (what its own drag handler does), and the other layouts get back what they had.
+  useEffect(() => {
+    if (!map || layout !== 'mini') return
+    const a = map.getContainer().querySelector('.maplibregl-ctrl-attrib.maplibregl-compact')
+    if (!a?.classList.contains('maplibregl-compact-show')) return
+    a.classList.remove('maplibregl-compact-show')
+    // Only if the person left it open: MapLibre keeps `open` and `compact-show` in step, and a closed one carrying the class is a
+    // wide empty pill whose first click seems to do nothing.
+    return () => {
+      if (a.hasAttribute('open')) a.classList.add('maplibregl-compact-show')
+    }
+  }, [map, layout])
+
   const installLayers = useCallback(
     (id: string, install: (m: MlMap) => void, uninstall: (m: MlMap) => void) => {
       installers.current.set(id, { install, uninstall })
@@ -140,14 +157,15 @@ export function MapStageProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const value = useMemo(
-    () => ({ map, tier, layout, setLayout, setTierOverride, installLayers }),
-    [map, tier, layout, setTierOverride, installLayers],
+    () => ({ map, tier, layout, stage, setLayout, setTierOverride, installLayers }),
+    [map, tier, layout, stage, setTierOverride, installLayers],
   )
   return (
     <Ctx.Provider value={value}>
       {/* Children first: the skip link must be the first Tab stop, ahead of the map canvas and its controls. Painting is unchanged (the stage is fixed at z-index 0; the shell sits at z 10 and up). */}
       {children}
       <div
+        ref={setStage}
         className="map-stage"
         data-layout={tier === 0 ? 'hidden' : layout}
         role="region"

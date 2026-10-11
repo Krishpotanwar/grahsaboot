@@ -39,6 +39,24 @@ describe('copy', () => {
     )
     expect(flow.workbench.caption('10 Jan 2025')).toBe('10 Jan 2025 · Sentinel-2 · 10 m')
   })
+  it('captions a photo with its satellite, read from the item id', () => {
+    const line = (id: string) => flow.workbench.captionLine1('22 Feb 2018', id)
+    expect(line('S2B_43QBB_20180222_0_L2A')).toBe('22 Feb 2018 · Sentinel-2B · 10 m')
+    expect(line('S2A_MSIL2A_20180222T053939_R005_T43QBB_20201014T123052')).toBe(
+      '22 Feb 2018 · Sentinel-2A · 10 m',
+    )
+    expect(line('S2C_43QBB_20250101_0_L2A')).toBe('22 Feb 2018 · Sentinel-2C · 10 m')
+    // an id that names no unit says no more than what is known
+    expect(line('LC09_L2SP_144047_20250101')).toBe('22 Feb 2018 · Sentinel-2 · 10 m')
+    expect(flow.workbench.clearView(41)).toBe('41% clear view')
+  })
+  it('writes a scale bar in metres below a kilometre and in kilometres from it, and numbers sections from 01', () => {
+    expect(flow.workbench.scale(50)).toBe('50 m')
+    expect(flow.workbench.scale(500)).toBe('500 m')
+    expect(flow.workbench.scale(1000)).toBe('1 km')
+    expect(flow.workbench.scale(10000)).toBe('10 km')
+    expect([0, 1, 9, 10].map(flow.workbench.sectionNo)).toEqual(['01', '02', '10', '11'])
+  })
   it('says some passes are not shown when a window is cut, without a number the search no longer has', () => {
     expect(flow.workbench.limited).toBe('Some passes are not shown. Narrow the dates to see them all.')
   })

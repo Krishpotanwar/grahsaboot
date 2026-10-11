@@ -1,7 +1,7 @@
 import { memo, useState } from 'react'
 import { setClaim, type Investigation } from '../data/investigation.ts'
 import { flow } from '../ui/copy-flow.ts'
-import { Button, Panel, TextField } from '../ui/kit.tsx'
+import { Button, Section, TEXTAREA, TextField } from '../ui/kit.tsx'
 
 /** The optional claim, kept as typed in the fields until Save. Memoised, so a runner update renders it not at all. */
 export const ClaimPanel = memo(function ClaimPanel({
@@ -17,10 +17,11 @@ export const ClaimPanel = memo(function ClaimPanel({
   const [text, setText] = useState(inv.claim?.text ?? '')
   const [date, setDate] = useState(inv.claim?.date ?? '')
   const [criterion, setCriterion] = useState(inv.claim?.criterion ?? '')
+  // Open on arrival when there is a claim to see; never closed again by a save or a remove.
+  const [startOpen] = useState(() => inv.claim !== null)
   return (
-    <Panel title={flow.claim.title}>
+    <Section title={flow.claim.title} help={flow.claim.help} collapsible defaultOpen={startOpen}>
       <div className="grid gap-4">
-        <p className="text-sm text-fg-2">{flow.claim.help}</p>
         <div className="grid gap-2">
           <label htmlFor="claim-text" className="text-sm font-medium">
             {flow.claim.text}
@@ -31,7 +32,7 @@ export const ClaimPanel = memo(function ClaimPanel({
             maxLength={2000}
             rows={2}
             onChange={(e) => setText(e.target.value)}
-            className="rounded-[6px] border border-control bg-bg p-3 text-fg focus:border-accent"
+            className={TEXTAREA}
           />
         </div>
         <TextField
@@ -74,6 +75,6 @@ export const ClaimPanel = memo(function ClaimPanel({
           )}
         </div>
       </div>
-    </Panel>
+    </Section>
   )
 })

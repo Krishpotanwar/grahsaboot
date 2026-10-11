@@ -1,19 +1,21 @@
-// Timeline, SectionGrid, NotesPanel and ClaimPanel rendered to a string (no DOM): the states they show, and the sizes real data brings.
+// Timeline, SectionGrid, NotesPanel, ClaimPanel and EvidenceViewer rendered to a string (no DOM): the states they show, and the sizes real data brings.
 // The featured worked example yields ~1,100 passes; a pinned-date grid holds at most 24 columns (26 here, for margin); notes go up to 200.
 import { createElement } from 'react'
 import { renderToString } from 'react-dom/server'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { addNote, newInvestigation, setClaim, type Investigation, type Note } from '../data/investigation.ts'
+import { makeDisplayGrid } from '../evidence/display.ts'
 import type { QualityLabel, QualityStats } from '../evidence/types.ts'
 import type { AoiInput } from '../geo/aoi.ts'
 import { copy } from '../ui/copy.ts'
 import { flow } from '../ui/copy-flow.ts'
 import type { QualityResult } from '../workers/imagery-core.ts'
 import { ClaimPanel } from './ClaimPanel.tsx'
+import { EvidenceViewer, type Slot } from './EvidenceViewer.tsx'
 import { NotesPanel } from './NotesPanel.tsx'
 import type { DateEntry, EntryStatus } from './runner.ts'
-import { SectionGrid } from './SectionGrid.tsx'
-import { Timeline } from './Timeline.tsx'
+import { GridSkeleton, SectionGrid } from './SectionGrid.tsx'
+import { Timeline, TimelineSkeleton } from './Timeline.tsx'
 
 const stats = (label: QualityLabel, over: Partial<QualityStats> = {}): QualityStats => {
   const clear = label === 'CLEAR' ? 1 : label === 'PARTIAL' ? 0.6 : 0
@@ -163,6 +165,32 @@ describe('Timeline', () => {
   it('keeps a pin error next to the pin buttons', () => {
     const html = timeline([entry('2025-01-10', 'CLEAR')], { error: 'TOO_MANY_PINS' })
     expect(html).toMatch(/role="alert"[^>]*>You can pin up to 24 dates\./)
+  })
+
+  // The notes below the timeline must not move when a check lands: its sentence, Details and preview hold their places.
+  it('holds the places of the sentence, Details and the preview while the date on show is being checked', () => {
+    const thumbGrid = makeDisplayGrid([79.0832, 21.1408, 79.0932, 21.1508], 256)
+    const pulses = (html: string) => html.match(/animate-pulse/g)?.length ?? 0
+    const waiting = timeline([entry('2025-01-10', null, { status: 'checking' })], { thumbGrid })
+    expect(pulses(waiting)).toBe(3)
+    expect(waiting).not.toContain('<details')
+    // Checked and usable: the result is in, only the preview is still to come.
+    const checked = timeline([entry('2025-01-10', 'CLEAR')], { thumbGrid })
+    expect(pulses(checked)).toBe(1)
+    expect(checked).toContain('<details')
+    // Failed, or seen to be obscured: nothing is held for what will not come.
+    expect(pulses(timeline([entry('2025-01-10', null, { status: 'error' })], { thumbGrid }))).toBe(0)
+    expect(pulses(timeline([entry('2025-01-10', 'OBSCURED')], { thumbGrid }))).toBe(0)
+  })
+
+  it('has a placeholder that is only decoration, with a place for each section of a road', () => {
+    const thumbGrid = makeDisplayGrid([79.0832, 21.1408, 79.0932, 21.1508], 256)
+    const site = renderToString(createElement(TimelineSkeleton, { thumbGrid, sections: 0 }))
+    const road = renderToString(createElement(TimelineSkeleton, { thumbGrid, sections: 3 }))
+    expect(site).toMatch(/^<div aria-hidden="true"/)
+    expect(site).not.toMatch(/<(input|button|a|svg)\b/) // nothing to focus, nothing to read
+    expect(road.length).toBeGreaterThan(site.length)
+    expect(renderToString(createElement(GridSkeleton, { rows: 4 })).match(/animate-pulse/g)).toHaveLength(5)
   })
 })
 
@@ -338,5 +366,163 @@ describe('ClaimPanel', () => {
     expect(saved).toContain('value="A bright roof"')
     expect(saved).toContain(flow.claim.remove)
     expect(saved).not.toContain('disabled=""')
+  })
+})
+
+/** What React prints for text: the quotes of a sentence are entities. */
+const esc = (text: string) => text.replaceAll('"', '&quot;')
+
+describe('EvidenceViewer', () => {
+  const grid = makeDisplayGrid([79.0832, 21.1408, 79.0932, 21.1508], 512)
+  const slot = (date: string, over: Partial<NonNullable<Slot>> = {}): Slot => ({
+    date,
+    frame: { display: { rgba: new Uint8ClampedArray(4) } } as never,
+    stats: stats('CLEAR'),
+    itemId: `S2B_44QKJ_${date.replaceAll('-', '')}_0_L2A`,
+    failed: false,
+    ...over,
+  })
+  const viewer = (over: Record<string, unknown> = {}, narrow = false) => {
+    vi.stubGlobal('matchMedia', () => ({ matches: narrow }))
+    try {
+      return renderToString(
+        createElement(EvidenceViewer, {
+          before: slot('2025-01-10'),
+          after: slot('2025-12-20'),
+          grid,
+          invalid: null,
+          aoi: SITE,
+          searching: false,
+          mapOpen: false,
+          onRetry: noop,
+          ...over,
+        }),
+      )
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  }
+
+  it('is memoised: a slider step on the timeline renders it not at all', () => {
+    expect((EvidenceViewer as unknown as { $$typeof: symbol }).$$typeof).toBe(Symbol.for('react.memo'))
+  })
+
+  it('lays the three views out as tabs of real radios in one group, the legend for screen readers', () => {
+    const html = viewer()
+    expect(html.match(/<input[^>]*type="radio"[^>]*name="view"/g)).toHaveLength(3)
+    expect(html).toContain(`<legend class="sr-only">${flow.workbench.view}</legend>`)
+    expect(html.match(/h-\[54px\]/g)).toHaveLength(3)
+    expect(html).toMatch(/<input[^>]*name="view"[^>]*checked=""[^>]*value="swipe"/) // Swipe is the view of a wide screen
+  })
+
+  it('draws a date chip at each corner of the swipe, a scale bar and a north arrow, none of it reachable', () => {
+    const html = viewer()
+    expect(html).toContain(flow.workbench.chip(flow.workbench.before, '10 Jan 2025'))
+    expect(html).toContain(flow.workbench.chip(flow.workbench.after, '20 Dec 2025'))
+    expect(html).toContain('>200 m<') // a 1 km square with its margins is 1.2 km wide
+    expect(html).toContain(`>${flow.workbench.north}<`)
+    expect(html).toMatch(
+      /aria-hidden="true" class="pointer-events-none absolute inset-0 \[container-type:inline-size\]"/,
+    )
+  })
+
+  it('captions each photo in three lines: date and satellite, clear view and "Not saved", the item id', () => {
+    const html = viewer()
+    expect(html).toContain('10 Jan 2025 · Sentinel-2B · 10 m')
+    expect(html).toContain(flow.workbench.clearView(100))
+    expect(html).toContain(flow.workbench.notSaved)
+    expect(html).toContain('title="S2B_44QKJ_20250110_0_L2A"')
+    expect(html).toContain(copy.quality.CLEAR.word)
+    // in that order: the first photo's lines, each searched for after the one before it
+    const date = html.indexOf('10 Jan 2025 · Sentinel-2B')
+    const clear = html.indexOf(flow.workbench.clearView(100), date)
+    const id = html.indexOf('title="S2B_44QKJ_20250110_0_L2A"', clear)
+    expect(date).toBeGreaterThan(-1)
+    expect(clear).toBeGreaterThan(date)
+    expect(id).toBeGreaterThan(clear)
+  })
+
+  it("numbers a road's sections along its line, on the outline only", () => {
+    const road: AoiInput = {
+      kind: 'road',
+      geometry: {
+        type: 'LineString',
+        coordinates: [
+          [79.07698, 21.138637],
+          [79.095988, 21.157819],
+        ],
+      },
+      widthM: 30,
+    }
+    const parts = [
+      { idx: 0, fromM: 0, toM: 2000 },
+      { idx: 1, fromM: 2000, toM: 2900 },
+    ]
+    const numbered = (html: string) => [...html.matchAll(/>(0[1-9])<\/span>/g)].map((m) => m[1])
+    // Two photos in the swipe, each with its outline.
+    expect(numbered(viewer({ aoi: road, sections: parts }))).toEqual(['01', '02', '01', '02'])
+    expect(numbered(viewer({ aoi: road, sections: parts.slice(0, 1) }))).toEqual([]) // one section: nothing to tell apart
+    expect(numbered(viewer())).toEqual([]) // a site
+  })
+
+  it('says what the photos wait for, holds their place, and leaves the controls that need photos off', () => {
+    const none = { before: null, after: null }
+    const searching = viewer({ ...none, searching: true })
+    expect(searching).toContain(flow.workbench.searching)
+    expect(searching).not.toContain(esc(flow.workbench.pickPair))
+    expect(searching).not.toContain('type="range"') // nothing to swipe
+    expect(searching).toMatch(/<fieldset[^>]*disabled/)
+    expect(searching).toMatch(/<input[^>]*type="checkbox"[^>]*disabled/) // the outline has no photo to be drawn on
+    expect(searching).toContain('>200 m<') // scale bar and north arrow need no photo
+    const waiting = viewer(none)
+    expect(waiting).toContain(esc(flow.workbench.pickPair))
+    expect(waiting).not.toContain(flow.workbench.searching)
+    // On a phone the two photos are one above the other: the place held is two photos tall.
+    const photos = (html: string) => html.match(/aspect-ratio:\s*\d+ \/ \d+/g)?.length ?? 0
+    expect(photos(viewer(none, true))).toBe(2)
+    expect(photos(viewer(none))).toBe(1)
+  })
+
+  it('has the map tool in the row only where there is a map, and reads its state from its label', () => {
+    expect(viewer()).not.toContain(flow.workbench.showMap)
+    expect(viewer({ onToggleMap: noop })).toMatch(
+      new RegExp(`<button[^>]*aria-pressed="false"[^>]*>.*${flow.workbench.showMap}</button>`),
+    )
+    expect(viewer({ onToggleMap: noop, mapOpen: true })).toMatch(
+      new RegExp(`<button[^>]*aria-pressed="true"[^>]*>.*${flow.workbench.hideMap}</button>`),
+    )
+  })
+})
+
+describe('the side sections', () => {
+  it('give Notes and Claim their regions, with the title as a heading and a rule under them', () => {
+    const inv = withNotes(0)
+    const notesHtml = notes(inv)
+    expect(notesHtml).toContain(`<section aria-label="${flow.notes.title}"`)
+    expect(notesHtml).toMatch(new RegExp(`<h2[^>]*>${flow.notes.title}</h2>`))
+    expect(notesHtml).not.toContain('[ ') // no bracketed micro label
+    const claimHtml = renderToString(createElement(ClaimPanel, { inv, update: () => true, error: null }))
+    expect(claimHtml).toContain(`<section aria-label="${flow.claim.title}"`)
+    expect(claimHtml).toMatch(new RegExp(`<h2[^>]*>${flow.claim.title.replace(/[()]/g, '\\$&')}</h2>`))
+  })
+
+  it('make the reading kinds three chips in one group, with the date and Add note in one footer row', () => {
+    const html = notes(withNotes(0))
+    expect(html).toContain(`<legend class="sr-only">${flow.notes.kindLegend}</legend>`)
+    expect(html.match(/<input[^>]*type="radio"[^>]*name="note-kind"/g)).toHaveLength(3)
+    // the dot is decoration: a screen reader says "Your note" and not "middle dot"
+    expect(html).toContain(`${flow.notes.yourNote}<span aria-hidden="true"> ·</span>`)
+    expect(html.indexOf(flow.notes.forDate)).toBeLessThan(html.indexOf(flow.notes.add))
+  })
+
+  it('fold the claim up until there is one: closed and open, with its help line once', () => {
+    const claim = (inv: Investigation) =>
+      renderToString(createElement(ClaimPanel, { inv, update: () => true, error: null }))
+    const closed = claim(withNotes(0))
+    expect(closed).toMatch(/<details class="group">/)
+    expect(closed).not.toMatch(/<details[^>]*\sopen/)
+    expect(closed.split(esc(flow.claim.help))).toHaveLength(2) // the one line of help, not also a paragraph
+    const saved = claim(setClaim(withNotes(0), { text: 'Roof done', date: null, criterion: '' }))
+    expect(saved).toMatch(/<details[^>]*\sopen=""/)
   })
 })

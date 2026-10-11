@@ -7,7 +7,9 @@ import { itemId } from '../fixtures/scene.ts'
 import {
   finishDatesAndOpen,
   manyPasses,
+  openClaim,
   openFixtureSite,
+  openThenEdit,
   outlineSiteByCoords,
   startAt,
   waitForPhotos,
@@ -23,7 +25,9 @@ test.describe.configure({ retries: 1 })
 const hasWebgl2 = (page: Page) => page.evaluate(() => !!document.createElement('canvas').getContext('webgl2'))
 const stage = (page: Page) => page.locator('.map-stage')
 const showMap = (page: Page) => page.getByRole('button', { name: flow.workbench.showMap })
-const hideMap = (page: Page) => page.getByRole('button', { name: flow.workbench.hideMap })
+/** The tool in the viewer's row (the page), and the map's own close button (in its panel): both are named "Hide map". */
+const hideMap = (page: Page) => page.locator('main').getByRole('button', { name: flow.workbench.hideMap })
+const closeMap = (page: Page) => stage(page).getByRole('button', { name: flow.workbench.hideMap })
 const slider = (page: Page) => page.getByRole('slider', { name: flow.workbench.timelineLabel })
 
 /** The fixture site opened at tier 2, so there is a map. Skips where the engine has no WebGL2. */
@@ -284,13 +288,93 @@ for (const [width, height] of [
     expect(await uncovered(hideMap(page))).toBe(true)
     await slider(page).evaluate((el) => el.scrollIntoView({ block: 'center' }))
     expect(await uncovered(slider(page))).toBe(true)
+    // The last control: Save claim, in the claim row once it is open (the page is taller by then).
+    const save = (await openClaim(page)).getByRole('button', { name: flow.claim.save })
     await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
-    const save = page
-      .getByRole('region', { name: flow.claim.title })
-      .getByRole('button', { name: flow.claim.save })
     expect(await uncovered(save)).toBe(true)
   })
 }
+
+// The page header is far above a phone's panel and the tool row scrolls away: the map has a way out of its own.
+test('the open map has its own close button in its top right corner, and it closes the map', async ({
+  page,
+}) => {
+  await openWithMap(page)
+  await showMap(page).click()
+  await expect(stage(page)).toHaveAttribute('data-layout', 'mini')
+  await expect(hideMap(page)).toBeVisible() // the tool in the viewer's row, and
+  const close = closeMap(page) // the panel's own
+  await expect(close).toBeVisible()
+  const [c, p] = [(await close.boundingBox())!, (await stage(page).boundingBox())!]
+  expect(c.width).toBeGreaterThanOrEqual(44)
+  expect(c.height).toBeGreaterThanOrEqual(44)
+  expect(p.x + p.width - (c.x + c.width)).toBeLessThan(16) // inside the panel, at its right
+  expect(c.y - p.y).toBeLessThan(16) // and at its top
+  expect(c.x).toBeGreaterThan(p.x)
+  // On top of the map, so it is the button that gets the click.
+  const centre = { x: c.x + c.width / 2, y: c.y + c.height / 2 }
+  expect(
+    await page.evaluate(
+      ({ x, y }) => document.elementFromPoint(x, y)?.closest('button')?.getAttribute('aria-label'),
+      centre,
+    ),
+  ).toBe(flow.workbench.hideMap)
+  await close.click()
+  await expect(stage(page)).toHaveAttribute('data-layout', 'hidden')
+  await expect(close).toHaveCount(0)
+  await expect(showMap(page)).toBeVisible() // the tool says Show map again
+  // Opened again from the tool, closed again from the panel.
+  await showMap(page).click()
+  await expect(hideMap(page)).toBeVisible()
+  await closeMap(page).click()
+  await expect(stage(page)).toHaveAttribute('data-layout', 'hidden')
+})
+
+// The tool is in the viewer's row; where there is no viewer (nothing to compare), it stays where the row would be.
+test('with no photos to compare, the map can still be opened and closed', async ({ page }) => {
+  const id = await openThenEdit(
+    page,
+    { dateFrom: '2025-06-01', dateTo: '2025-06-30', before: null, after: null, pinned: [] },
+    openWithMap,
+  )
+  await page.goto(`/i/${id}?tier=2`)
+  await expect(page.getByText(flow.workbench.allCloudy)).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('radio', { name: flow.workbench.modes.swipe })).toHaveCount(0) // no viewer
+  await showMap(page).click()
+  await expect(stage(page)).toHaveAttribute('data-layout', 'mini')
+  await closeMap(page).click()
+  await expect(stage(page)).toHaveAttribute('data-layout', 'hidden')
+})
+
+test('the mini map starts with its attribution folded to the "i" button, one click from the text', async ({
+  page,
+}) => {
+  await openWithMap(page)
+  await showMap(page).click()
+  await expect(stage(page)).toHaveAttribute('data-layout', 'mini')
+  const attrib = stage(page).locator('.maplibregl-ctrl-attrib')
+  const button = attrib.locator('.maplibregl-ctrl-attrib-button')
+  const text = attrib.locator('.maplibregl-ctrl-attrib-inner')
+  await expect(button).toBeVisible()
+  await expect(text).toBeHidden()
+  await button.click()
+  await expect(text).toBeVisible()
+  await expect(text).toContainText(copy.attribution.osm)
+  await expect(text).toContainText(copy.attribution.gibs)
+  await button.click()
+  await expect(text).toBeHidden()
+})
+
+test('the full attribution is back on the other layouts after the mini map', async ({ page }) => {
+  await openWithMap(page)
+  await showMap(page).click()
+  await expect(stage(page)).toHaveAttribute('data-layout', 'mini')
+  const text = stage(page).locator('.maplibregl-ctrl-attrib-inner')
+  await expect(text).toBeHidden()
+  await page.getByRole('link', { name: copy.nav.home }).click()
+  await expect(stage(page)).toHaveAttribute('data-layout', 'globe')
+  await expect(text).toBeVisible()
+})
 
 test('the workbench with its map open passes axe in both themes', async ({ page }) => {
   await openWithMap(page)
@@ -303,4 +387,29 @@ test('the workbench with its map open passes axe in both themes', async ({ page 
     expect(results.violations, JSON.stringify(results.violations, null, 2)).toEqual([])
     await page.getByRole('button', { name: copy.nav.themeToggle }).click()
   }
+})
+
+test("the close button is over none of the map's own controls", async ({ page }) => {
+  await openWithMap(page)
+  await showMap(page).click()
+  await expect(stage(page)).toHaveAttribute('data-layout', 'mini')
+  const c = (await closeMap(page).boundingBox())!
+  const controls = stage(page).locator('.maplibregl-ctrl button, summary.maplibregl-ctrl-attrib-button')
+  for (const el of await controls.all()) {
+    const r = await el.boundingBox()
+    if (!r) continue // hidden
+    const apart =
+      r.x + r.width <= c.x || c.x + c.width <= r.x || r.y + r.height <= c.y || c.y + c.height <= r.y
+    expect(apart, 'a map control sits under the close button').toBe(true)
+  }
+})
+
+test('closing the map from its own button leaves the focus on the map tool', async ({ page }) => {
+  await openWithMap(page)
+  await showMap(page).click()
+  await expect(stage(page)).toHaveAttribute('data-layout', 'mini')
+  await closeMap(page).focus()
+  await page.keyboard.press('Enter')
+  await expect(stage(page)).toHaveAttribute('data-layout', 'hidden')
+  await expect(showMap(page)).toBeFocused()
 })

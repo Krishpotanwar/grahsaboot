@@ -2,6 +2,9 @@ import type { NoteKind } from '../data/investigation.ts'
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
 
+/** "Sentinel-2B" from an item id such as S2B_43QBB_20180222_0_L2A; plain "Sentinel-2" when the id names no unit. */
+const satellite = (itemId: string) => `Sentinel-2${/^S2([ABC])_/.exec(itemId)?.[1] ?? ''}`
+
 export const flow = {
   stepOf: (n: number) => `Step ${n} of 4`,
   steps: ['Place', 'Outline', 'Dates', 'Review'],
@@ -78,6 +81,15 @@ export const flow = {
       'Brightness difference between these two dates. Season, moisture, shadows and clouds also cause differences. This is not a construction detector.',
     caption: (date: string, clearPct?: number) =>
       `${date} · Sentinel-2 · 10 m${clearPct === undefined ? '' : ` · ${clearPct}% clear view`}`,
+    // The caption under a photo is three lines: this one, then the clear-view figure with "Not saved", then the item id.
+    satellite,
+    captionLine1: (date: string, itemId: string) => `${date} · ${satellite(itemId)} · 10 m`,
+    clearView: (clearPct: number) => `${clearPct}% clear view`,
+    // Over the photo (shown in capitals): which photo it is, what the difference view shows, the scale bar, the north arrow.
+    chip: (role: string, date: string) => `${role} · ${date}`,
+    diffChip: 'Difference',
+    scale: (m: number) => (m >= 1000 ? `${m / 1000} km` : `${m} m`),
+    north: 'N↑',
     photoAlt: (role: string, date: string, clearPct?: number) =>
       `${role} photo, ${date}, Sentinel-2 true colour${clearPct !== undefined ? ` · ${clearPct}% clear view` : ''}`,
     timeline: 'Timeline',
@@ -92,6 +104,8 @@ export const flow = {
     grid: 'Sections × dates',
     sectionCol: 'Section',
     section: (from: number, to: number) => `${(from / 1000).toFixed(1)}–${(to / 1000).toFixed(1)} km`,
+    // A road's sections are numbered 01, 02, ... along the line, on the photos and (P1b) in the grid.
+    sectionNo: (idx: number) => String(idx + 1).padStart(2, '0'),
     shares: {
       valid: 'Visible ground',
       uncertain: 'Uncertain (shadow or unclassified)',
@@ -136,6 +150,7 @@ export const flow = {
       no_clear_change: 'No clear visible change',
       unsure: 'Not sure',
     } satisfies Record<NoteKind, string>,
+    yourNote: 'Your note',
     forDate: 'Photo date',
     anyDate: 'No specific date',
     forSection: 'Section',

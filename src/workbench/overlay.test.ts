@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { makeDisplayGrid } from '../evidence/display.ts'
+import { haversineM } from '../evidence/geodesy.ts'
 import type { LonLat } from '../evidence/types.ts'
 import { summarizeAoi, type AoiInput } from '../geo/aoi.ts'
-import { outlinePath } from './overlay.ts'
+import { outlinePath, pointAlong } from './overlay.ts'
 
 const points = (d: string) =>
   [...d.matchAll(/[ML](-?[\d.]+) (-?[\d.]+)/g)].map((m) => [Number(m[1]), Number(m[2])])
@@ -71,5 +72,53 @@ describe('outlinePath', () => {
       expect(y).toBeGreaterThanOrEqual(0)
       expect(y).toBeLessThanOrEqual(g.height)
     }
+  })
+})
+
+describe('pointAlong', () => {
+  const near = (a: [number, number], b: [number, number]) => {
+    expect(a[0]).toBeCloseTo(b[0], 1)
+    expect(a[1]).toBeCloseTo(b[1], 1)
+  }
+  const at = (line: LonLat[], d: number) => {
+    const r = summarizeAoi({ kind: 'road', geometry: { type: 'LineString', coordinates: line }, widthM: 30 })
+    if (!r.ok) throw new Error('the test line must be valid')
+    const g = makeDisplayGrid(r.summary.bbox, 512)
+    return { g, p: pointAlong(line, g, d) }
+  }
+
+  it('walks a straight line: the middle is half way between its ends', () => {
+    const line = road.geometry.coordinates
+    const total = haversineM(line[0]!, line[1]!)
+    const g = gridFor(road)
+    const [start, end] = points(outlinePath(road, g))
+    const mid: [number, number] = [(start![0]! + end![0]!) / 2, (start![1]! + end![1]!) / 2]
+    near(pointAlong(line, g, total / 2), mid)
+    near(pointAlong(line, g, 0), [start![0]!, start![1]!])
+    near(pointAlong(line, g, total), [end![0]!, end![1]!])
+  })
+
+  it('turns the corner of a bent line by metres along it, not by the share of the vertices', () => {
+    // 2 km east, then 1 km north
+    const a: LonLat = [79.0, 21.1]
+    const b: LonLat = [79.0 + 2 / (111.195 * Math.cos((21.1 * Math.PI) / 180)), 21.1]
+    const c: LonLat = [b[0], 21.1 + 1 / 111.195]
+    const line = [a, b, c]
+    const d1 = haversineM(a, b)
+    const d2 = haversineM(b, c)
+    const { g, p } = at(line, d1 + d2 / 2) // half way up the second leg
+    const [pb, pc] = [pointAlong(line, g, d1), pointAlong(line, g, d1 + d2)]
+    near(p, [pb[0], (pb[1] + pc[1]) / 2])
+    expect(pc[1]).toBeLessThan(pb[1]) // north is up: smaller y
+    // and half way along the first leg (a third of the way along the whole line) is half way to the corner
+    const pa = pointAlong(line, g, 0)
+    near(pointAlong(line, g, d1 / 2), [(pa[0] + pb[0]) / 2, pa[1]])
+  })
+
+  it('stays on the line when asked for a distance past either end', () => {
+    const line = road.geometry.coordinates
+    const g = gridFor(road)
+    near(pointAlong(line, g, -50), pointAlong(line, g, 0))
+    near(pointAlong(line, g, 1e7), pointAlong(line, g, haversineM(line[0]!, line[1]!)))
   })
 })
