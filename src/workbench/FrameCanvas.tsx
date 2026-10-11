@@ -5,7 +5,7 @@ export function FrameCanvas({
   width,
   height,
   label,
-  className = '',
+  className = 'h-auto w-full',
 }: {
   rgba: Uint8ClampedArray
   width: number
@@ -21,5 +21,5 @@ export function FrameCanvas({
     c.height = height
     c.getContext('2d')?.putImageData(new ImageData(new Uint8ClampedArray(rgba), width, height), 0, 0)
   }, [rgba, width, height])
-  return <canvas ref={ref} role="img" aria-label={label} className={`block h-auto w-full ${className}`} />
+  return <canvas ref={ref} role="img" aria-label={label} className={`block ${className}`} />
 }

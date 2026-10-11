@@ -1,5 +1,5 @@
 import { X } from '@phosphor-icons/react'
-import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { setBeforeAfter, togglePin } from '../data/investigation.ts'
 import { useInvestigation } from '../data/useInvestigation.ts'
@@ -109,6 +109,23 @@ export default function Workbench({ id }: { id: string }) {
     }, 250)
     return () => clearTimeout(t)
   }, [current, wantCheck, wantThumb, requestCheck, requestThumb])
+
+  // Every pinned date has its preview: its row shows it, and a save sends it. The runner loads the first twelve usable dates
+  // unasked, so these are the pins past them. Asked for once, through the runner's own queue (never more than its cap in flight),
+  // and for at most 24 dates: nothing here grows with the number of passes. A check still waiting in the sweep goes first.
+  const asked = useRef(new Set<string>())
+  useEffect(() => {
+    if (byDate.size === 0) asked.current.clear() // a new run
+    for (const d of inv?.pinned ?? []) {
+      const e = byDate.get(d)
+      if (!e) continue
+      if (e.status === 'queued') {
+        if (asked.current.has(d)) continue
+        asked.current.add(d)
+        requestCheck(d)
+      } else if (isUsable(e) && !e.thumb && !e.thumbFailed) requestThumb(d)
+    }
+  }, [byDate, inv?.pinned, requestCheck, requestThumb])
 
   // Mini map: the outline, and the photo of the date the slider rests on. Never `current`: a fast slider (about 1,100 passes)
   // would ask for a full frame and encode a PNG at every step.
@@ -237,8 +254,11 @@ export default function Workbench({ id }: { id: string }) {
               {flow.workbench.errors[error] ?? error}
             </p>
           )}
-          {/* A live region has to be in the page before its words are: empty, it takes no room. */}
-          <div aria-live="polite" className="grid justify-items-start gap-2 text-sm text-fg-2 empty:sr-only">
+          {/* A live region has to be in the page before its words are. Empty it takes no room, except while a "finding" line is on its way or comes and goes (the search runs): then it keeps its line, so the viewer below does not step down for it. */}
+          <div
+            aria-live="polite"
+            className={`grid justify-items-start gap-2 text-sm text-fg-2 ${state.phase === 'searching' || state.more ? 'min-h-5' : 'empty:sr-only'}`}
+          >
             {state.phase === 'searching' && !searching && <p>{flow.workbench.searching}</p>}
             {state.more && <p>{flow.workbench.searchingMore}</p>}
             {state.phase === 'error' && state.error === 'BAD_OUTLINE' && (
@@ -283,46 +303,52 @@ export default function Workbench({ id }: { id: string }) {
           className="min-w-0 border-t border-line lg:border-l lg:border-t-0"
           aria-label={flow.workbench.timeline}
         >
-          {(searching || entries.length > 0) && (
-            <div className="grid gap-6 border-b border-line px-4 py-5 lg:px-6">
-              {searching ? (
-                <TimelineSkeleton
-                  thumbGrid={thumbGrid}
-                  sections={summary?.kind === 'road' ? summary.parts.length : 0}
-                />
-              ) : (
-                <Timeline
-                  entries={entries}
-                  from={inv.dateFrom}
-                  to={inv.dateTo}
+          {(searching || entries.length > 0) &&
+            (searching ? (
+              <TimelineSkeleton
+                from={inv.dateFrom}
+                to={inv.dateTo}
+                road={summary?.kind === 'road'}
+                sections={summary?.kind === 'road' ? summary.parts.length : 0}
+                // The pinned dates; with no pair yet, the two the search is about to pin. When it arrives the list has one row
+                // (the latest pass on show), then three (the pair and that pass) or two (when the latest is the after date): two
+                // is the middle, so no step of it is more than a row from what is held.
+                rows={inv.pinned.length + (inv.before ? 0 : 2)}
+              />
+            ) : (
+              <Timeline
+                entries={entries}
+                from={inv.dateFrom}
+                to={inv.dateTo}
+                current={current}
+                before={inv.before}
+                after={inv.after}
+                pinned={inv.pinned}
+                thumbGrid={thumbGrid}
+                sections={summary?.kind === 'road' ? summary.parts : undefined}
+                more={state.more}
+                error={pinError}
+                onSelect={setCurrent}
+                onBefore={(d) => update((i) => setBeforeAfter(i, d, i.after!))}
+                onAfter={(d) => update((i) => setBeforeAfter(i, i.before!, d))}
+                onPin={(d) => update((i) => togglePin(i, d))}
+                onRetry={retry}
+              />
+            ))}
+          {(searching || entries.length > 0) &&
+            (gridPending && road ? (
+              <GridSkeleton rows={road.length} />
+            ) : (
+              summary?.kind === 'road' && (
+                <SectionGrid
+                  entries={pinnedEntries}
+                  parts={summary.parts}
                   current={current}
-                  before={inv.before}
-                  after={inv.after}
-                  pinned={inv.pinned}
-                  thumbGrid={thumbGrid}
-                  sections={summary?.kind === 'road' ? summary.parts : undefined}
-                  error={pinError}
+                  shown={cur}
                   onSelect={setCurrent}
-                  onBefore={(d) => update((i) => setBeforeAfter(i, d, i.after!))}
-                  onAfter={(d) => update((i) => setBeforeAfter(i, i.before!, d))}
-                  onPin={(d) => update((i) => togglePin(i, d))}
-                  onRetry={retry}
                 />
-              )}
-              {gridPending && road ? (
-                <GridSkeleton rows={road.length} />
-              ) : (
-                summary?.kind === 'road' && (
-                  <SectionGrid
-                    entries={pinnedEntries}
-                    parts={summary.parts}
-                    current={current}
-                    onSelect={setCurrent}
-                  />
-                )
-              )}
-            </div>
-          )}
+              )
+            ))}
           <NotesPanel
             inv={inv}
             parts={summary?.parts ?? NO_PARTS}

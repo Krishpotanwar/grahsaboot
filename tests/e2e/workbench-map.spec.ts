@@ -122,13 +122,17 @@ test('at tier 0 there is no map button, and the page works without one', async (
 test('opening and closing the map keeps the photos, and a closed map holds no photo', async ({ page }) => {
   await openWithMap(page)
   await waitForPhotos(page)
-  await expect(showMap(page)).toHaveAttribute('aria-pressed', 'false')
+  // The label says what pressing does; there is no pressed state to say twice.
+  await expect(showMap(page)).not.toHaveAttribute('aria-pressed')
   await showMap(page).click()
-  await expect(hideMap(page)).toHaveAttribute('aria-pressed', 'true')
+  await expect(hideMap(page)).toBeVisible()
+  await expect(hideMap(page)).not.toHaveAttribute('aria-pressed')
+  await expect(showMap(page)).toHaveCount(0)
   await expect.poll(() => onMap(page), { timeout: 30_000 }).toEqual([true, 'image', true])
   await waitForPhotos(page)
   await hideMap(page).click()
-  await expect(showMap(page)).toHaveAttribute('aria-pressed', 'false')
+  await expect(showMap(page)).toBeVisible()
+  await expect(hideMap(page)).toHaveCount(0)
   await waitForPhotos(page)
   await expect.poll(() => mapState(page).then((s) => s.frame)).toBe(null)
   expect((await mapState(page)).aoi).toBe(true) // the outline stays installed; only the photo goes

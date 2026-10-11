@@ -1,9 +1,11 @@
-import { memo } from 'react'
-import type { DisplayGrid, QualityLabel } from '../evidence/types.ts'
+import { useState } from 'react'
+import type { DisplayGrid } from '../evidence/types.ts'
 import { fmtDate, pct } from '../lib/format.ts'
 import { copy } from '../ui/copy.ts'
 import { flow } from '../ui/copy-flow.ts'
-import { Button, Panel, QualityGlyph, QualityTag, Skeleton } from '../ui/kit.tsx'
+import { Button, QualityGlyph, Section, Skeleton } from '../ui/kit.tsx'
+import { Barcode } from './Barcode.tsx'
+import { barcodeHeight, listDates, ROW_GAP, yearRows } from './barcode.ts'
 import { isUsable } from './defaults.ts'
 import { FrameCanvas } from './FrameCanvas.tsx'
 import type { DateEntry } from './runner.ts'
@@ -12,39 +14,47 @@ import type { DateEntry } from './runner.ts'
 export const waitingWord = (e: Pick<DateEntry, 'status'>) =>
   e.status === 'error' ? flow.workbench.checkFailed : copy.common.loading
 
+/** `waitingWord` for a cell or a row of a list, where the sentence does not fit; the sentence stays in the selected row. */
+export const shortWord = (e: Pick<DateEntry, 'status'>) =>
+  e.status === 'error' ? flow.workbench.checkFailedShort : copy.common.loading
+
 const wordOf = (e: DateEntry) => (e.quality ? copy.quality[e.quality.stats.label].word : waitingWord(e))
 
-/** 2 = the date on show, 1 = the before or after date, 0 = any other. Primitives, so a mark re-renders only when its own state changes. */
-type MarkState = 0 | 1 | 2
+/** The 52 px preview of a row, always the same box: what arrives later (a check, a picture) moves nothing under it. */
+const THUMB = 'h-[52px] w-[52px]'
+const STRIPES = 'bg-[image:repeating-linear-gradient(135deg,var(--gs-line)_0_6px,var(--gs-panel)_6px_12px)]'
+/** A row of the list: 9 px over and under its 52 px picture, and its 1 px rule. */
+const ROW_PX = 71
+/** The sentence under the date on show: one line, and two where the column is narrower than the sentence (a phone). */
+const SENTENCE = 'h-5 max-[420px]:h-10'
 
-// One memoised mark per pass: a runner update changes one entry, so only that mark renders again (real data has ~1,100).
-const Mark = memo(function Mark({
-  date,
-  label,
-  state,
-  t0,
-  span,
-}: {
-  date: string
-  label: QualityLabel | null
-  state: MarkState
-  t0: number
-  span: number
-}) {
-  const colour = state === 2 ? 'z-10 text-accent' : state === 1 ? 'z-10 text-fg' : 'text-fg-2'
+function Thumb({ e, grid }: { e: DateEntry; grid: DisplayGrid | null }) {
+  // The row says the same in words; the picture is for the eye.
+  if (e.thumb && grid)
+    return (
+      <span aria-hidden className={`block ${THUMB}`}>
+        <FrameCanvas
+          rgba={e.thumb.display.rgba}
+          width={grid.width}
+          height={grid.height}
+          label={flow.workbench.photoAlt(
+            flow.workbench.timelineLabel,
+            fmtDate(e.date),
+            e.quality ? pct(e.quality.stats.clearFraction) : undefined,
+          )}
+          className={`${THUMB} object-cover`}
+        />
+      </span>
+    )
+  // A check or a preview on its way: a pulse. Anything else that has no picture (obscured, not covered, a failure): the stripes.
+  if (e.status === 'queued' || e.status === 'checking' || (isUsable(e) && !e.thumbFailed))
+    return <span aria-hidden className={`block animate-pulse bg-line ${THUMB}`} />
   return (
-    <span
-      className={`absolute top-1/2 -translate-x-1/2 -translate-y-1/2 ${colour}`}
-      style={{ left: `${((Date.parse(date) - t0) / span) * 100}%` }}
-    >
-      {label ? (
-        <QualityGlyph label={label} size={state ? 14 : 10} />
-      ) : (
-        <span className={`block ${state === 2 ? 'h-5 w-0.5 bg-accent' : 'h-2 w-px bg-control'}`} />
-      )}
+    <span aria-hidden className={`grid place-items-center text-fg-2 ${THUMB} ${STRIPES}`}>
+      <QualityGlyph label={e.quality?.stats.label ?? 'NOT_COVERED'} size={18} />
     </span>
   )
-})
+}
 
 interface Props {
   entries: DateEntry[]
@@ -55,8 +65,10 @@ interface Props {
   after: string | null
   pinned: string[]
   thumbGrid: DisplayGrid | null
-  /** A road's sections: the current date lists how clearly each one is seen. Undefined for a site. */
+  /** A road's sections: the date on show lists how clearly each one is seen. Undefined for a site. */
   sections?: Array<{ idx: number; fromM: number; toM: number }>
+  /** More passes are still being found: the rows of pinned dates not found yet hold their places. */
+  more?: boolean
   /** The code of a refused pin (`flow.workbench.errors`), shown next to the pin buttons. */
   error?: string | null
   onSelect(date: string): void
@@ -76,6 +88,7 @@ export function Timeline({
   pinned,
   thumbGrid,
   sections,
+  more = false,
   error,
   onSelect,
   onBefore,
@@ -83,191 +96,254 @@ export function Timeline({
   onPin,
   onRetry,
 }: Props) {
+  // The detail block is a different row's each time the date on show changes: Details keeps its state here.
+  const [open, setOpen] = useState(false)
   if (entries.length === 0) return null
-  const t0 = Date.parse(from)
-  const span = Math.max(1, Date.parse(to) - t0)
   const idx = Math.max(
     0,
     entries.findIndex((e) => e.date === current),
   )
   const cur = entries[idx]!
   const q = cur.quality
-  // Its check is on its way: hold the places of what the result brings (a sentence, Details, the preview), so the notes below do not move.
+  // Its check is on its way: hold the places of what the result brings (a sentence, Details), so the notes below do not move.
   const pending = !q && cur.status !== 'error'
+  // The pinned dates and the date on show: one pass over the passes, no more than 25 rows.
+  const want = new Set(listDates(pinned, cur.date))
+  const rows = entries.filter((e) => want.has(e.date))
+  const held = more ? want.size - rows.length : 0
+  const isPinned = pinned.includes(cur.date)
   return (
-    <Panel title={`${flow.workbench.timeline} · ${flow.workbench.passes(entries.length)}`}>
-      <div className="relative isolate h-10 border-b border-line" aria-hidden>
-        {entries.map((e) => (
-          <Mark
-            key={e.date}
-            date={e.date}
-            label={e.quality?.stats.label ?? null}
-            state={e.date === cur.date ? 2 : e.date === before || e.date === after ? 1 : 0}
-            t0={t0}
-            span={span}
-          />
-        ))}
-      </div>
-      <input
-        type="range"
-        min={0}
-        max={entries.length - 1}
-        step={1}
-        value={idx}
-        onChange={(e) => onSelect(entries[Number(e.target.value)]!.date)}
-        aria-label={flow.workbench.timelineLabel}
-        aria-valuetext={`${fmtDate(cur.date)}, ${wordOf(cur)}`}
-        className="mt-3 h-11 w-full accent-[var(--gs-accent)]"
+    <Section
+      title={flow.workbench.photoTimeline}
+      count={`${flow.workbench.passes(entries.length)} · ${flow.workbench.pinnedCount(pinned.length)}`}
+    >
+      <Barcode
+        entries={entries}
+        from={from}
+        to={to}
+        idx={idx}
+        label={flow.workbench.timelineLabel}
+        valueText={`${fmtDate(cur.date)}, ${wordOf(cur)}`}
+        before={before}
+        after={after}
+        pinned={pinned}
+        road={!!sections}
+        onSelect={onSelect}
       />
-      <div className="mt-4 grid gap-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="font-mono num">{fmtDate(cur.date)}</p>
-          {q ? (
-            <QualityTag label={q.stats.label} />
-          ) : (
-            cur.status !== 'error' && <span className="text-sm text-fg-2">{waitingWord(cur)}</span>
-          )}
-        </div>
-        {q ? (
-          <p className="text-sm text-fg-2">
-            {copy.quality[q.stats.label].help} {pct(q.stats.clearFraction)}%.
-          </p>
-        ) : (
-          pending && <Skeleton className="h-10" />
-        )}
-        {cur.status === 'error' && (
-          <div className="flex flex-wrap items-center gap-3 text-sm text-bad">
-            <p>{flow.workbench.checkFailed}</p>
-            <Button size="sm" onClick={() => onRetry(cur.date)}>
-              {copy.common.retry}
-            </Button>
-          </div>
-        )}
-        {sections && (
-          <ul className="grid gap-1 text-sm">
-            {sections.map((p) => {
-              const st = q?.parts.find((x) => x.idx === p.idx)?.stats
-              return (
-                <li key={p.idx} className="flex items-center justify-between gap-3">
-                  <span className="font-mono text-[0.75rem] num">
-                    {flow.workbench.section(p.fromM, p.toM)}
+      <ul className="mt-3.5 border-t border-line">
+        {rows.map((e) => {
+          const selected = e.date === cur.date
+          const label = e.quality?.stats.label
+          const tag =
+            e.date === before
+              ? flow.workbench.before
+              : e.date === after
+                ? flow.workbench.after
+                : pinned.includes(e.date)
+                  ? flow.workbench.pinned
+                  : null
+          return (
+            <li
+              key={e.date}
+              className={`border-b border-line ${selected ? 'outline outline-1 -outline-offset-1 outline-accent' : ''}`}
+            >
+              <button
+                type="button"
+                aria-current={selected ? 'date' : undefined}
+                onClick={() => onSelect(e.date)}
+                className="grid w-full grid-cols-[52px_minmax(0,1fr)] items-center gap-3 px-2 py-[9px] text-left hover:bg-panel"
+              >
+                <Thumb e={e} grid={thumbGrid} />
+                <span className="grid min-w-0 gap-1">
+                  {/* The tag is on this line, not beside both: the line under keeps the whole width and stays one line at 440 px. */}
+                  <span className="flex items-center justify-between gap-x-3">
+                    <span className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-0.5">
+                      <span className="font-mono text-sm font-medium num">{fmtDate(e.date)}</span>
+                      <span className="inline-flex items-center gap-1.5 font-mono text-[11px] font-medium uppercase tracking-[0.08em]">
+                        {label && <QualityGlyph label={label} />}
+                        {label ? copy.quality[label].word : shortWord(e)}
+                      </span>
+                    </span>
+                    {tag && (
+                      <span className="shrink-0 font-mono text-[11px] uppercase tracking-[0.08em] text-accent">
+                        {tag}
+                      </span>
+                    )}
                   </span>
-                  <span className="inline-flex items-center gap-1.5">
-                    {st && <QualityGlyph label={st.label} />}
-                    <span>{st ? copy.quality[st.label].word : waitingWord(cur)}</span>
+                  <span className="truncate font-mono text-xs text-fg-2 num">
+                    {flow.workbench.rowMeta(
+                      e.candidate.item.id,
+                      e.quality ? pct(e.quality.stats.clearFraction) : undefined,
+                    )}
                   </span>
-                </li>
-              )
-            })}
-          </ul>
-        )}
-        {pending && <Skeleton className="h-11" />}
-        {q && (
-          <details>
-            <summary className="cursor-pointer py-3 text-sm font-medium">{copy.common.details}</summary>
-            <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-sm">
-              {(
-                [
-                  ['valid', q.stats.validFraction],
-                  ['uncertain', q.stats.uncertainFraction],
-                  ['obstructed', q.stats.obstructedFraction],
-                  ['nodata', q.stats.nodataFraction],
-                ] as const
-              ).map(([k, v]) => (
-                <div key={k} className="contents">
-                  <dt className="text-fg-2">{flow.workbench.shares[k]}</dt>
-                  <dd className="font-mono num">{`${pct(v)}%`}</dd>
+                </span>
+              </button>
+              {selected && (
+                <div className="grid gap-3 px-2 pb-3">
+                  {q ? (
+                    <p className="text-sm text-fg-2">
+                      {copy.quality[q.stats.label].help} {pct(q.stats.clearFraction)}%.
+                    </p>
+                  ) : (
+                    pending && <Skeleton className={SENTENCE} />
+                  )}
+                  {q ? (
+                    <details open={open} onToggle={(e) => setOpen(e.currentTarget.open)}>
+                      <summary className="cursor-pointer py-3 text-sm font-medium">
+                        {copy.common.details}
+                      </summary>
+                      <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-sm">
+                        {(
+                          [
+                            ['valid', q.stats.validFraction],
+                            ['uncertain', q.stats.uncertainFraction],
+                            ['obstructed', q.stats.obstructedFraction],
+                            ['nodata', q.stats.nodataFraction],
+                          ] as const
+                        ).map(([k, v]) => (
+                          <div key={k} className="contents">
+                            <dt className="text-fg-2">{flow.workbench.shares[k]}</dt>
+                            <dd className="font-mono num">{`${pct(v)}%`}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                    </details>
+                  ) : (
+                    pending && <Skeleton className="h-11" />
+                  )}
+                  {isUsable(cur) && cur.thumbFailed && (
+                    <p className="text-sm text-fg-2">{flow.workbench.thumbFailed}</p>
+                  )}
+                  {sections && (
+                    <ul aria-label={flow.workbench.sectionsLabel} className="grid gap-1 text-sm">
+                      {sections.map((p) => {
+                        const st = q?.parts.find((x) => x.idx === p.idx)?.stats
+                        return (
+                          <li key={p.idx} className="flex items-center justify-between gap-3">
+                            <span className="font-mono text-[0.75rem] num">
+                              {flow.workbench.section(p.fromM, p.toM)}
+                            </span>
+                            <span className="inline-flex items-center gap-1.5">
+                              {st && <QualityGlyph label={st.label} />}
+                              <span>{st ? copy.quality[st.label].word : shortWord(cur)}</span>
+                            </span>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  )}
+                  {cur.status === 'error' && (
+                    <div className="flex flex-wrap items-center gap-3 text-sm text-bad">
+                      <p>{flow.workbench.checkFailed}</p>
+                      <Button size="sm" onClick={() => onRetry(cur.date)}>
+                        {copy.common.retry}
+                      </Button>
+                    </div>
+                  )}
+                  {/* One row that takes one more control: nothing here is a fixed width. */}
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => onBefore(cur.date)}
+                      disabled={!after || cur.date >= after}
+                    >
+                      {flow.workbench.useBefore}
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => onAfter(cur.date)}
+                      disabled={!before || cur.date <= before}
+                    >
+                      {flow.workbench.useAfter}
+                    </Button>
+                    {/* The label says what pressing does, so it is not also a toggle button. */}
+                    <Button
+                      size="sm"
+                      onClick={() => onPin(cur.date)}
+                      disabled={cur.date === before || cur.date === after}
+                    >
+                      {isPinned ? flow.workbench.unpin : flow.workbench.pin}
+                    </Button>
+                  </div>
+                  {error && (
+                    <p role="alert" className="text-sm text-bad">
+                      {flow.workbench.errors[error] ?? error}
+                    </p>
+                  )}
                 </div>
-              ))}
-            </dl>
-          </details>
-        )}
-        {thumbGrid &&
-          (isUsable(cur) || pending) &&
-          (cur.thumb ? (
-            <FrameCanvas
-              rgba={cur.thumb.display.rgba}
-              width={thumbGrid.width}
-              height={thumbGrid.height}
-              label={flow.workbench.photoAlt(
-                flow.workbench.timelineLabel,
-                fmtDate(cur.date),
-                pct(q!.stats.clearFraction),
               )}
-            />
-          ) : cur.thumbFailed ? (
-            <p className="text-sm text-fg-2">{flow.workbench.thumbFailed}</p>
-          ) : (
-            <div style={{ aspectRatio: `${thumbGrid.width} / ${thumbGrid.height}` }}>
-              <Skeleton className="h-full w-full" />
+            </li>
+          )
+        })}
+        {Array.from({ length: held }, (_, i) => (
+          <li key={i} aria-hidden className="border-b border-line" style={{ height: ROW_PX }}>
+            <div className="px-2 py-[9px]">
+              <Skeleton className={THUMB} />
             </div>
-          ))}
-        <div className="flex flex-wrap gap-2">
-          <Button size="sm" onClick={() => onBefore(cur.date)} disabled={!after || cur.date >= after}>
-            {flow.workbench.useBefore}
-          </Button>
-          <Button size="sm" onClick={() => onAfter(cur.date)} disabled={!before || cur.date <= before}>
-            {flow.workbench.useAfter}
-          </Button>
-          <Button
-            size="sm"
-            aria-pressed={pinned.includes(cur.date)}
-            onClick={() => onPin(cur.date)}
-            disabled={cur.date === before || cur.date === after}
-          >
-            {pinned.includes(cur.date) ? flow.workbench.unpin : flow.workbench.pin}
-          </Button>
-        </div>
-        {error && (
-          <p role="alert" className="text-sm text-bad">
-            {flow.workbench.errors[error] ?? error}
-          </p>
-        )}
-        <p className="text-xs text-fg-2">{flow.workbench.legend}</p>
-      </div>
-    </Panel>
+          </li>
+        ))}
+      </ul>
+    </Section>
   )
 }
 
 /**
- * What the side column holds while the search for passes is on: the size the Timeline will have (its date row, the sentence,
- * Details and the preview of the date on show, and a road's sections), so the notes below it do not move when it arrives. The
- * no-jump e2e test fails when the two drift apart: change this with the Timeline.
+ * What the side column holds while the search for passes is on: the size the Timeline will have (a row per year or the strip,
+ * the legend, the rows of the pinned dates with the sentence, Details, the sections of a road and the buttons under the one on
+ * show), so the notes below it do not move when it arrives. The no-jump e2e test fails when the two drift apart: change this
+ * with the Timeline.
  */
 export function TimelineSkeleton({
-  thumbGrid,
+  from,
+  to,
+  road,
   sections,
+  rows,
 }: {
-  thumbGrid: DisplayGrid | null
+  from: string
+  to: string
+  road: boolean
   /** How many sections a road has (a site: 0). */
   sections: number
+  /** The rows of the list: the pinned dates, or the pinned dates and the date on show. */
+  rows: number
 }) {
+  const years = yearRows([], from, to).length
   return (
-    <div aria-hidden className="border border-line bg-panel">
-      <div className="h-10 border-b border-line" />
-      <div className="p-4">
-        <div className="grid h-10 items-center border-b border-line">
-          <Skeleton className="h-2" />
-        </div>
-        <div className="mt-3 grid h-11 items-center">
-          <Skeleton className="h-1.5" />
-        </div>
-        <div className="mt-4 grid gap-3">
-          <div className="grid h-6 items-center">
-            <Skeleton className="h-4 w-28" />
-          </div>
-          <Skeleton className="h-10" />
-          {sections > 0 && <div style={{ height: sections * 24 - 4 }} />}
-          <Skeleton className="h-11" />
-          {thumbGrid && (
-            <div style={{ aspectRatio: `${thumbGrid.width} / ${thumbGrid.height}` }}>
-              <Skeleton className="h-full w-full" />
+    <Section title={flow.workbench.photoTimeline}>
+      <div aria-hidden>
+        <div className="grid" style={{ height: barcodeHeight(road, years) }}>
+          {road ? (
+            <Skeleton className="h-[17px]" />
+          ) : (
+            <div className="grid" style={{ gap: ROW_GAP }}>
+              {Array.from({ length: years }, (_, i) => (
+                <Skeleton key={i} className="h-[17px]" />
+              ))}
             </div>
           )}
-          <div className="h-8" />
-          <div className="h-4 max-[400px]:h-8" />
+        </div>
+        <div className="mt-2.5 h-4 max-[420px]:h-9">
+          <Skeleton className="h-3 w-2/3" />
+        </div>
+        <div className="mt-3.5 border-t border-line">
+          {Array.from({ length: Math.max(1, rows) }, (_, i) => (
+            <div key={i} className="border-b border-line">
+              <div style={{ height: ROW_PX - 1 }} className="px-2 py-[9px]">
+                <Skeleton className={THUMB} />
+              </div>
+              {i === 0 && (
+                <div className="grid gap-3 px-2 pb-3">
+                  <Skeleton className={SENTENCE} />
+                  <Skeleton className="h-11" />
+                  {sections > 0 && <div style={{ height: sections * 24 - 4 }} />}
+                  <div className="h-8 max-[389px]:h-[72px]" />
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       </div>
-    </div>
+    </Section>
   )
 }

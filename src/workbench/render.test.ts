@@ -10,6 +10,8 @@ import type { AoiInput } from '../geo/aoi.ts'
 import { copy } from '../ui/copy.ts'
 import { flow } from '../ui/copy-flow.ts'
 import type { QualityResult } from '../workers/imagery-core.ts'
+import { barcodeHeight } from './barcode.ts'
+import { Tick } from './Barcode.tsx'
 import { ClaimPanel } from './ClaimPanel.tsx'
 import { EvidenceViewer, type Slot } from './EvidenceViewer.tsx'
 import { NotesPanel } from './NotesPanel.tsx'
@@ -51,7 +53,12 @@ function entry(
 ): DateEntry {
   return {
     date,
-    candidate: { date, item: { id: `S2_${date}` } as never, alternates: [], coversAoi: true },
+    candidate: {
+      date,
+      item: { id: `S2B_44QKJ_${date.replaceAll('-', '')}_0_L2A` } as never,
+      alternates: [],
+      coversAoi: true,
+    },
     quality: label ? quality(label, parts, over) : null,
     thumb: null,
     full: null,
@@ -91,7 +98,7 @@ const grid = (entries: DateEntry[], over: Record<string, unknown> = {}) =>
   )
 
 describe('Timeline', () => {
-  it('renders ~1,100 passes quickly, with one slider and no extra tab stops', () => {
+  it('renders ~1,100 passes quickly, with one slider and no extra tab stops in the barcode', () => {
     const labels = ['CLEAR', 'PARTIAL', 'OBSCURED', null] as const
     const entries = Array.from({ length: 1100 }, (_, i) => entry(day(i), labels[i % 4]!))
     const t0 = performance.now()
@@ -103,11 +110,12 @@ describe('Timeline', () => {
     })
     expect(performance.now() - t0).toBeLessThan(400)
     expect(html).toContain('max="1099"')
-    expect(html.match(/<input/g)).toHaveLength(1)
-    expect(html).not.toContain('tabindex') // the marks are decoration; the slider carries the keyboard
+    expect(html.match(/data-date=/g)).toHaveLength(1100) // a tick for every pass
+    expect(html.match(/<input/g)).toHaveLength(1) // the slider is the barcode's only control
+    expect(html).not.toContain('tabindex') // the ticks are decoration, never a tab stop
   })
 
-  it('reads out the date and how clearly it sees the outline', () => {
+  it('reads out the date and how clearly it sees the outline, and says the same in its sentence', () => {
     const html = timeline([entry('2025-01-10', 'CLEAR'), entry('2025-03-05', 'PARTIAL')], {
       current: '2025-03-05',
     })
@@ -118,12 +126,17 @@ describe('Timeline', () => {
   it('says Loading only while a check is on its way, and the failure when it failed', () => {
     const waiting = timeline([entry('2025-01-10', null, { status: 'checking' })])
     expect(waiting).toContain(`aria-valuetext="10 Jan 2025, ${copy.common.loading}"`)
+    expect(waiting).toContain(`>${copy.common.loading}<`) // on its row, too
     expect(waiting).not.toContain(flow.workbench.checkFailed)
+    expect(waiting).not.toContain(flow.workbench.checkFailedShort)
 
+    // The slider says the sentence; the row says the short word; the sentence is in the row's own message, with Try again.
     const failed = timeline([entry('2025-01-10', null, { status: 'error' })])
     expect(failed).toContain(`aria-valuetext="10 Jan 2025, ${flow.workbench.checkFailed}"`)
+    expect(failed).toContain(`${flow.workbench.checkFailedShort}</span>`)
+    expect(failed).toContain(`<p>${flow.workbench.checkFailed}</p>`)
     expect(failed).toContain(copy.common.retry)
-    expect(failed).not.toContain(`, ${copy.common.loading}"`)
+    expect(failed).not.toContain(`>${copy.common.loading}<`)
   })
 
   it('lists the four shares of the checked outline under Details', () => {
@@ -144,22 +157,27 @@ describe('Timeline', () => {
       )
   })
 
-  it('lists the sections of a road for the current date, each with its glyph and word', () => {
+  it('lists the sections of a road for the date on show, each with its glyph and word, short when a check failed', () => {
     const sections = PARTS.slice(0, 2)
-    const rows = (e: DateEntry) => timeline([e], { sections }).match(/<li\b.*?<\/li>/g) ?? []
-    const checked = rows(entry('2025-01-10', 'CLEAR', { parts: 2 }))
+    const listed = (e: DateEntry) => {
+      const html = timeline([e], { sections })
+      return html.match(/<ul aria-label="Sections".*?<\/ul>/)?.[0].match(/<li\b.*?<\/li>/g) ?? []
+    }
+    const checked = listed(entry('2025-01-10', 'CLEAR', { parts: 2 }))
     expect(checked).toHaveLength(2)
     expect(checked[0]).toContain(flow.workbench.section(0, 2000))
     expect(checked[1]).toContain(flow.workbench.section(2000, 4000))
     for (const row of checked) expect(row).toContain(`>${copy.quality.CLEAR.word}<`)
-    expect(timeline([entry('2025-01-10', 'CLEAR')])).not.toContain('<ul') // a site has no sections
+    expect(timeline([entry('2025-01-10', 'CLEAR')])).not.toContain(
+      `aria-label="${flow.workbench.sectionsLabel}"`,
+    ) // a site
     // not checked yet, or failed: each row says so instead of showing a glyph
-    for (const row of rows(entry('2025-01-10', null, { status: 'checking' }))) {
+    for (const row of listed(entry('2025-01-10', null, { status: 'checking' }))) {
       expect(row).toContain(`>${copy.common.loading}<`)
       expect(row).not.toContain('<svg')
     }
-    for (const row of rows(entry('2025-01-10', null, { status: 'error' })))
-      expect(row).toContain(`>${flow.workbench.checkFailed}<`)
+    for (const row of listed(entry('2025-01-10', null, { status: 'error' })))
+      expect(row).toContain(`>${flow.workbench.checkFailedShort}<`)
   })
 
   it('keeps a pin error next to the pin buttons', () => {
@@ -167,7 +185,18 @@ describe('Timeline', () => {
     expect(html).toMatch(/role="alert"[^>]*>You can pin up to 24 dates\./)
   })
 
-  // The notes below the timeline must not move when a check lands: its sentence, Details and preview hold their places.
+  it('names itself in a flat section, with the passes and the pinned dates counted in mono', () => {
+    const html = timeline([entry('2025-01-10', 'CLEAR'), entry('2025-03-05', 'PARTIAL')], {
+      pinned: ['2025-01-10'],
+    })
+    expect(html).toContain(`<section aria-label="${flow.workbench.photoTimeline}"`)
+    expect(html).toMatch(new RegExp(`<h2[^>]*>${flow.workbench.photoTimeline}</h2>`))
+    expect(html).toContain('>2 passes · 1 pinned<')
+    expect(timeline([entry('2025-01-10', 'CLEAR')])).toContain('>1 pass · 0 pinned<')
+  })
+
+  // The notes below the timeline must not move when a check lands: its sentence and Details hold their places, and its row has
+  // a picture's place whatever the picture turns out to be.
   it('holds the places of the sentence, Details and the preview while the date on show is being checked', () => {
     const thumbGrid = makeDisplayGrid([79.0832, 21.1408, 79.0932, 21.1508], 256)
     const pulses = (html: string) => html.match(/animate-pulse/g)?.length ?? 0
@@ -178,19 +207,245 @@ describe('Timeline', () => {
     const checked = timeline([entry('2025-01-10', 'CLEAR')], { thumbGrid })
     expect(pulses(checked)).toBe(1)
     expect(checked).toContain('<details')
-    // Failed, or seen to be obscured: nothing is held for what will not come.
-    expect(pulses(timeline([entry('2025-01-10', null, { status: 'error' })], { thumbGrid }))).toBe(0)
-    expect(pulses(timeline([entry('2025-01-10', 'OBSCURED')], { thumbGrid }))).toBe(0)
+    // Failed, or seen to be obscured: the same box, with stripes and the glyph, and nothing pulsing for what will not come.
+    for (const e of [entry('2025-01-10', null, { status: 'error' }), entry('2025-01-10', 'OBSCURED')]) {
+      const html = timeline([e], { thumbGrid })
+      expect(pulses(html)).toBe(0)
+      expect(html).toContain('repeating-linear-gradient')
+    }
+    // A preview that failed is the stripes too, and the row says so in words.
+    const lost = { ...entry('2025-01-10', 'CLEAR'), thumbFailed: true }
+    expect(pulses(timeline([lost], { thumbGrid }))).toBe(0)
+    expect(timeline([lost], { thumbGrid })).toContain(flow.workbench.thumbFailed)
   })
 
-  it('has a placeholder that is only decoration, with a place for each section of a road', () => {
+  it('draws the preview of a row in a 52 px box, cropped to fill it, and hides it from a screen reader', () => {
     const thumbGrid = makeDisplayGrid([79.0832, 21.1408, 79.0932, 21.1508], 256)
-    const site = renderToString(createElement(TimelineSkeleton, { thumbGrid, sections: 0 }))
-    const road = renderToString(createElement(TimelineSkeleton, { thumbGrid, sections: 3 }))
-    expect(site).toMatch(/^<div aria-hidden="true"/)
+    const rgba = new Uint8ClampedArray(4)
+    const e = { ...entry('2025-01-10', 'CLEAR'), thumb: { display: { rgba } } as never }
+    const html = timeline([e], { thumbGrid })
+    expect(html).toMatch(
+      /<span aria-hidden="true" class="block h-\[52px\] w-\[52px\]"><canvas[^>]*object-cover/,
+    )
+  })
+
+  it('has a placeholder that is only decoration, with a place for each year or the strip, each row and each section', () => {
+    const site = renderToString(
+      createElement(TimelineSkeleton, {
+        from: '2018-01-01',
+        to: '2025-12-31',
+        road: false,
+        sections: 0,
+        rows: 2,
+      }),
+    )
+    const road = renderToString(
+      createElement(TimelineSkeleton, {
+        from: '2018-01-01',
+        to: '2025-12-31',
+        road: true,
+        sections: 3,
+        rows: 2,
+      }),
+    )
+    expect(site).toContain(`<section aria-label="${flow.workbench.photoTimeline}"`) // the title is there from the start
     expect(site).not.toMatch(/<(input|button|a|svg)\b/) // nothing to focus, nothing to read
-    expect(road.length).toBeGreaterThan(site.length)
-    expect(renderToString(createElement(GridSkeleton, { rows: 4 })).match(/animate-pulse/g)).toHaveLength(5)
+    expect(site).toContain(`height:${barcodeHeight(false, 8)}px`) // 2018 to 2025: eight rows
+    expect(road).toContain(`height:${barcodeHeight(true, 8)}px`) // one strip and its years
+    expect(road).toContain('height:68px') // three sections of 20 px and their gaps
+    expect(site).not.toContain('height:68px')
+    expect(site.match(/height:70px/g)).toHaveLength(2) // two rows
+    expect(renderToString(createElement(GridSkeleton, { rows: 4 })).match(/animate-pulse/g)).toHaveLength(8)
+  })
+})
+
+describe('the pinned dates and the date on show', () => {
+  const dates = ['2025-01-10', '2025-03-05', '2025-06-15', '2025-12-20']
+  const four = () => [
+    entry(dates[0]!, 'CLEAR'),
+    entry(dates[1]!, 'PARTIAL'),
+    entry(dates[2]!, 'OBSCURED'),
+    entry(dates[3]!, 'CLEAR'),
+  ]
+  /** The rows of the list, each as its date. */
+  const listed = (html: string) =>
+    [...html.matchAll(/<button[^>]*type="button"[^>]*class="grid w-full[^>]*>.*?<\/button>/g)].map(
+      (m) => m[0],
+    )
+
+  it('has a row for each pinned date and the one on show, once each, oldest first', () => {
+    const html = timeline(four(), { pinned: [dates[3]!, dates[0]!], current: dates[1]! })
+    const rows = listed(html)
+    expect(rows).toHaveLength(3)
+    expect(rows[0]).toContain('10 Jan 2025')
+    expect(rows[1]).toContain('5 Mar 2025') // the date on show, not pinned
+    expect(rows[2]).toContain('20 Dec 2025')
+    // already pinned: no row of its own
+    expect(listed(timeline(four(), { pinned: [dates[3]!, dates[0]!], current: dates[3]! }))).toHaveLength(2)
+  })
+
+  it('marks the date on show as the current one, and only its row holds the buttons', () => {
+    const html = timeline(four(), {
+      pinned: [dates[0]!, dates[3]!],
+      before: dates[0]!,
+      after: dates[3]!,
+      current: dates[3]!,
+    })
+    expect(html.match(/aria-current="date"/g)).toHaveLength(1)
+    expect(html).toMatch(/<button[^>]*aria-current="date"[^>]*>.*?20 Dec 2025/)
+    for (const label of [flow.workbench.useBefore, flow.workbench.useAfter, flow.workbench.unpin])
+      expect(html.match(new RegExp(`>${label}</button>`, 'g')), label).toHaveLength(1)
+    // The pin button says what it does and is not also a toggle.
+    expect(html).not.toContain('aria-pressed')
+  })
+
+  it('tags before, after and a pinned date, and a date that is only on show has no tag', () => {
+    const html = timeline(four(), {
+      pinned: [dates[0]!, dates[1]!, dates[3]!],
+      before: dates[0]!,
+      after: dates[3]!,
+      current: dates[2]!,
+    })
+    const rows = listed(html)
+    expect(rows).toHaveLength(4)
+    const tag = (row: string) => row.match(/text-accent">([^<]*)<\/span>/)?.[1] ?? ''
+    expect(tag(rows[0]!)).toBe(flow.workbench.before)
+    expect(tag(rows[1]!)).toBe(flow.workbench.pinned)
+    expect(tag(rows[2]!)).toBe('') // 15 Jun: on show only
+    expect(tag(rows[3]!)).toBe(flow.workbench.after)
+  })
+
+  it('says the satellite, the resolution and the clear view under the date, once checked', () => {
+    const rows = listed(timeline(four(), { pinned: [dates[0]!], current: dates[1]! }))
+    expect(rows[0]).toContain('Sentinel-2B · 10 m · 100% clear view')
+    expect(rows[1]).toContain('Sentinel-2B · 10 m · 60% clear view')
+    const unchecked = listed(timeline([entry(dates[0]!, null, { status: 'queued' })]))
+    expect(unchecked[0]).toContain('>Sentinel-2B · 10 m<')
+    expect(unchecked[0]).not.toContain('clear view')
+  })
+
+  it('holds a row for each pinned date still being found, and only while more passes are on their way', () => {
+    const some = four().slice(0, 2)
+    const pinned = [dates[0]!, dates[2]!, dates[3]!] // two of them are not in the list yet
+    const heldRows = (html: string) => html.match(/<li aria-hidden="true"/g)?.length ?? 0
+    expect(heldRows(timeline(some, { pinned, more: true }))).toBe(2)
+    expect(heldRows(timeline(some, { pinned, more: false }))).toBe(0)
+    expect(heldRows(timeline(four(), { pinned, more: true }))).toBe(0)
+  })
+})
+
+describe('the barcode', () => {
+  const at = (html: string, date: string) =>
+    new RegExp(`data-date="${date}" class="([^"]*)" style="left:([\\d.]+)%;height:(\\d+)px"`).exec(html)!
+
+  it('is one row per year for a site: the year in a 34 px column, each tick at its day of the year', () => {
+    const e = [entry('2024-07-01', 'CLEAR'), entry('2025-01-10', 'CLEAR'), entry('2025-12-31', 'CLEAR')]
+    const html = timeline(e, { from: '2024-01-01', to: '2025-12-31', current: '2025-01-10' })
+    expect(html.match(/h-\[17px\] border-b border-line/g)).toHaveLength(2) // 2024 and 2025
+    expect(html).toContain('w-[34px]')
+    expect(html).toContain('>2024<')
+    expect(html).toContain('>2025<')
+    expect(Number(at(html, '2024-07-01')[2])).toBeCloseTo((182 / 366) * 100, 1) // a leap year of 366 days
+    expect(Number(at(html, '2025-12-31')[2])).toBeCloseTo((364 / 365) * 100, 1)
+  })
+
+  it('is memoised per pass, so one finished check renders one tick', () => {
+    expect((Tick as unknown as { $$typeof: symbol }).$$typeof).toBe(Symbol.for('react.memo'))
+  })
+
+  it('keeps a pinned tick above the passes drawn after it, and the marks have colours of their own in forced-colors mode', () => {
+    const e = [entry('2025-01-10', 'CLEAR'), entry('2025-01-11', 'CLEAR')]
+    const html = timeline(e, { from: '2025-01-01', to: '2025-12-31', pinned: ['2025-01-10'] })
+    expect(at(html, '2025-01-10')[1]).toContain('z-[1]')
+    expect(at(html, '2025-01-11')[1]).not.toContain('z-[1]')
+    expect(at(html, '2025-01-11')[1]).toContain('forced-colors:bg-[CanvasText]')
+    expect(at(html, '2025-01-10')[1]).toContain('forced-colors:bg-[Highlight]')
+  })
+
+  it('holds two lines for its legend on a phone, where the fifth word wraps', () => {
+    expect(timeline([entry('2025-01-10', 'CLEAR')])).toContain('max-[420px]:min-h-9')
+    const sk = renderToString(
+      createElement(TimelineSkeleton, {
+        from: '2025-01-01',
+        to: '2025-12-31',
+        road: false,
+        sections: 0,
+        rows: 1,
+      }),
+    )
+    expect(sk).toContain('max-[420px]:h-9')
+    expect(sk).toContain('max-[389px]:h-[72px]') // the three buttons wrap below 390 px
+  })
+
+  it('is one strip for a road, with the years under it', () => {
+    const e = [entry('2018-02-22', 'CLEAR', { parts: 2 }), entry('2025-12-12', 'CLEAR', { parts: 2 })]
+    const html = timeline(e, { from: '2018-01-01', to: '2025-12-31', sections: PARTS.slice(0, 2) })
+    expect(html.match(/h-\[17px\] border-b border-line/g)).toHaveLength(1)
+    expect(html).not.toContain('w-[34px]')
+    for (let y = 2018; y <= 2025; y++) expect(html).toContain(`>${y}</span>`)
+  })
+
+  it('draws a clear pass 16 px tall, partly clear 8, obscured or not covered 3, not checked yet 2, a failed check 3', () => {
+    const e = [
+      entry('2025-01-10', 'CLEAR'),
+      entry('2025-02-10', 'PARTIAL'),
+      entry('2025-03-10', 'OBSCURED'),
+      entry('2025-04-10', 'NOT_COVERED'),
+      entry('2025-05-10', null, { status: 'queued' }),
+      entry('2025-06-10', null, { status: 'error' }),
+    ]
+    const html = timeline(e, { from: '2025-01-01', to: '2025-12-31' })
+    expect(e.map((x) => Number(at(html, x.date)[3]))).toEqual([16, 8, 3, 3, 2, 3])
+    // fainter as they see less: the weight carries it for those who see the page in one colour
+    expect(at(html, '2025-01-10')[1]).toContain('opacity-85')
+    expect(at(html, '2025-03-10')[1]).toContain('opacity-45')
+    expect(at(html, '2025-05-10')[1]).toContain('opacity-25')
+  })
+
+  it('draws before, after and pinned dates in the accent, 3 px wide, and the date on show with a caret under it', () => {
+    const e = [entry('2025-01-10', 'CLEAR'), entry('2025-03-05', 'PARTIAL'), entry('2025-06-15', 'OBSCURED')]
+    const html = timeline(e, {
+      from: '2025-01-01',
+      to: '2025-12-31',
+      before: '2025-01-10',
+      pinned: ['2025-01-10', '2025-03-05'],
+      current: '2025-06-15',
+    })
+    expect(at(html, '2025-01-10')[1]).toContain('bg-accent')
+    expect(at(html, '2025-01-10')[1]).toContain('w-[3px]')
+    expect(at(html, '2025-03-05')[1]).toContain('bg-accent') // pinned
+    expect(at(html, '2025-06-15')[1]).not.toContain('bg-accent')
+    // one caret, under the tick of the date on show
+    const carets = [...html.matchAll(/class="absolute top-full[^"]*" style="left:([\d.]+)%"/g)]
+    expect(carets).toHaveLength(1)
+    expect(carets[0]![1]).toBe(at(html, '2025-06-15')[2])
+  })
+
+  it('leaves the barcode and its legend out of the reading order, and keeps the slider in it', () => {
+    const html = timeline([entry('2025-01-10', 'CLEAR')])
+    const input = html.indexOf('<input')
+    expect(html.slice(input, html.indexOf('>', input))).not.toContain('aria-hidden')
+    expect(html).toMatch(/<div aria-hidden="true" class="select-none/) // the ticks
+    expect(html).toMatch(/<p aria-hidden="true"[^>]*>.*Pinned/) // the legend
+    expect(html).toContain('peer-focus-visible:outline') // a ring around it while the slider has the focus
+    expect(html).toContain('touch-pan-y') // a vertical swipe still scrolls the page
+  })
+
+  it('names the faintest tick in its legend only while a pass is not checked yet', () => {
+    const word = flow.workbench.notCheckedYet
+    const base = [entry('2025-01-10', 'CLEAR')]
+    const legend = (e: DateEntry[]) => timeline(e).match(/<p aria-hidden="true"[^>]*>.*?<\/p>/)![0]
+    for (const w of [
+      copy.quality.CLEAR.word,
+      copy.quality.PARTIAL.word,
+      copy.quality.OBSCURED.word,
+      flow.workbench.pinned,
+    ])
+      expect(legend(base)).toContain(w)
+    expect(legend(base)).not.toContain(word)
+    expect(legend([...base, entry('2025-02-10', null, { status: 'checking' })])).toContain(word)
+    expect(legend([...base, entry('2025-02-10', null, { status: 'queued' })])).toContain(word)
+    expect(legend([...base, entry('2025-02-10', null, { status: 'error' })])).not.toContain(word)
   })
 })
 
@@ -207,7 +462,7 @@ describe('SectionGrid', () => {
     expect(html.match(/<th[^>]*scope="row"/g)).toHaveLength(5)
   })
 
-  it('gives each cell the glyph and its word, and reads them out with the section and date', () => {
+  it('gives each cell the glyph and its word on one line, and reads them out with the section and date', () => {
     const html = grid(
       [entry('2025-01-10', 'CLEAR', { parts: 2 }), entry('2025-03-05', 'PARTIAL', { parts: 2 })],
       { parts: PARTS.slice(0, 2) },
@@ -215,6 +470,43 @@ describe('SectionGrid', () => {
     expect(html).toContain(`aria-label="${flow.workbench.cell('2.0–4.0 km', '5 Mar 2025', 'Partly clear')}"`)
     expect(html).toContain('>Partly clear<')
     expect(html).toContain('>Clear<')
+    // mono 11 px capitals with a letter-space, on one line, 5 rem at least
+    expect(html).toContain('font-mono text-[11px] uppercase tracking-[0.08em]')
+    expect(html).toContain('whitespace-nowrap')
+    expect(html).toContain('min-w-20')
+  })
+
+  it('lays the table out as in the mockup: two-line date headers, numbered row headers, a border on every cell', () => {
+    const html = grid(
+      [entry('2025-01-10', 'CLEAR', { parts: 2 }), entry('2025-03-05', 'PARTIAL', { parts: 2 })],
+      { parts: PARTS.slice(0, 2) },
+    )
+    // "10 Jan" over "2025": a block of its own, never written sideways
+    expect(html).toMatch(/10 Jan(<!-- -->)? (<!-- -->)?<span class="block[^>]*>2025<\/span>/)
+    expect(html).not.toContain('vertical-rl')
+    expect(html).toMatch(/<th[^>]*scope="row"[^>]*>01 · 0\.0–2\.0 km<\/th>/)
+    expect(html).toMatch(/<th[^>]*scope="row"[^>]*>02 · 2\.0–4\.0 km<\/th>/)
+    expect(html).toMatch(/<th[^>]*scope="col"[^>]*>Section<\/th>/)
+    expect(html.match(/<td class="border-b border-r border-line p-0">/g)).toHaveLength(4)
+    expect(html).toContain('sticky left-0') // the section names stay while the dates scroll
+    expect(html).toContain(`>${flow.workbench.gridHelp}<`) // under its title, in a flat section
+  })
+
+  it('outlines the date on show in the row that has the focus, and says what it is about below the table', () => {
+    const e = [entry('2025-01-10', 'CLEAR', { parts: 2 }), entry('2025-03-05', 'PARTIAL', { parts: 2 })]
+    const html = grid(e, { parts: PARTS.slice(0, 2), current: '2025-03-05' })
+    expect(html.match(/shadow-\[inset_0_0_0_1px_var\(--gs-accent\)\]/g)).toHaveLength(1) // row 01 x 5 Mar
+    expect(html).toMatch(/<h3[^>]*>Section 01 · 0\.0–2\.0 km<\/h3>/)
+    expect(html).toContain('>5 Mar 2025 · Partly clear view<')
+    expect(html).toContain(flow.workbench.gapNote.replaceAll('"', '&quot;'))
+    // a date on show that is not a column is still what the detail is about
+    const off = grid(e, {
+      parts: PARTS.slice(0, 2),
+      current: '2025-06-15',
+      shown: entry('2025-06-15', 'OBSCURED', { parts: 2 }),
+    })
+    expect(off).toContain('>15 Jun 2025 · Obscured view<')
+    expect(off).not.toContain('shadow-[inset')
   })
 
   it('keeps a pinned date that is not checked yet, or failed, as a column with its word and no glyph', () => {
@@ -227,9 +519,11 @@ describe('SectionGrid', () => {
     expect(html).toContain(
       `aria-label="${flow.workbench.cell('0.0–2.0 km', '5 Mar 2025', copy.common.loading)}"`,
     )
+    // The short word: the sentence is in the row of the date on show.
     expect(html).toContain(
-      `aria-label="${flow.workbench.cell('0.0–2.0 km', '15 Jun 2025', flow.workbench.checkFailed)}"`,
+      `aria-label="${flow.workbench.cell('0.0–2.0 km', '15 Jun 2025', flow.workbench.checkFailedShort)}"`,
     )
+    expect(html).not.toContain(flow.workbench.checkFailed)
     expect(html.match(/<svg/g)).toHaveLength(2) // the two cells of the checked date; the other columns have none
   })
 
@@ -424,6 +718,9 @@ describe('EvidenceViewer', () => {
     expect(html).toMatch(
       /aria-hidden="true" class="pointer-events-none absolute inset-0 \[container-type:inline-size\]"/,
     )
+    // The e2e tests find the chips and the handle by these, not by their styling.
+    expect(html.match(/data-chip=""/g)).toHaveLength(2)
+    expect(html.match(/data-handle=""/g)).toHaveLength(1)
   })
 
   it('captions each photo in three lines: date and satellite, clear view and "Not saved", the item id', () => {
@@ -483,14 +780,15 @@ describe('EvidenceViewer', () => {
     expect(photos(viewer(none))).toBe(1)
   })
 
-  it('has the map tool in the row only where there is a map, and reads its state from its label', () => {
+  it('has the map tool in the row only where there is a map, and says what pressing does in its label alone', () => {
     expect(viewer()).not.toContain(flow.workbench.showMap)
-    expect(viewer({ onToggleMap: noop })).toMatch(
-      new RegExp(`<button[^>]*aria-pressed="false"[^>]*>.*${flow.workbench.showMap}</button>`),
-    )
-    expect(viewer({ onToggleMap: noop, mapOpen: true })).toMatch(
-      new RegExp(`<button[^>]*aria-pressed="true"[^>]*>.*${flow.workbench.hideMap}</button>`),
-    )
+    const shut = viewer({ onToggleMap: noop })
+    expect(shut).toMatch(new RegExp(`<button[^>]*>.*${flow.workbench.showMap}</button>`))
+    const open = viewer({ onToggleMap: noop, mapOpen: true })
+    expect(open).toMatch(new RegExp(`<button[^>]*>.*${flow.workbench.hideMap}</button>`))
+    // The label changes, so a pressed state would be said twice.
+    expect(shut).not.toContain('aria-pressed')
+    expect(open).not.toContain('aria-pressed')
   })
 })
 

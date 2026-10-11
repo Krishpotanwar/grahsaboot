@@ -57,6 +57,20 @@ describe('copy', () => {
     expect(flow.workbench.scale(10000)).toBe('10 km')
     expect([0, 1, 9, 10].map(flow.workbench.sectionNo)).toEqual(['01', '02', '10', '11'])
   })
+  it('words a row of the photo timeline, the grid headers and the detail under the grid', () => {
+    const id = 'S2B_43QBB_20180222_0_L2A'
+    expect(flow.workbench.rowMeta(id, 100)).toBe('Sentinel-2B · 10 m · 100% clear view')
+    expect(flow.workbench.rowMeta(id)).toBe('Sentinel-2B · 10 m') // not checked yet: no figure to give
+    expect(flow.workbench.rowMeta('LC09_L2SP_144047_20250101', 41)).toBe('Sentinel-2 · 10 m · 41% clear view')
+    expect(flow.workbench.sectionHead(1, 2000, 4000)).toBe('02 · 2.0–4.0 km')
+    expect(flow.workbench.sectionTitle(1, 2000, 4000)).toBe('Section 02 · 2.0–4.0 km')
+    expect(flow.workbench.sectionView('12 Dec 2025', 'Clear', true)).toBe('12 Dec 2025 · Clear view')
+    expect(flow.workbench.sectionView('12 Dec 2025', 'Loading', false)).toBe('12 Dec 2025 · Loading')
+    expect(flow.workbench.passes(1076)).toBe('1076 passes')
+    expect(flow.workbench.pinnedCount(2)).toBe('2 pinned')
+    expect(flow.workbench.checkFailedShort.length).toBeLessThan(flow.workbench.checkFailed.length)
+    expect(flow.workbench.gridHelp).toBe('How clearly each section is visible on each date.')
+  })
   it('says some passes are not shown when a window is cut, without a number the search no longer has', () => {
     expect(flow.workbench.limited).toBe('Some passes are not shown. Narrow the dates to see them all.')
   })

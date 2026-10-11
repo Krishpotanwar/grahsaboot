@@ -5,6 +5,11 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
 /** "Sentinel-2B" from an item id such as S2B_43QBB_20180222_0_L2A; plain "Sentinel-2" when the id names no unit. */
 const satellite = (itemId: string) => `Sentinel-2${/^S2([ABC])_/.exec(itemId)?.[1] ?? ''}`
 
+const clearView = (clearPct: number) => `${clearPct}% clear view`
+/** "0.0–2.0 km". A road's sections are numbered 01, 02, ... along the line, on the photos and in the grid. */
+const section = (from: number, to: number) => `${(from / 1000).toFixed(1)}–${(to / 1000).toFixed(1)} km`
+const sectionNo = (idx: number) => String(idx + 1).padStart(2, '0')
+
 export const flow = {
   stepOf: (n: number) => `Step ${n} of 4`,
   steps: ['Place', 'Outline', 'Dates', 'Review'],
@@ -84,7 +89,10 @@ export const flow = {
     // The caption under a photo is three lines: this one, then the clear-view figure with "Not saved", then the item id.
     satellite,
     captionLine1: (date: string, itemId: string) => `${date} · ${satellite(itemId)} · 10 m`,
-    clearView: (clearPct: number) => `${clearPct}% clear view`,
+    clearView,
+    // A row of the photo timeline: the satellite and resolution, then the clear view once the date is checked.
+    rowMeta: (itemId: string, clearPct?: number) =>
+      `${satellite(itemId)} · 10 m${clearPct === undefined ? '' : ` · ${clearView(clearPct)}`}`,
     // Over the photo (shown in capitals): which photo it is, what the difference view shows, the scale bar, the north arrow.
     chip: (role: string, date: string) => `${role} · ${date}`,
     diffChip: 'Difference',
@@ -93,19 +101,30 @@ export const flow = {
     photoAlt: (role: string, date: string, clearPct?: number) =>
       `${role} photo, ${date}, Sentinel-2 true colour${clearPct !== undefined ? ` · ${clearPct}% clear view` : ''}`,
     timeline: 'Timeline',
+    photoTimeline: 'Photo timeline',
     timelineLabel: 'Satellite pass',
     passes: (n: number) => plural(n, 'pass', 'passes'),
+    pinnedCount: (n: number) => `${n} pinned`,
+    // On a row of the list (shown in capitals) and in the legend under the barcode.
+    pinned: 'Pinned',
+    notCheckedYet: 'Not checked yet',
     useBefore: 'Use as before',
     useAfter: 'Use as after',
     pin: 'Pin to report',
     unpin: 'Unpin',
     pinLimit: 'You can pin up to 24 dates.',
-    legend: 'Each mark shows how clearly that photo sees your outline.',
     grid: 'Sections × dates',
+    gridHelp: 'How clearly each section is visible on each date.',
     sectionCol: 'Section',
-    section: (from: number, to: number) => `${(from / 1000).toFixed(1)}–${(to / 1000).toFixed(1)} km`,
-    // A road's sections are numbered 01, 02, ... along the line, on the photos and (P1b) in the grid.
-    sectionNo: (idx: number) => String(idx + 1).padStart(2, '0'),
+    sectionsLabel: 'Sections',
+    section,
+    sectionNo,
+    // The grid's row header and the detail block under it.
+    sectionHead: (idx: number, from: number, to: number) => `${sectionNo(idx)} · ${section(from, to)}`,
+    sectionTitle: (idx: number, from: number, to: number) =>
+      `Section ${sectionNo(idx)} · ${section(from, to)}`,
+    sectionView: (date: string, word: string, seen: boolean) => `${date} · ${seen ? `${word} view` : word}`,
+    gapNote: 'Cloudy or missing views are gaps in the evidence, not "no change".',
     shares: {
       valid: 'Visible ground',
       uncertain: 'Uncertain (shadow or unclassified)',
@@ -125,6 +144,8 @@ export const flow = {
     },
     loadingPhoto: 'Loading photo',
     checkFailed: 'This photo could not be checked.',
+    // Where the sentence does not fit (a grid cell, a section row): the sentence stays in the selected row.
+    checkFailedShort: 'Check failed',
     badOutline: 'This outline can no longer be read. Draw it again from the start.',
     thumbFailed: 'Preview unavailable.',
     notFound:

@@ -84,6 +84,7 @@ function Chrome({
         {chips.map(([text, side]) => (
           <span
             key={side}
+            data-chip=""
             className={`${CHIP}${two ? ' max-w-[calc(50%-4px)] truncate' : ''} ${side === 'left' ? 'left-0' : 'right-0'}`}
           >
             {text}
@@ -250,13 +251,15 @@ function Waiting({
   )
 }
 
-/** Show map / Hide map: the viewer's row holds it; `Workbench` puts it alone where there is no viewer. The label says what it does. */
+/**
+ * Show map / Hide map: the viewer's row holds it; `Workbench` puts it alone where there is no viewer. The label says what
+ * pressing does, so it is not also a toggle button (a screen reader would say the state twice).
+ */
 export function MapTool({ open, onToggle }: { open: boolean; onToggle: () => void }) {
   return (
     <button
       id="gs-map-tool"
       type="button"
-      aria-pressed={open}
       onClick={onToggle}
       className="inline-flex h-11 select-none items-center gap-2 rounded-[6px] px-2.5 text-sm text-fg-2 hover:bg-panel hover:text-fg active:scale-[0.98]"
     >
@@ -435,6 +438,7 @@ function EvidenceViewerBody({
               {/* The native range above is the control; this is its visible handle, kept whole inside the photo. */}
               <div
                 aria-hidden
+                data-handle=""
                 className="pointer-events-none absolute top-1/2 grid h-11 w-11 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-accent text-on-accent shadow-[0_2px_10px_rgb(0_0_0/0.45)] peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent"
                 style={{ left: `clamp(22px, ${pos}%, calc(100% - 22px))` }}
               >

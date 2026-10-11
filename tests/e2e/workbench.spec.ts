@@ -425,7 +425,7 @@ test('every photo has its date chip, a scale bar to scale and a north arrow, all
   page,
 }) => {
   await sitePage(page)
-  const chip = (text: string) => page.locator('span.uppercase', { hasText: text })
+  const chip = (text: string) => page.locator('[data-chip]', { hasText: text })
   // Swipe: BEFORE at the left corner, AFTER at the right.
   const before = chip(`${flow.workbench.before} · 10 Jan 2025`)
   const after = chip(`${flow.workbench.after} · 20 Dec 2025`)
@@ -450,7 +450,7 @@ test('every photo has its date chip, a scale bar to scale and a north arrow, all
   expect(bar.width / photo.width).toBeLessThan(0.18)
   await expect(page.getByText(flow.workbench.north)).toBeVisible()
   // The handle stays whole inside the photo at both ends of the swipe.
-  const handle = page.locator('div.rounded-full[aria-hidden="true"]')
+  const handle = page.locator('[data-handle]')
   for (const v of ['0', '100']) {
     await page.getByRole('slider', { name: flow.workbench.swipeLabel }).fill(v)
     const h = (await handle.boundingBox())!
@@ -526,6 +526,48 @@ for (const [name, width, height, limit, open] of [
   })
 }
 
+// "Finding the other passes." is said above the viewer while the whole range is searched, on a phone the whole page's worth of
+// content below it: its line is held from the first moment, so it comes in without moving the viewer, the timeline or the notes.
+test('the line that says the other passes are being found comes in without moving anything below it', async ({
+  page,
+}) => {
+  const id = await openThenEdit(page, {
+    before: '2025-01-10',
+    after: '2025-12-20',
+    pinned: ['2025-01-10', '2025-12-20'],
+  })
+  await page.setViewportSize({ width: 390, height: 844 })
+  // Two gates: the search of each known day (the pair, answered first) and the search of the whole range.
+  let openDays!: () => void
+  let openRange!: () => void
+  const days = new Promise<void>((r) => (openDays = r))
+  const range = new Promise<void>((r) => (openRange = r))
+  await page.route('**/stac/search', async (route) => {
+    const [from = '', to = ''] = ((route.request().postDataJSON()?.datetime as string) ?? '').split('/')
+    await (from.slice(0, 10) === to.slice(0, 10) ? days : range)
+    await route.continue()
+  })
+  try {
+    await page.goto(`/i/${id}?tier=0`)
+    const add = page
+      .getByRole('region', { name: flow.notes.title })
+      .getByRole('button', { name: flow.notes.add })
+    await expect(page.getByText(flow.workbench.searching)).toBeVisible()
+    await page.waitForTimeout(300)
+    const held = (await add.boundingBox())!.y
+    openDays()
+    await waitForPhotos(page)
+    await expect(page.getByText(flow.workbench.searchingMore)).toBeVisible()
+    await page.waitForTimeout(300)
+    const moved = (await add.boundingBox())!.y
+    expect(Math.abs(moved - held), `the notes moved from ${held} to ${moved}`).toBeLessThan(12)
+  } finally {
+    openDays()
+    openRange()
+  }
+  await expect(page.getByText(flow.workbench.searchingMore)).toHaveCount(0)
+})
+
 test('while the search runs the viewer says so in its own box, and nothing is left saying it afterwards', async ({
   page,
 }) => {
@@ -549,7 +591,7 @@ test('while the search runs the viewer says so in its own box, and nothing is le
 test('the swipe date chips do not run into each other on a phone', async ({ page }) => {
   await sitePage(page, 390, 844)
   await page.getByRole('radio', { name: flow.workbench.modes.swipe }).check()
-  const chip = (t: string) => page.locator('span.uppercase', { hasText: t })
+  const chip = (t: string) => page.locator('[data-chip]', { hasText: t })
   const b = (await chip(`${flow.workbench.before} · 10 Jan 2025`).boundingBox())!
   const a = (await chip(`${flow.workbench.after} · 20 Dec 2025`).boundingBox())!
   expect(b.x + b.width).toBeLessThanOrEqual(a.x)

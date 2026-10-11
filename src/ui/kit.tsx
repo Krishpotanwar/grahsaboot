@@ -79,6 +79,9 @@ export function Panel({
 export const TEXTAREA =
   'min-h-[66px] rounded-[6px] border border-control bg-bg px-3.5 py-[11px] text-sm leading-[1.45] text-fg focus:border-accent'
 
+/** The box of a flat section of a side column: a 1 px rule under it and 20 x 24 px of room. */
+export const SECTION = 'border-b border-line px-4 py-5 lg:px-6'
+
 /**
  * A flat section of a side column (approved mockup 02): a 1 px rule under it and a 17 px title with an optional mono count on
  * the right. With `collapsible` the header is a disclosure row (native `<details>`); `help` is then one line under the title
@@ -115,7 +118,7 @@ export function Section({
     </>
   )
   return (
-    <section aria-label={title} className="border-b border-line px-4 py-5 lg:px-6">
+    <section aria-label={title} className={SECTION}>
       {collapsible ? (
         <details open={defaultOpen} className="group">
           <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 [&::-webkit-details-marker]:hidden">
