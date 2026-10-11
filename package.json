@@ -12,6 +12,7 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
+    "test:deno": "DENO_NO_UPDATE_CHECK=1 deno test --config supabase/functions/deno.json --cached-only supabase/functions",
     "check": "npm run sync:evidence && npm run typecheck && npm run test && npm run build && tsx scripts/check-bundle.ts",
     "sync:evidence": "tsx scripts/sync-evidence.ts",
     "bundle": "tsx scripts/check-bundle.ts",
