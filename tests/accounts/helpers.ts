@@ -1,10 +1,13 @@
 import type { Page, Route } from '@playwright/test'
+import { CONSENT_VERSION, consentKey } from '../../src/accounts/consent.ts'
 
 // Shared by every accounts spec: one signed-in user, one syntactically valid JWT, one fake Supabase at the build's own origin
 // (.env.accounts: http://127.0.0.1:4174/supabase), so page.route needs no CORS and no preflight.
 
 export const SUPABASE_KEY = 'e2e-publishable-key'
 export const USER_ID = '00000000-0000-4000-8000-00000000000a'
+/** The id a first save gets back, unless a spec says another. */
+export const INSERTED_ID = '11111111-1111-4111-8111-111111111111'
 
 const b64 = (o: object) => Buffer.from(JSON.stringify(o)).toString('base64url')
 /** header.payload. with no signature: the app and supabase-js can read it, a server would refuse it. */
@@ -39,6 +42,14 @@ export async function signedIn(page: Page) {
   await page.addInitScript((session) => localStorage.setItem('gs-auth', JSON.stringify(session)), SESSION)
 }
 
+/** This user has agreed to the notice in this browser, so a save does not ask. */
+export async function agreed(page: Page) {
+  await page.addInitScript(
+    ([key, version]) => localStorage.setItem(key!, version!),
+    [consentKey(USER_ID), CONSENT_VERSION],
+  )
+}
+
 export interface SupabaseCall {
   method: string
   /** Path below the fake Supabase root, e.g. /rest/v1/investigations. */
@@ -53,8 +64,10 @@ export interface MockOptions {
   investigations?: Array<Record<string, unknown>>
   annotations?: Array<Record<string, unknown>>
   frames?: Array<Record<string, unknown>>
-  /** The id a first save gets back. */
+  /** The id a first save gets back (INSERTED_ID by default). */
   insertedId?: string
+  /** The answer to recording the agreement (nothing, 204, by default). */
+  consent?: { status: number; body?: unknown }
   /** The verify function's answer for a request body; by default every frame comes back verified with the hash it sent. */
   verify?: (body: { frames: Array<{ asset: string; level: number; sha256: string }> }) => {
     status: number
@@ -90,7 +103,17 @@ export async function mockSupabase(page: Page, opts: MockOptions = {}) {
     const get = req.method() === 'GET'
 
     if (path === '/auth/v1/user') return json(route, 200, USER)
-    if (path === '/rest/v1/rpc/record_consent') return nothing(route)
+    // supabase-js sends the browser here (window.location.assign): a page of its own, so a spec can read the redirect it holds.
+    if (path === '/auth/v1/authorize')
+      return route.fulfill({
+        status: 200,
+        contentType: 'text/html',
+        body: '<!doctype html><title>Google</title><p>Google sign-in</p>',
+      })
+    // The code exchange of the return from Google: the session, whatever the code.
+    if (path === '/auth/v1/token') return json(route, 200, SESSION)
+    if (path === '/rest/v1/rpc/record_consent')
+      return opts.consent ? json(route, opts.consent.status, opts.consent.body ?? {}) : nothing(route)
     if (path === '/functions/v1/verify') {
       const body = req.postDataJSON() as Parameters<NonNullable<MockOptions['verify']>>[0]
       const out = opts.verify?.(body) ?? {
@@ -111,8 +134,7 @@ export async function mockSupabase(page: Page, opts: MockOptions = {}) {
     }
     if (path === '/rest/v1/investigations') {
       if (get) return json(route, 200, rowsOf(opts.investigations, 'id'))
-      if (req.method() === 'POST')
-        return json(route, 201, { id: opts.insertedId ?? '11111111-1111-4111-8111-111111111111' })
+      if (req.method() === 'POST') return json(route, 201, { id: opts.insertedId ?? INSERTED_ID })
       if (req.method() === 'PATCH') return json(route, 200, [{ id: eq('id') }])
       return nothing(route)
     }

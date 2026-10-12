@@ -226,10 +226,11 @@ export const setServerNoteIds = (inv: Investigation, ids: string[], now = new Da
 
 /**
  * The record that speaks for the photo on screen, or null. It must be for this item. A "verified" record counts only for the
- * pixels the browser holds now (the server's hash is the hash of those pixels); a mismatch for this item always shows.
+ * pixels the browser holds now (the server's hash is the hash of those pixels); a mismatch for this item always shows. It reads
+ * only the record map, so a memo can depend on `inv.verification` and not on every edit of the investigation.
  */
 export function verificationFor(
-  inv: Investigation,
+  inv: Pick<Investigation, 'verification'>,
   date: string,
   asset: 'visual' | 'scl',
   level: number,

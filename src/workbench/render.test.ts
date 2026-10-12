@@ -739,6 +739,51 @@ describe('EvidenceViewer', () => {
     expect(id).toBeGreaterThan(clear)
   })
 
+  describe("the server's check of a photo, in its caption", () => {
+    const record = (over: Partial<NonNullable<NonNullable<Slot>['verification']>> = {}) => ({
+      status: 'verified' as const,
+      verifiedAt: '2026-10-05T10:00:00+00:00',
+      frameId: 'f',
+      serverSha256: 'a'.repeat(64),
+      clientSha256: 'a'.repeat(64),
+      itemId: 'S2B_44QKJ_20250110_0_L2A',
+      ...over,
+    })
+    const second = (html: string) => html.slice(html.indexOf('20 Dec 2025 · Sentinel-2B'))
+
+    it('says "Verified" with the date of the check, in place of "Not saved", for the photo it is for', () => {
+      const html = viewer({ before: slot('2025-01-10', { verification: record() }) })
+      const before = html.slice(0, html.indexOf('20 Dec 2025 · Sentinel-2B'))
+      expect(before).toContain(flow.workbench.verifiedBadge('5 Oct 2026'))
+      expect(before).not.toContain(flow.workbench.notSaved)
+      expect(before).toContain('text-ok')
+      // the other photo has no record: it still says what it said
+      expect(second(html)).toContain(flow.workbench.notSaved)
+      expect(second(html)).not.toContain('Verified ·')
+    })
+
+    it('says "Did not match the source" in words and with a mark, not by colour alone', () => {
+      const html = viewer({ after: slot('2025-12-20', { verification: record({ status: 'mismatch' }) }) })
+      const after = second(html)
+      expect(after).toContain(flow.workbench.mismatchBadge)
+      expect(after).toContain('text-warn')
+      expect(after).not.toContain(flow.workbench.notSaved)
+      // the mark: a hidden icon next to the words
+      expect(after).toMatch(
+        new RegExp(`<svg[^>]*aria-hidden="true"[^>]*>[\\s\\S]*?</svg>[^<]*${flow.workbench.mismatchBadge}`),
+      )
+    })
+
+    it('shows nothing of it for a photo with no record, or with an explicit null', () => {
+      for (const verification of [undefined, null]) {
+        const html = viewer({ before: slot('2025-01-10', { verification }) })
+        expect(html).not.toContain('Verified ·')
+        expect(html).not.toContain(flow.workbench.mismatchBadge)
+        expect(html.match(new RegExp(flow.workbench.notSaved, 'g'))).toHaveLength(2)
+      }
+    })
+  })
+
   it("numbers a road's sections along its line, on the outline only", () => {
     const road: AoiInput = {
       kind: 'road',

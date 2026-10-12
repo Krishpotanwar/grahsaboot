@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
+import { LIMITS } from '../geo/limits.ts'
 import { account } from './copy-account.ts'
+import { flow } from './copy-flow.ts'
 import { copy } from './copy.ts'
 
 // The words of signing in are only for a build with accounts (copy-account.ts). The live pages say nothing about them.
@@ -38,5 +40,35 @@ describe('account copy', () => {
     expect(text).toContain('for one year')
     expect(text).toContain('kept while your account exists')
     expect(text).toContain('Google name and email stay until you delete your account')
+  })
+
+  it("leaves the words of a photo's check to the main tree: the caption badge and the report are copy-flow's", () => {
+    expect(Object.keys(account)).not.toContain('verifiedBadge')
+    expect(Object.keys(account)).not.toContain('mismatchBadge')
+    expect(flow.workbench.verifiedBadge('20 Dec 2025')).toBe('Verified · 20 Dec 2025')
+    expect(flow.workbench.mismatchBadge).toBe('Did not match the source')
+  })
+
+  it('says how many frames are verified, in the singular for one', () => {
+    expect(account.saved(7, '5 Oct 2026')).toBe('Saved · 7 frames verified · 5 Oct 2026')
+    expect(account.saved(1, '5 Oct 2026')).toBe('Saved · 1 frame verified · 5 Oct 2026')
+    // with none, there is no date to give
+    expect(account.savedNone).toBe('Saved. No frames are verified yet.')
+  })
+
+  it('tells the 50-frame cap apart from "try again": what to do, with the number from LIMITS', () => {
+    expect(account.frameLimit).toContain(String(LIMITS.pinnedDates * 2 + 2))
+    expect(account.frameLimit).toMatch(/unpin/i)
+    expect(account.frameLimit).toMatch(/split/i)
+    expect(account.frameLimit).not.toMatch(/try again|save again to retry/i)
+    // the retryable lines still say so
+    expect(account.failed(2)).toContain('Save again to retry')
+  })
+
+  it('has a reason line for each thing a save waits for, and its own failure line for the agreement', () => {
+    expect(account.waiting.checks).toMatch(/checks/i)
+    expect(account.waiting.photos).toMatch(/photos/i)
+    expect(account.consent.failed).toMatch(/nothing was saved/i)
+    expect(account.consent.cancel).not.toBe(account.delete.cancel) // "Keep" is for an investigation, not a notice
   })
 })

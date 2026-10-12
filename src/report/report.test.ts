@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { escapeHtml } from './escape.ts'
 import { buildProvenance } from './provenance.ts'
 import { buildReportHtml, type ReportImage } from './html.ts'
-import { addNote, newInvestigation, setBeforeAfter, setClaim } from '../data/investigation.ts'
+import { addNote, newInvestigation, setBeforeAfter, setClaim, togglePin } from '../data/investigation.ts'
 import { makeDisplayGrid } from '../evidence/display.ts'
 import type { AoiSummary } from '../geo/aoi.ts'
 import { flow } from '../ui/copy-flow.ts'
@@ -247,6 +247,75 @@ describe('buildProvenance', () => {
   })
 })
 
+// The server's check of a saved investigation (D8b): records keyed by date, asset and level, for one item and one set of pixels.
+const A = 'a'.repeat(64) // the SCL window of both dates
+const B = 'b'.repeat(64) // the 10 m photo of both dates
+const itemOf = (date: string) => `S2B_44QKJ_${date.replaceAll('-', '')}_0_L2A`
+const rec = (date: string, asset: 'scl' | 'visual', level: number, sha: string, over: object = {}) => ({
+  [`${date}:${asset}:${level}`]: {
+    status: 'verified' as const,
+    verifiedAt: '2026-10-05T10:00:00Z',
+    frameId: `f-${asset}`,
+    serverSha256: sha,
+    clientSha256: sha,
+    itemId: itemOf(date),
+    ...over,
+  },
+})
+const saved = (...r: object[]) => ({ ...inv, serverId: 'srv-1', verification: Object.assign({}, ...r) })
+const everyFrame = [
+  rec('2025-01-10', 'scl', 0, A),
+  rec('2025-01-10', 'visual', 0, B),
+  rec('2025-12-20', 'scl', 0, A, { verifiedAt: '2026-10-06T08:00:00Z' }),
+  rec('2025-12-20', 'visual', 0, B, { verifiedAt: '2026-10-06T08:00:00Z' }),
+]
+
+describe('buildProvenance: the server check', () => {
+  it("puts each frame's own record on it and null on a frame with none", () => {
+    const v = saved(
+      rec('2025-01-10', 'scl', 0, A),
+      rec('2025-01-10', 'visual', 0, B, { verifiedAt: '2026-10-06T08:00:00Z' }),
+    )
+    const p = buildProvenance(v, summary, entries, '0.1.0', T)
+    expect(p.frames.map((f) => `${f.date}:${f.asset}:${f.level}`)).toEqual([
+      '2025-01-10:scl:0',
+      '2025-01-10:visual:0',
+      '2025-12-20:scl:0',
+      '2025-12-20:visual:0',
+    ])
+    expect(p.frames.map((f) => f.verification)).toEqual([
+      { status: 'verified', verifiedAt: '2026-10-05T10:00:00Z', serverSha256: A },
+      { status: 'verified', verifiedAt: '2026-10-06T08:00:00Z', serverSha256: B },
+      null,
+      null,
+    ])
+  })
+
+  it('shows a record only for this item and these pixels, and a mismatch for this item always', () => {
+    const v = saved(
+      rec('2025-01-10', 'scl', 0, A, { itemId: 'S2_OTHER' }), // another item's check
+      rec('2025-01-10', 'visual', 0, 'c'.repeat(64)), // the server read other pixels than the browser holds now
+      rec('2025-12-20', 'scl', 0, 'z'.repeat(64), { status: 'mismatch' }), // a finding is never hidden
+    )
+    const frames = buildProvenance(v, summary, entries, '0.1.0', T).frames
+    expect(frames.map((f) => f.verification)).toEqual([
+      null,
+      null,
+      { status: 'mismatch', verifiedAt: '2026-10-05T10:00:00Z', serverSha256: 'z'.repeat(64) },
+      null,
+    ])
+  })
+
+  it("gives a never-saved investigation today's JSON: a null on every frame, at the same place in it", () => {
+    const frames = buildProvenance(inv, summary, entries, '0.1.0', T).frames
+    expect(frames.every((f) => f.verification === null)).toBe(true)
+    const common = ['date', 'collection', 'itemId', 'acquiredAt', 'processingBaseline', 'crs', 'verification']
+    const rest = ['asset', 'href', 'level', 'window', 'transform', 'recipe', 'sha256']
+    expect(Object.keys(frames[0]!)).toEqual([...common, ...rest, 'quality'])
+    expect(Object.keys(frames[1]!)).toEqual([...common, ...rest])
+  })
+})
+
 describe('buildReportHtml', () => {
   const html = build()
   it('escapes every piece of user text and never includes a raw script tag from notes', () => {
@@ -413,5 +482,101 @@ describe('buildReportHtml', () => {
     expect(out).toContain('alt="Before photo, 10 Jan 2025, Sentinel-2 true colour"')
     expect(out).not.toMatch(/% clear view/)
     expect(/<figcaption[\s\S]*?<\/figcaption>/.exec(out)![0]).not.toContain('badge')
+  })
+})
+
+describe('buildReportHtml: the server check of a saved investigation', () => {
+  const provenance = buildProvenance(inv, summary, entries, '0.1.0', T)
+  const badgeOf = (html: string) => /<p class="badge accent">(.*?)<\/p>/.exec(html)![1]
+  const checkCells = (html: string) =>
+    tableOf(html, 'dates')
+      .split('<tr>')
+      .slice(2)
+      .map((row) => [...row.matchAll(/<td[^>]*>(.*?)<\/td>/g)].map((m) => m[1])[2])
+  const C = flow.report.check
+
+  it('is unchanged for an investigation that was never saved, whatever records it carries', () => {
+    const records = { ...saved(...everyFrame), serverId: null }
+    const out = build({ inv: records, provenance })
+    expect(out).toBe(build())
+    expect(out).toBe(build({ inv: { ...records, verification: undefined }, provenance }))
+    expect(badgeOf(out)).toBe(escapeHtml(flow.report.unverified))
+    expect(checkCells(out)).toEqual([flow.report.values.notChecked, flow.report.values.notChecked])
+  })
+
+  it('says verified, with the latest check, when every held frame of every pinned date is', () => {
+    const out = build({ inv: saved(...everyFrame), provenance })
+    expect(badgeOf(out)).toBe(escapeHtml(flow.report.verified('6 Oct 2026')))
+    expect(checkCells(out)).toEqual([C.verified, C.verified])
+  })
+
+  it('says a difference was found, and marks the date, when any held frame did not match', () => {
+    const v = saved(
+      rec('2025-01-10', 'scl', 0, A),
+      rec('2025-01-10', 'visual', 0, 'z'.repeat(64), { status: 'mismatch' }),
+      rec('2025-12-20', 'scl', 0, A),
+      rec('2025-12-20', 'visual', 0, B),
+    )
+    const out = build({ inv: v, provenance })
+    expect(badgeOf(out)).toBe(escapeHtml(flow.report.mismatch))
+    expect(badgeOf(out)).not.toContain('not verified yet')
+    expect(checkCells(out)).toEqual([C.mismatch, C.verified])
+  })
+
+  it('says partly verified when a date has none, and "not checked" for it', () => {
+    const out = build({
+      inv: saved(rec('2025-01-10', 'scl', 0, A), rec('2025-01-10', 'visual', 0, B)),
+      provenance,
+    })
+    expect(badgeOf(out)).toBe(escapeHtml(flow.report.partlyVerified))
+    expect(checkCells(out)).toEqual([C.verified, C.none])
+    // saved but nothing verified yet
+    const none = build({ inv: saved(), provenance })
+    expect(badgeOf(none)).toBe(escapeHtml(flow.report.partlyVerified))
+    expect(checkCells(none)).toEqual([C.none, C.none])
+  })
+
+  it('does not count a record for other pixels or another item, and partly verified needs every held frame', () => {
+    const v = saved(
+      rec('2025-01-10', 'scl', 0, A),
+      rec('2025-01-10', 'visual', 0, 'c'.repeat(64)), // the server read other pixels than the report holds
+      rec('2025-12-20', 'scl', 0, A, { itemId: 'S2_OTHER' }),
+      rec('2025-12-20', 'visual', 0, B),
+    )
+    expect(checkCells(build({ inv: v, provenance }))).toEqual([C.none, C.none])
+  })
+
+  it('judges a pinned date by the frames a save sends: a full photo held for a middle date is not waited for', () => {
+    // 15 Jun is pinned but is neither before nor after: a save sends its SCL window and its preview, never its full photo,
+    // although the mini map may well have loaded one (which the provenance lists, as the best photo held).
+    const middle = {
+      ...entry('2025-06-15', 'CLEAR', 1),
+      thumb: {
+        window: [46, 47, 102, 106] as [number, number, number, number],
+        level: 1 as const,
+        sha256: 'd'.repeat(64),
+        native: { width: 56, height: 59, rgb: new Uint8Array() },
+        display: { width: 1, height: 1, rgba: new Uint8ClampedArray(4) },
+      },
+    }
+    const three = [entries[0]!, middle, entries[1]!]
+    const pinned = togglePin(
+      saved(...everyFrame, rec('2025-06-15', 'scl', 0, A), rec('2025-06-15', 'visual', 1, 'd'.repeat(64))),
+      '2025-06-15',
+      T,
+    )
+    const out = build({
+      inv: pinned,
+      entries: three,
+      provenance: buildProvenance(pinned, summary, three, '0.1.0', T),
+    })
+    expect(checkCells(out)).toEqual([C.verified, C.verified, C.verified])
+    expect(badgeOf(out)).toBe(escapeHtml(flow.report.verified('6 Oct 2026')))
+  })
+
+  it('keeps the table the same shape: the same six columns, one row per pinned date', () => {
+    const table = tableOf(build({ inv: saved(...everyFrame), provenance }), 'dates')
+    expect([...table.matchAll(/<th scope="col">(.*?)<\/th>/g)]).toHaveLength(6)
+    expect(table.split('<tr>').slice(2)).toHaveLength(2)
   })
 })

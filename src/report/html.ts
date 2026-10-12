@@ -1,4 +1,4 @@
-import type { Investigation } from '../data/investigation.ts'
+import { verificationFor, type Investigation } from '../data/investigation.ts'
 import type { DisplayGrid, QualityStats } from '../evidence/types.ts'
 import type { AoiSummary } from '../geo/aoi.ts'
 import { fmtDate, pct } from '../lib/format.ts'
@@ -50,6 +50,32 @@ details pre{white-space:pre-wrap;word-break:break-all;font-size:.7rem}
 const none = flow.report.values.none
 const word = (s: QualityStats | null | undefined) => (s ? copy.quality[s.label].word : none)
 
+/** The most recent of some ISO times, by the instant they name (a fraction or a "+00:00" does not sort like the text). */
+const latestOf = (times: string[]) => times.reduce((a, b) => (Date.parse(b) > Date.parse(a) ? b : a))
+
+/**
+ * The server's check of one pinned date: the frames a save sends for it (spec 8.2: the SCL window, the preview, and the full
+ * photo only for before and after; NOT "the best photo held": the mini map may hold a full photo of any date, which a save never
+ * sends), each by the same rule as the provenance (this item, these pixels; a mismatch for this item always counts). Verified
+ * needs at least one frame and all of them verified; a single mismatch makes the date a mismatch; anything else is not checked.
+ * `at`: the latest check, when verified.
+ */
+function dateCheck(
+  inv: Investigation,
+  x: DateEntry,
+): { status: 'verified' | 'mismatch' | 'none'; at: string } {
+  const id = x.candidate.item.id
+  const photos = [x.thumb, x.date === inv.before || x.date === inv.after ? x.full : null]
+  const held = [
+    ...(x.quality ? [verificationFor(inv, x.date, 'scl', 0, x.quality.sha256, id)] : []),
+    ...photos.flatMap((f) => (f ? [verificationFor(inv, x.date, 'visual', f.level, f.sha256, id)] : [])),
+  ]
+  if (held.some((v) => v?.status === 'mismatch')) return { status: 'mismatch', at: '' }
+  if (held.length && held.every((v) => v?.status === 'verified'))
+    return { status: 'verified', at: latestOf(held.map((v) => v!.verifiedAt)) }
+  return { status: 'none', at: '' }
+}
+
 export function buildReportHtml(a: {
   inv: Investigation
   summary: AoiSummary
@@ -69,6 +95,15 @@ export function buildReportHtml(a: {
     (x) => x.quality && (x.quality.stats.label === 'OBSCURED' || x.quality.stats.label === 'NOT_COVERED'),
   ).length
   const unchecked = pinned.filter((x) => !x.quality).length
+  // Only a saved investigation has a server check to report; an unsaved one prints what it always has.
+  const checks = inv.serverId ? pinned.map((x) => dateCheck(inv, x)) : null
+  const badge = !checks
+    ? R.unverified
+    : checks.some((c) => c.status === 'mismatch')
+      ? R.mismatch
+      : checks.length && checks.every((c) => c.status === 'verified')
+        ? R.verified(fmtDate(latestOf(checks.map((c) => c.at)).slice(0, 10)))
+        : R.partlyVerified
   const range = flow.review.range(fmtDate(inv.dateFrom), fmtDate(inv.dateTo))
   const compared =
     inv.before && inv.after ? flow.workbench.meta.pair(fmtDate(inv.before), fmtDate(inv.after)) : range
@@ -120,8 +155,8 @@ export function buildReportHtml(a: {
     .map((h) => `<th scope="col">${e(h)}</th>`)
     .join('')}</tr></thead><tbody>${pinned
     .map(
-      (x) =>
-        `<tr><th scope="row">${e(fmtDate(x.date))}</th><td>${e(word(x.quality?.stats))}</td><td>${x.quality ? `${pct(x.quality.stats.clearFraction)}%` : e(none)}</td><td>${e(R.values.notChecked)}</td><td class="mono">${e(x.candidate.item.id)}</td><td class="mono">${e(x.full?.sha256 ?? x.quality?.sha256 ?? none)}</td></tr>`,
+      (x, i) =>
+        `<tr><th scope="row">${e(fmtDate(x.date))}</th><td>${e(word(x.quality?.stats))}</td><td>${x.quality ? `${pct(x.quality.stats.clearFraction)}%` : e(none)}</td><td>${e(checks ? R.check[checks[i]!.status] : R.values.notChecked)}</td><td class="mono">${e(x.candidate.item.id)}</td><td class="mono">${e(x.full?.sha256 ?? x.quality?.sha256 ?? none)}</td></tr>`,
     )
     .join('')}</tbody></table>`
 
@@ -183,7 +218,7 @@ export function buildReportHtml(a: {
 <body><main>
 <p class="mono eyebrow">${e(copy.app.name)} · ${e(R.title)} · ${e(R.generated)} ${e(fmtDate(iso.slice(0, 10)))} ${e(iso.slice(11, 16))} UTC</p>
 <h1>${e(inv.name)}</h1>
-<p class="badge accent">${e(R.unverified)}</p>
+<p class="badge accent">${e(badge)}</p>
 <div class="strip"><dl>${facts.map(([k, v]) => `<div><dt>${e(k)}</dt><dd>${e(v)}</dd></div>`).join('')}</dl>${prepared ? `<p class="by">${e(R.preparedByLabel)}: ${e(prepared)}</p>` : ''}</div>
 ${sections.map(([title, body], i) => `<section><span class="n" aria-hidden="true">${String(i + 1).padStart(2, '0')}</span><div><h2>${e(title)}</h2>${body}</div></section>`).join('\n')}
 </main></body></html>`

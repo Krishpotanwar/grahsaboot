@@ -1,7 +1,8 @@
 import { X } from '@phosphor-icons/react'
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { setBeforeAfter, togglePin } from '../data/investigation.ts'
+import { loadAccounts } from '../accounts/enabled.ts'
+import { setBeforeAfter, togglePin, verificationFor, type Investigation } from '../data/investigation.ts'
 import { useInvestigation } from '../data/useInvestigation.ts'
 import { rgbaToPngDataUrl } from '../lib/canvas.ts'
 import { fmtDate } from '../lib/format.ts'
@@ -18,6 +19,7 @@ import { canPickDefaults, isUsable, pickDefaults } from '../workbench/defaults.t
 import { EvidenceViewer, MapTool, type Slot } from '../workbench/EvidenceViewer.tsx'
 import { NotesPanel } from '../workbench/NotesPanel.tsx'
 import type { DateEntry } from '../workbench/runner.ts'
+import { saveWait } from '../workbench/saveReady.ts'
 import { GridSkeleton, SectionGrid } from '../workbench/SectionGrid.tsx'
 import { Timeline, TimelineSkeleton } from '../workbench/Timeline.tsx'
 import { useEvidence } from '../workbench/useEvidence.ts'
@@ -26,7 +28,32 @@ import NotFound from './NotFound.tsx'
 // A fallback that is the same array every render, so the memoised NotesPanel is not rendered again for it.
 const NO_PARTS: never[] = []
 
-const slot = (e: DateEntry | undefined): Slot =>
+/** The status of an investigation that is not saved: the title block's, as it has always been, and its place until a save control is. */
+function NotSaved() {
+  return (
+    <span className="mr-2 inline-flex items-center gap-2 font-mono text-[0.8125rem] text-fg-2">
+      <span aria-hidden className="h-[7px] w-[7px] rounded-full border-[1.5px] border-fg-2" />
+      {flow.workbench.notSaved}
+    </span>
+  )
+}
+/** What stands in for the save control when its code cannot be loaded (offline, a newer release): the workbench carries on. */
+const NoSaveBar = (_: Record<string, unknown>) => <NotSaved />
+
+// Null in a build without accounts: the save control below is then not rendered, requested or loaded at all, and the title block is
+// what it was before accounts existed. The one import() lives in src/accounts/enabled.ts (the bundle guard proves it).
+const load = loadAccounts
+const LazySaveBar = load
+  ? lazy(() =>
+      load().then(
+        (m) => ({ default: m.SaveBar }),
+        () => ({ default: NoSaveBar }),
+      ),
+    )
+  : null
+
+/** `verification`: the saved investigation's records. The photo's own check shows only for the exact pixels on screen. */
+const slot = (e: DateEntry | undefined, verification: Investigation['verification']): Slot =>
   e
     ? {
         date: e.date,
@@ -34,6 +61,16 @@ const slot = (e: DateEntry | undefined): Slot =>
         stats: e.quality?.stats ?? null,
         itemId: e.candidate.item.id,
         failed: e.error !== null && e.full === null,
+        verification: e.full
+          ? verificationFor(
+              { verification },
+              e.date,
+              'visual',
+              e.full.level,
+              e.full.sha256,
+              e.candidate.item.id,
+            )
+          : null,
       }
     : null
 
@@ -56,9 +93,10 @@ export default function Workbench({ id }: { id: string }) {
   const byDate = useMemo(() => new Map(entries.map((e) => [e.date, e])), [entries])
   const beforeEntry = inv?.before ? byDate.get(inv.before) : undefined
   const afterEntry = inv?.after ? byDate.get(inv.after) : undefined
-  // Stable while those two entries are, so scrubbing the timeline never renders the viewer again.
-  const beforeSlot = useMemo(() => slot(beforeEntry), [beforeEntry])
-  const afterSlot = useMemo(() => slot(afterEntry), [afterEntry])
+  // Stable while those two entries and the records are, so scrubbing the timeline never renders the viewer again.
+  const verification = inv?.verification
+  const beforeSlot = useMemo(() => slot(beforeEntry, verification), [beforeEntry, verification])
+  const afterSlot = useMemo(() => slot(afterEntry, verification), [afterEntry, verification])
   // A pixel is unusable for the difference when either photo cannot show it clearly. Null until both masks have arrived.
   const invalid = useMemo(() => {
     const a = beforeEntry?.invalid
@@ -221,7 +259,8 @@ export default function Workbench({ id }: { id: string }) {
     !!road &&
     !inv.before &&
     (searching || entries.some((e) => e.status === 'queued' || e.status === 'checking'))
-
+  // What a save is waiting for, when there is one to press (E7): the whole range searched, or every pinned date in.
+  const wait = LazySaveBar ? saveWait(inv, byDate, state.phase === 'ready' && !state.more) : null
   return (
     <div className="min-h-[calc(100dvh-64px)]">
       <header className="flex flex-col gap-4 border-b border-line px-4 pb-5 pt-5 sm:flex-row sm:items-end sm:justify-between lg:px-8">
@@ -235,10 +274,25 @@ export default function Workbench({ id }: { id: string }) {
         </div>
         {/* A row that takes one more control without wrapping: the status sits first, the buttons after it. */}
         <div className="flex flex-wrap items-center gap-2.5">
-          <span className="mr-2 inline-flex items-center gap-2 font-mono text-[0.8125rem] text-fg-2">
-            <span aria-hidden className="h-[7px] w-[7px] rounded-full border-[1.5px] border-fg-2" />
-            {flow.workbench.notSaved}
-          </span>
+          {LazySaveBar ? (
+            <Suspense
+              fallback={
+                <>
+                  {/* Until the chunk arrives: the status it has now, and the button's place held (160 px by 44, as in SaveBar), so
+                      the row does not change size. A saved copy must not say "Not saved" meanwhile: its status (208 px wide, as
+                      in SaveBar) is held blank. */}
+                  {inv.serverId ? <span aria-hidden className="invisible mr-2 w-52" /> : <NotSaved />}
+                  <span aria-hidden className="invisible h-11 w-40" />
+                  {/* The line SaveBar shows while the page is not ready: its place is held too, so nothing steps down. */}
+                  {wait !== null && <span aria-hidden className="invisible order-last h-5 w-0 min-w-full" />}
+                </>
+              }
+            >
+              <LazySaveBar inv={inv} entries={entries} ready={wait === null} why={wait} update={update} />
+            </Suspense>
+          ) : (
+            <NotSaved />
+          )}
           <Link
             to={`/i/${inv.id}/report`}
             className="inline-flex h-11 select-none items-center justify-center rounded-[6px] bg-fg px-4 text-[0.9375rem] font-medium text-bg transition-transform duration-100 hover:opacity-90 active:scale-[0.98]"

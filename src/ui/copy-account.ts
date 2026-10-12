@@ -1,5 +1,8 @@
 import { LIMITS } from '../geo/limits.ts'
 
+// Spec 8.2: the scene check and the preview of each pinned date, and the full photo of before and after.
+const FRAME_CAP = LIMITS.pinnedDates * 2 + 2
+
 // Every word of the accounts feature. Only src/accounts/ imports this file (tests/unit/accounts-boundary.test.ts), so a build
 // without the accounts flag holds none of it (scripts/check-bundle.ts looks for "Sign in with Google").
 export const account = {
@@ -10,15 +13,24 @@ export const account = {
   none: 'Nothing saved yet.',
   save: 'Save and verify',
   savedLabel: 'Saved to your account',
+  // Said until the first answer says how many dates there are to verify.
+  working: 'Saving your investigation',
   saving: (done: number, total: number) => `Verifying ${done} of ${total} dates`,
-  saved: (verified: number, at: string) => `Saved · ${verified} frames verified · ${at}`,
+  saved: (verified: number, at: string) =>
+    `Saved · ${verified} frame${verified === 1 ? '' : 's'} verified · ${at}`,
+  savedNone: 'Saved. No frames are verified yet.',
+  // Why "Save and verify" is dimmed: what it is waiting for. It saves everything it can in one go.
+  waiting: {
+    checks: 'Waiting for the date checks to finish.',
+    photos: 'Waiting for the photos to load.',
+  },
   mismatched: (n: number) =>
     `${n} frame${n === 1 ? '' : 's'} did not match the source file. It is shown as unverified.`,
   failed: (n: number) => `${n} date${n === 1 ? '' : 's'} could not be checked. Save again to retry.`,
   limited: 'Daily verification limit reached. The rest will verify when you save again tomorrow.',
+  // A refusal that saving again cannot fix: say what to do instead.
+  frameLimit: `This investigation holds as many frames as a saved one can keep (${FRAME_CAP}). Saving again will not change that. Unpin some dates, or split it into two investigations.`,
   saveFailed: 'Could not save. Your work is still in this browser.',
-  verifiedBadge: (at: string) => `Verified · ${at}`,
-  mismatchBadge: 'Did not match the source',
   consent: {
     title: 'Before you save',
     intro:
@@ -31,6 +43,9 @@ export const account = {
     ],
     age: 'I am 18 or older.',
     agree: 'Agree and save',
+    cancel: 'Not now',
+    // The agreement is saved first and the save follows, so a failure here means nothing went to the server.
+    failed: 'Could not record your agreement, so nothing was saved. Try again.',
     privacy: 'Read the privacy notice',
   },
   delete: {

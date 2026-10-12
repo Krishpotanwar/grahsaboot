@@ -8,6 +8,7 @@ import {
 } from '../data/investigation.ts'
 import type { DateEntry } from '../workbench/runner.ts'
 import {
+  countVerified,
   framesToVerify,
   saveAndVerify,
   SessionExpiredError,
@@ -180,6 +181,72 @@ const deps = (over: Partial<SaveDeps> = {}): SaveDeps => ({
 })
 const run = (d: SaveDeps, i = inv, onSaved?: (id: string) => void) =>
   saveAndVerify(d, i, ENTRIES, () => {}, onSaved)
+
+describe('countVerified', () => {
+  const rec = (key: string, v: object = {}) => ({
+    [key]: {
+      status: 'verified' as const,
+      verifiedAt: '2026-10-05T10:00:00Z',
+      frameId: 'f',
+      serverSha256: 'z'.repeat(64),
+      clientSha256: key.includes(':scl:') ? SCL : key.endsWith(':0') ? FULL : THUMB,
+      itemId: `S2_${key.slice(0, 10)}`,
+      ...v,
+    },
+  })
+  const merged = (...r: object[]) =>
+    setVerification({ ...inv, serverId: 'srv-1' }, Object.assign({}, ...r) as never, T)
+
+  it('counts the frames a save would consider whose record is verified, whatever this run sent', async () => {
+    const first = await run(deps())
+    const saved = setVerification({ ...inv, serverId: 'srv-1' }, first.verification, T)
+    expect(countVerified(saved, ENTRIES)).toEqual({
+      verified: 7,
+      mismatched: 0,
+      latest: '2026-10-05T10:00:00Z',
+    })
+    // a save with everything recorded sends nothing and verifies 0 new frames: the count must not say 0
+    const again = await run(deps(), saved)
+    expect(again.verified).toBe(0)
+    expect(countVerified(saved, ENTRIES).verified).toBe(7)
+  })
+
+  it('does not count a record for another item, other pixels, an unpinned date or a full photo that is not before or after', () => {
+    const entries = [ENTRIES[0]!, ENTRIES[1]!, entry('2025-06-15', { full: true, thumb: true }), ENTRIES[3]!]
+    const v = merged(
+      rec('2025-01-10:scl:0'), // counted
+      rec('2025-06-15:scl:0', { itemId: 'S2_OTHER' }), // another item
+      rec('2025-12-20:scl:0', { clientSha256: 'x'.repeat(64) }), // other pixels
+      rec('2025-03-05:scl:0'), // not pinned
+      rec('2025-06-15:visual:0'), // a full photo of a date that is not before or after: never sent
+    )
+    expect(countVerified(v, entries).verified).toBe(1)
+    // counter-case: the same records on the dates they belong to are all counted
+    const ok = merged(rec('2025-06-15:scl:0'), rec('2025-06-15:visual:1'), rec('2025-12-20:visual:0'))
+    expect(countVerified(ok, entries).verified).toBe(3)
+  })
+
+  it('does not count a date that is not checked', () => {
+    const v = merged(rec('2025-01-10:scl:0'))
+    expect(countVerified(v, [entry('2025-01-10', { status: 'queued' })]).verified).toBe(0)
+    expect(countVerified(v, [entry('2025-01-10')]).verified).toBe(1)
+  })
+
+  it('counts a mismatch apart from the verified frames', () => {
+    const v = merged(rec('2025-01-10:scl:0'), rec('2025-01-10:visual:1', { status: 'mismatch' }))
+    expect(countVerified(v, ENTRIES)).toMatchObject({ verified: 1, mismatched: 1 })
+  })
+
+  it('takes the latest check by time, not by text, and has none when nothing is verified', () => {
+    // "…:00.5+00:00" is half a second after "…:00Z", though "Z" sorts after "."
+    const v = merged(
+      rec('2025-01-10:scl:0', { verifiedAt: '2026-10-05T10:00:00Z' }),
+      rec('2025-12-20:scl:0', { verifiedAt: '2026-10-05T10:00:00.5+00:00' }),
+    )
+    expect(countVerified(v, ENTRIES).latest).toBe('2026-10-05T10:00:00.5+00:00')
+    expect(countVerified(inv, ENTRIES)).toEqual({ verified: 0, mismatched: 0, latest: null })
+  })
+})
 
 describe('saveAndVerify', () => {
   it('saves, replaces the notes, verifies each pinned date and reports progress', async () => {
@@ -368,5 +435,14 @@ describe('saveAndVerify', () => {
       expect(again).toMatchObject({ serverId: 'srv-NEW', verified: 7 })
       expect(verify).toHaveBeenCalledTimes(3)
     })
+  })
+})
+
+describe('a verification time the page cannot print', () => {
+  it('is counted as a failed check and recorded as nothing', async () => {
+    const out = await run(deps({ verify: async (b) => okFor(b, { verified_at: 'not a time' }) }))
+    expect(out.verification).toEqual({})
+    expect(out.verified).toBe(0)
+    expect(out.failed).toBeGreaterThan(0)
   })
 })

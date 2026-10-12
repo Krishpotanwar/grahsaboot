@@ -202,6 +202,15 @@ describe('server verification records', () => {
     expect(look(inv, 'b'.repeat(64))).toMatchObject({ status: 'mismatch' }) // other pixels do not hide it
     expect(look(inv, 'a'.repeat(64), 'S2_B')).toBeNull() // E23: another item's mismatch must not show here
   })
+  it('needs only the record map, so a memo can depend on `inv.verification` and not on every edit', () => {
+    const { verification } = withRec(rec())
+    expect(
+      verificationFor({ verification }, '2025-01-10', 'visual', 0, 'a'.repeat(64), 'S2_A'),
+    ).toMatchObject({
+      status: 'verified',
+    })
+    expect(verificationFor({}, '2025-01-10', 'visual', 0, 'a'.repeat(64), 'S2_A')).toBeNull()
+  })
   it('keeps the records of the same server row and drops those of another', () => {
     const saved = { ...withRec(rec()), serverId: 'srv-1' }
     expect(setServerId(saved, 'srv-1', T).verification).toEqual(saved.verification)

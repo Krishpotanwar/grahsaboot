@@ -5,9 +5,11 @@ import {
   Columns,
   MapTrifold,
   SplitHorizontal,
+  Warning,
 } from '@phosphor-icons/react'
 import { animate } from 'motion/react'
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
+import type { FrameVerification } from '../data/investigation.ts'
 import { brightnessDiff } from '../evidence/diff.ts'
 import type { DisplayGrid, QualityStats } from '../evidence/types.ts'
 import type { AoiInput } from '../geo/aoi.ts'
@@ -28,6 +30,8 @@ export type Slot = {
   itemId: string
   /** The check or the full frame failed and nothing is retrying it. */
   failed: boolean
+  /** The server's check of THIS photo (this item, these pixels), set only for a saved investigation that has one. */
+  verification?: FrameVerification | null
 } | null
 type Mode = 'swipe' | 'side' | 'diff'
 
@@ -52,7 +56,22 @@ function Caption({ slot, right = false }: { slot: NonNullable<Slot>; right?: boo
             <span aria-hidden>·</span>
           </>
         )}
-        <span>{flow.workbench.notSaved}</span>
+        {/* A record is only ever there for a saved investigation, so it stands in place of "Not saved". */}
+        {slot.verification ? (
+          slot.verification.status === 'verified' ? (
+            <span className="text-ok">
+              {flow.workbench.verifiedBadge(fmtDate(slot.verification.verifiedAt.slice(0, 10)))}
+            </span>
+          ) : (
+            // Words and a mark: a difference is not told by colour alone.
+            <span className="inline-flex items-center gap-1 text-warn">
+              <Warning size={14} weight="bold" aria-hidden />
+              {flow.workbench.mismatchBadge}
+            </span>
+          )
+        ) : (
+          <span>{flow.workbench.notSaved}</span>
+        )}
       </span>
       <span className="max-w-[28ch] truncate text-fg-2" title={slot.itemId}>
         {slot.itemId}

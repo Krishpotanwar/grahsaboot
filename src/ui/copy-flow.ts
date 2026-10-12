@@ -6,6 +6,7 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
 const satellite = (itemId: string) => `Sentinel-2${/^S2([ABC])_/.exec(itemId)?.[1] ?? ''}`
 
 const clearView = (clearPct: number) => `${clearPct}% clear view`
+const notChecked = 'Not checked'
 /** "0.0–2.0 km". A road's sections are numbered 01, 02, ... along the line, on the photos and in the grid. */
 const section = (from: number, to: number) => `${(from / 1000).toFixed(1)}–${(to / 1000).toFixed(1)} km`
 const sectionNo = (idx: number) => String(idx + 1).padStart(2, '0')
@@ -136,6 +137,9 @@ export const flow = {
     hideMap: 'Hide map',
     report: 'Report',
     notSaved: 'Not saved',
+    // The server's check of a photo, in its caption: only where a record for this item and these pixels exists.
+    verifiedBadge: (date: string) => `Verified · ${date}`,
+    mismatchBadge: 'Did not match the source',
     meta: {
       site: (km2: number, dates: string) => `Site · ${km2.toFixed(2)} km² · ${dates}`,
       road: (km: number, widthM: number, dates: string) =>
@@ -221,6 +225,14 @@ export const flow = {
     generated: 'Generated',
     unverified:
       'Not verified. This investigation is not saved. The pictures were derived in a browser from the public Sentinel-2 files listed in the provenance.',
+    // A saved investigation: what the server's check of the pinned photos found. A difference is a finding, never "not yet".
+    verified: (date: string) =>
+      `Verified ${date}. The GrahSaboot server re-read every pinned photo from its public source file and got the same pixels.`,
+    partlyVerified:
+      'Saved, but not every pinned date is verified. The table shows each date. Saving again checks the dates that can still be checked.',
+    mismatch:
+      'Saved, but the server check found a difference. For at least one pinned photo, the GrahSaboot server read different pixels from the public source file than this browser did. The table marks each date.',
+    check: { verified: 'Verified', mismatch: 'Did not match the source', none: notChecked },
     // The strip under the title and the headers of the pinned-dates table.
     labels: {
       area: 'Area',
@@ -237,7 +249,7 @@ export const flow = {
     values: {
       source: 'Sentinel-2 L2A',
       resolution: '10 m',
-      notChecked: 'Not checked',
+      notChecked,
       none: '—',
       area: (km2: number) => `${km2.toFixed(2)} km²`,
       length: (km: number) => `${km.toFixed(2)} km`,

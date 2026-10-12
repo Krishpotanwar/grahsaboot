@@ -1,4 +1,4 @@
-import type { Investigation } from '../data/investigation.ts'
+import { verificationFor, type Investigation } from '../data/investigation.ts'
 import { RECIPES } from '../evidence/types.ts'
 import type { AoiSummary } from '../geo/aoi.ts'
 import { copy } from '../ui/copy.ts'
@@ -59,12 +59,17 @@ export function buildProvenance(
       acquiredAt: it.datetime,
       processingBaseline: it.baseline,
       crs: `EPSG:${it.epsg}`,
-      verification: null,
+    }
+    // The server's check of this frame: for this item and these pixels, or null (never saved, not checked, or other pixels).
+    const check = (asset: 'visual' | 'scl', level: number, sha256: string) => {
+      const v = verificationFor(inv, e.date, asset, level, sha256, it.id)
+      return v ? { status: v.status, verifiedAt: v.verifiedAt, serverSha256: v.serverSha256 } : null
     }
     const out: ProvenanceFrame[] = []
     if (e.quality)
       out.push({
         ...base,
+        verification: check('scl', 0, e.quality.sha256),
         asset: 'scl',
         href: it.scl.href,
         level: 0,
@@ -87,6 +92,7 @@ export function buildProvenance(
     if (f)
       out.push({
         ...base,
+        verification: check('visual', f.level, f.sha256),
         asset: 'visual',
         href: it.visual.href,
         level: f.level,

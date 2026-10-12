@@ -66,9 +66,34 @@ export class SessionExpiredError extends Error {
 const nonEmpty = (w: Window) => w[2] > w[0] && w[3] > w[1]
 
 /**
- * What to send for the pinned dates (spec 8.2): the SCL window for every checked date, the preview (level 1) and, for the
- * dates whose full photo the browser holds (before and after), the full photo (level 0). Frames already recorded for the same
- * item and the same pixels are not sent again.
+ * The frames a save can send for one date (spec 8.2): the SCL window of a checked pinned date, the preview (level 1) and, for
+ * before and after, the full photo (level 0), each as the browser holds it. Nothing for any other date.
+ */
+function candidates(inv: Investigation, e: DateEntry): VerifyFrameIn[] {
+  // An unchecked date has nothing to send; a [0,0,0,0] window is a scene that does not cover the outline (the server refuses it).
+  if (!inv.pinned.includes(e.date) || e.status !== 'checked' || !e.quality || !nonEmpty(e.quality.window))
+    return []
+  const held: VerifyFrameIn[] = [
+    { asset: 'scl', level: 0, window: e.quality.window, sha256: e.quality.sha256 },
+  ]
+  // The full photo only for before and after. The mini map loads one for whatever date the slider rests on, and sending it
+  // would push a 24-pin investigation past the 50-frame cap.
+  const full = e.date === inv.before || e.date === inv.after ? e.full : null
+  for (const f of [e.thumb, full])
+    if (f && nonEmpty(f.window))
+      held.push({ asset: 'visual', level: f.level, window: f.window, sha256: f.sha256 })
+  return held
+}
+
+/** The record that speaks for `f` of `e`: for the same item and the same pixels the browser sent. Null when there is none. */
+function recorded(inv: Investigation, e: DateEntry, f: VerifyFrameIn): FrameVerification | null {
+  const v = inv.verification?.[verificationKey(e.date, f.asset, f.level)]
+  return v && v.itemId === e.candidate.item.id && v.clientSha256 === f.sha256 ? v : null
+}
+
+/**
+ * What to send for the pinned dates: `candidates` of each, less the frames already recorded as verified for the same item and
+ * the same pixels.
  */
 export function framesToVerify(
   inv: Investigation,
@@ -76,27 +101,37 @@ export function framesToVerify(
 ): Array<{ date: string; item: S2Item; frames: VerifyFrameIn[] }> {
   const jobs: Array<{ date: string; item: S2Item; frames: VerifyFrameIn[] }> = []
   for (const e of entries) {
-    // An unchecked date has nothing to send; a [0,0,0,0] window is a scene that does not cover the outline (the server refuses it).
-    if (!inv.pinned.includes(e.date) || e.status !== 'checked' || !e.quality || !nonEmpty(e.quality.window))
-      continue
-    const held: VerifyFrameIn[] = [
-      { asset: 'scl', level: 0, window: e.quality.window, sha256: e.quality.sha256 },
-    ]
-    // Spec 8.2: the full photo (level 0) only for before and after. The mini map loads one for whatever date the slider rests
-    // on, and sending it would push a 24-pin investigation past the 50-frame cap.
-    const full = e.date === inv.before || e.date === inv.after ? e.full : null
-    for (const f of [e.thumb, full])
-      if (f && nonEmpty(f.window))
-        held.push({ asset: 'visual', level: f.level, window: f.window, sha256: f.sha256 })
-    const item = e.candidate.item
-    const frames = held.filter((f) => {
-      const v = inv.verification?.[verificationKey(e.date, f.asset, f.level)]
-      // Only a "verified" record is final: a mismatch is checked again (the cause may have been a failed read).
-      return !(v && v.status === 'verified' && v.itemId === item.id && v.clientSha256 === f.sha256)
-    })
-    if (frames.length) jobs.push({ date: e.date, item, frames })
+    // Only a "verified" record is final: a mismatch is checked again (the cause may have been a failed read).
+    const frames = candidates(inv, e).filter((f) => recorded(inv, e, f)?.status !== 'verified')
+    if (frames.length) jobs.push({ date: e.date, item: e.candidate.item, frames })
   }
   return jobs
+}
+
+/**
+ * What the investigation's own records say about the frames a save would consider, for the line under "Save and verify". Counted
+ * from the merged records, not from one run: a save that finds everything recorded verifies no new frame, and the line must
+ * still say how many are. `latest` is the most recent check (an ISO time), null when none is verified.
+ */
+export function countVerified(
+  inv: Investigation,
+  entries: DateEntry[],
+): { verified: number; mismatched: number; latest: string | null } {
+  let verified = 0
+  let mismatched = 0
+  let latest: string | null = null
+  for (const e of entries)
+    for (const f of candidates(inv, e)) {
+      const v = recorded(inv, e, f)
+      if (!v) continue
+      if (v.status === 'mismatch') mismatched++
+      else {
+        verified++
+        // By time: ISO strings with a fraction or a "+00:00" do not sort like the instants they name.
+        if (latest === null || Date.parse(v.verifiedAt) > Date.parse(latest)) latest = v.verifiedAt
+      }
+    }
+  return { verified, mismatched, latest }
 }
 
 const BACKOFF = [1000, 3000]
@@ -146,6 +181,11 @@ export async function saveAndVerify(
       for (const f of result.frames) {
         const sent = job.frames.find((x) => x.asset === f.asset && x.level === f.level)
         if (!sent) continue
+        // A time the page cannot print would break every screen that shows it: count it as a failed check instead.
+        if (typeof f.verified_at !== 'string' || Number.isNaN(Date.parse(f.verified_at))) {
+          out.failed++
+          continue
+        }
         out.verification[verificationKey(job.date, f.asset, f.level)] = {
           status: f.status,
           verifiedAt: f.verified_at,
