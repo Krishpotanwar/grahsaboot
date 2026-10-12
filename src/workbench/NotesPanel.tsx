@@ -1,4 +1,4 @@
-import { memo, useEffect, useState } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 import {
   addNote,
   removeNote,
@@ -14,6 +14,10 @@ import { flow } from '../ui/copy-flow.ts'
 import { Button, Section, TEXTAREA } from '../ui/kit.tsx'
 
 const KINDS: NoteKind[] = ['change', 'no_clear_change', 'unsure']
+
+/** Which note a button is for, so 200 notes are not 400 buttons named "Edit" and "Delete": the kind, the date, the start of the text. */
+const noteName = (n: Note) =>
+  `${flow.notes.kinds[n.kind]}${n.date ? `, ${fmtDate(n.date)}` : ''}: ${n.body.slice(0, 40)}${n.body.length > 40 ? '…' : ''}`
 
 interface Props {
   inv: Investigation
@@ -44,11 +48,14 @@ export const NotesPanel = memo(function NotesPanel({ inv, parts, current, update
         {flow.workbench.errors[error] ?? error}
       </p>
     ) : null
+  // Where the focus goes once the next render has put its target in the page (the button that was pressed may be gone).
+  const focusNext = useRef<string | null>(null)
   useEffect(() => {
-    if (!lastDeleted) return
-    const t = setTimeout(() => setLastDeleted(null), 6000)
-    return () => clearTimeout(t)
-  }, [lastDeleted])
+    const id = focusNext.current
+    if (!id) return
+    focusNext.current = null
+    document.getElementById(id)?.focus()
+  })
 
   const add = () => {
     // The draft goes only when the note was kept; a refused one leaves the text where it was, and the message says why.
@@ -60,8 +67,10 @@ export const NotesPanel = memo(function NotesPanel({ inv, parts, current, update
         sectionIdx: section === '' ? null : Number(section),
       }),
     )
-    if (ok) setBody('')
-    else setRefused('add')
+    if (ok) {
+      setBody('')
+      setLastDeleted(null) // the undo of a delete lasts until the next note action
+    } else setRefused('add')
   }
 
   return (
@@ -150,10 +159,13 @@ export const NotesPanel = memo(function NotesPanel({ inv, parts, current, update
             <div role="status" className="flex items-center justify-between border border-line p-2 text-sm">
               <span>{flow.notes.deleted}</span>
               <Button
+                id="note-undo"
                 size="sm"
                 onClick={() => {
-                  if (update((i) => restoreNote(i, lastDeleted))) setLastDeleted(null)
-                  else setRefused('undo')
+                  if (update((i) => restoreNote(i, lastDeleted))) {
+                    focusNext.current = `note-edit-${lastDeleted.id}`
+                    setLastDeleted(null)
+                  } else setRefused('undo')
                 }}
               >
                 {flow.notes.undo}
@@ -196,8 +208,10 @@ export const NotesPanel = memo(function NotesPanel({ inv, parts, current, update
                           variant="primary"
                           onClick={() => {
                             // The editor stays open when the edit is refused, with the text as typed.
-                            if (update((i) => updateNote(i, n.id, { body: editing.body }))) setEditing(null)
-                            else setRefused(n.id)
+                            if (update((i) => updateNote(i, n.id, { body: editing.body }))) {
+                              focusNext.current = `note-edit-${n.id}`
+                              setEditing(null)
+                            } else setRefused(n.id)
                           }}
                         >
                           {flow.notes.save}
@@ -206,6 +220,7 @@ export const NotesPanel = memo(function NotesPanel({ inv, parts, current, update
                           size="sm"
                           onClick={() => {
                             setRefused(null)
+                            focusNext.current = `note-edit-${n.id}`
                             setEditing(null)
                           }}
                         >
@@ -218,9 +233,13 @@ export const NotesPanel = memo(function NotesPanel({ inv, parts, current, update
                       <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{n.body}</p>
                       <div className="flex gap-2">
                         <Button
+                          id={`note-edit-${n.id}`}
                           size="sm"
+                          aria-label={`${flow.notes.edit}: ${noteName(n)}`}
                           onClick={() => {
                             setRefused(null)
+                            setLastDeleted(null) // another note action: the last delete can no longer be undone
+                            focusNext.current = `edit-${n.id}`
                             setEditing({ id: n.id, body: n.body })
                           }}
                         >
@@ -229,8 +248,12 @@ export const NotesPanel = memo(function NotesPanel({ inv, parts, current, update
                         <Button
                           size="sm"
                           variant="danger"
+                          aria-label={`${flow.notes.delete}: ${noteName(n)}`}
                           onClick={() => {
-                            if (update((i) => removeNote(i, n.id))) setLastDeleted(n)
+                            if (update((i) => removeNote(i, n.id))) {
+                              focusNext.current = 'note-undo'
+                              setLastDeleted(n)
+                            }
                           }}
                         >
                           {flow.notes.delete}

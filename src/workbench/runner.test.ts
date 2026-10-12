@@ -192,6 +192,29 @@ describe('createRunner', () => {
     await settle()
     expect(calls.filter((c) => c === 'f0:2025-12-20')).toHaveLength(1)
   })
+  it('releaseFull frees a loaded full frame and its mask, and a later requestFull loads it again', async () => {
+    const { d, calls } = deps()
+    const frame: RunnerDeps['frame'] = async (req) => {
+      calls.push(`f${req.level}:${req.item.id}`)
+      return { level: req.level, sha256: 'x', window: [0, 0, 1, 1] } as never
+    }
+    let last: EvidenceState | null = null
+    const r = createRunner({ ...d, frame }, input, (s) => (last = s), 2)
+    await r.start()
+    const date = '2025-12-20'
+    const entryOf = () => last!.entries.find((e) => e.date === date)!
+    r.requestFull(date)
+    await settle()
+    expect(entryOf().full).not.toBeNull()
+    r.releaseFull(date)
+    expect(entryOf().full).toBeNull()
+    expect(entryOf().invalid).toBeNull()
+    r.requestFull(date)
+    await settle()
+    expect(entryOf().full).not.toBeNull()
+    expect(calls.filter((c) => c === `f0:${entryOf().candidate.item.id}`)).toHaveLength(2)
+  })
+
   it('does not request a failed full frame again until retry(date), and a success clears the error', async () => {
     const { d, calls } = deps()
     let broken = true

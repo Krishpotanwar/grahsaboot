@@ -87,6 +87,15 @@ test('map toggle shows the outline and the selected photo on the map', async ({ 
   await page.waitForFunction(() => (window as any).__gs?.map?.getSource('gs-frame')?.type === 'image', null, {
     timeout: 30_000,
   })
+  // The pixels reached the GPU: the image source holds them as ImageData and has made its texture (no fetch of a data: URL).
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const src = (window as any).__gs.map.getSource('gs-frame')
+        return [src?.image?.constructor?.name, !!src?.texture]
+      }),
+    )
+    .toEqual(['ImageData', true])
   await expect(stage(page)).toHaveAttribute('data-layout', 'mini')
   await hideMap(page).click()
   await expect(stage(page)).toHaveAttribute('data-layout', 'hidden')
@@ -181,7 +190,7 @@ test('the map opens on the whole outline', async ({ page }) => {
     .toBe(true)
 })
 
-// 1,100 passes and a fast slider: the map follows the date the slider rests on, and asks for and encodes nothing on the way.
+// 1,100 passes and a fast slider: the map follows the date the slider rests on, and is given, asks for and encodes nothing on the way.
 test('scrubbing with the map open loads and encodes nothing until the slider rests', async ({ page }) => {
   const counts = await countWork(page)
   const { log, dates } = await manyPasses(page, 20)
@@ -218,8 +227,22 @@ test('scrubbing with the map open loads and encodes nothing until the slider res
   await showMap(page).click()
   await expect.poll(() => onMap(page), { timeout: 30_000 }).toEqual([true, 'image', true])
   await quiet()
+  // The photo goes to the map as decoded pixels: count the times the map is given one (its image source is made again each
+  // time the date at rest changes).
+  await page.evaluate(() => {
+    const w = window as any
+    const map = w.__gs.map
+    w.__upd = 0
+    const add = map.addSource.bind(map)
+    map.addSource = (id: string, spec: unknown) => {
+      if (id === 'gs-frame') w.__upd++
+      return add(id, spec)
+    }
+  })
+  const updates = () => page.evaluate(() => (window as any).__upd as number)
   const before = await counts()
-  expect(before.enc).toBe(1) // the photo of the date the map opened on
+  const upd0 = await updates()
+  expect(before.enc).toBe(0) // the photo of the date the map opened on reached the map without a PNG
   // Twenty steps back, 15 ms apart: never 250 ms at rest. The steps and the counts are timed inside the page: a round trip to
   // the browser can stall for longer than the rest the app waits for (a busy machine did), and then the date really rests.
   const during = await s.evaluate(async (el: HTMLInputElement) => {
@@ -230,20 +253,22 @@ test('scrubbing with the map open loads and encodes nothing until the slider res
       await new Promise((r) => setTimeout(r, 15))
     }
     const w = window as any
-    return { enc: w.__enc as number, full: [...w.__full] as string[] }
+    return { enc: w.__enc as number, full: [...w.__full] as string[], upd: w.__upd as number }
   })
   expect(during.full).toEqual(before.full)
   expect(during.enc).toBe(before.enc)
+  expect(during.upd).toBe(upd0) // nothing was handed to the map on the way
   const rested = dates[3]!
   await expect(s).toHaveAttribute('aria-valuetext', `${fmtDate(rested)}, Clear`)
-  // At rest: its full frame is asked for once, its PNG made once, and it is on the map.
+  // At rest: its full frame is asked for once, handed to the map once (never encoded), and it is on the map.
   await expect
     .poll(async () => (await counts()).full, { timeout: 15_000 })
     .toEqual([...before.full, itemId(rested)])
-  await expect.poll(async () => (await counts()).enc, { timeout: 15_000 }).toBe(before.enc + 1)
+  await expect.poll(updates, { timeout: 15_000 }).toBe(upd0 + 1)
   await expect.poll(() => onMap(page), { timeout: 15_000 }).toEqual([true, 'image', true])
   await page.waitForTimeout(500)
-  expect(await counts()).toEqual({ enc: before.enc + 1, full: [...before.full, itemId(rested)] })
+  expect(await counts()).toEqual({ enc: 0, full: [...before.full, itemId(rested)] })
+  expect(await updates()).toBe(upd0 + 1)
 })
 
 test('resting on a pass with no usable photo takes the photo off the map and keeps the outline', async ({

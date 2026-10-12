@@ -1,16 +1,19 @@
-import type { ImageSource, Map as MlMap } from 'maplibre-gl'
+import type { ImageSource, ImageSourceSpecification, Map as MlMap } from 'maplibre-gl'
 import type { DisplayGrid } from '../evidence/types.ts'
 
-// MapLibre 6.12 loads an image source with fetch(), data: URLs included, so the CSP's connect-src has to allow data: (C11).
-export function setFrameLayer(map: MlMap, url: string | null, grid: DisplayGrid) {
-  if (!url) return removeFrameLayer(map)
+// The photo goes to the map as decoded pixels (`updateImage({ image })`, no network request): no PNG is encoded for it, no
+// data: URL is fetched, and the page's content security policy has no `data:` in `connect-src` for it.
+export function setFrameLayer(map: MlMap, image: ImageData | null, grid: DisplayGrid) {
+  if (!image) return removeFrameLayer(map)
   const coordinates = grid.cornersLonLat
   const src = map.getSource('gs-frame') as ImageSource | undefined
   if (src) {
-    src.updateImage({ url, coordinates })
+    src.updateImage({ image, coordinates })
     return
   }
-  map.addSource('gs-frame', { type: 'image', url, coordinates })
+  // A source with coordinates only: the image is handed over right after it exists.
+  map.addSource('gs-frame', { type: 'image', coordinates } as unknown as ImageSourceSpecification)
+  ;(map.getSource('gs-frame') as ImageSource).updateImage({ image, coordinates })
   map.addLayer(
     { id: 'gs-frame', type: 'raster', source: 'gs-frame', paint: { 'raster-fade-duration': 0 } },
     map.getLayer('gs-aoi-fill') ? 'gs-aoi-fill' : undefined,

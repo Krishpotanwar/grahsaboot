@@ -82,6 +82,52 @@ test('add, edit and delete-with-undo a note; text stays text', async ({ page }) 
   ).toBeVisible()
 })
 
+test('each note button says which note it is for, and focus follows every note action', async ({ page }) => {
+  const id = await openThenEdit(page, {
+    notes: seeded(3),
+    before: '2025-01-10',
+    after: '2025-12-20',
+    pinned: ['2025-01-10', '2025-12-20'],
+  })
+  await page.goto(`/i/${id}?tier=0`)
+  await waitForSettled(page)
+  const panel = notesOf(page)
+  // 3 notes, 6 buttons, 6 different names (a screen reader's list of buttons says which note each is for)
+  const names = await panel
+    .getByRole('listitem')
+    .getByRole('button')
+    .evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')))
+  expect(new Set(names).size).toBe(6)
+  expect(names[0]).toContain('Seeded note')
+  const first = panel.getByRole('listitem').nth(0)
+  // Edit goes into the editor; Cancel comes back to that note's Edit button; Save too.
+  await first.getByRole('button', { name: flow.notes.edit }).click()
+  await expect(first.getByRole('textbox')).toBeFocused()
+  await first.getByRole('button', { name: flow.notes.cancel }).click()
+  await expect(first.getByRole('button', { name: flow.notes.edit })).toBeFocused()
+  await first.getByRole('button', { name: flow.notes.edit }).click()
+  await first.getByRole('textbox').fill('Changed once')
+  await first.getByRole('button', { name: flow.notes.save }).click()
+  await expect(first.getByRole('button', { name: flow.notes.edit })).toBeFocused()
+  // Delete goes to Undo, which does not expire; Undo gives the focus back to the restored note.
+  await first.getByRole('button', { name: flow.notes.delete }).click()
+  const undo = panel.getByRole('button', { name: flow.notes.undo })
+  await expect(undo).toBeFocused()
+  await page.waitForTimeout(7000) // longer than the 6 s it used to last (WCAG 2.2.1)
+  await expect(undo).toBeVisible()
+  await undo.click()
+  await expect(panel.getByText('Changed once')).toBeVisible()
+  await expect(
+    panel.getByRole('listitem').nth(0).getByRole('button', { name: flow.notes.edit }),
+  ).toBeFocused()
+  // Another note action ends the chance to undo the last delete.
+  await panel.getByRole('listitem').nth(0).getByRole('button', { name: flow.notes.delete }).click()
+  await expect(undo).toBeVisible()
+  await panel.getByLabel(flow.notes.what).fill('A new one')
+  await panel.getByRole('button', { name: flow.notes.add }).click()
+  await expect(undo).toHaveCount(0)
+})
+
 test('empty notes are refused with a message', async ({ page }) => {
   await openSettled(page)
   const panel = page.getByRole('region', { name: flow.notes.title })
@@ -298,7 +344,8 @@ test('an edit that is refused keeps the editor open and the note as it was', asy
   await panel.getByLabel(flow.notes.what).fill('Roof visible')
   await panel.getByRole('button', { name: flow.notes.add }).click()
   await panel.getByRole('button', { name: flow.notes.edit }).click()
-  const editor = panel.getByLabel(flow.notes.edit)
+  // A textbox: once the editor closes, the note's Edit button (named for its note) must not match.
+  const editor = panel.getByRole('textbox', { name: flow.notes.edit })
   await editor.fill('  ')
   await panel.getByRole('button', { name: flow.notes.save }).click()
   // Said in the editor that was refused, not by the Add button at the other end of a long list.

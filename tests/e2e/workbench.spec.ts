@@ -107,7 +107,9 @@ test('a save that fails is shown, and the photos still load', async ({ page }) =
     }
   })
   await openFixtureSite(page)
-  await expect(page.getByText(flow.workbench.errors.SAVE_FAILED!)).toBeVisible({ timeout: 30_000 })
+  // Said once, as a toast where the person is, not also in the header far above the notes.
+  await expect(page.getByText(flow.workbench.errors.SAVE_FAILED!)).toHaveCount(1, { timeout: 30_000 })
+  await expect(page.getByText(flow.workbench.errors.SAVE_FAILED!)).toBeInViewport()
   await waitForPhotos(page)
 })
 

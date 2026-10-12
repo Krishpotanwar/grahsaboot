@@ -59,7 +59,7 @@ export function Shell({ route, children }: { route: Route; children: ReactNode }
         {copy.common.skip}
       </a>
       <header className="no-print relative z-30 flex h-16 items-center justify-between border-b border-line bg-bg px-4 lg:px-6">
-        <Link to="/" aria-label={copy.nav.home} className="rounded-[6px]">
+        <Link to="/" aria-label={copy.nav.home} className="inline-flex min-h-11 items-center rounded-[6px]">
           <Wordmark />
         </Link>
         <nav className="flex items-center gap-1">
@@ -108,10 +108,16 @@ export function Shell({ route, children }: { route: Route; children: ReactNode }
           <div className="mx-auto flex max-w-[1200px] flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="max-w-[65ch]">{copy.footer.disclaimer}</p>
             <div className="flex gap-4">
-              <Link to="/privacy" className="underline-offset-4 hover:underline">
+              <Link
+                to="/privacy"
+                className="inline-flex min-h-11 min-w-11 items-center justify-center underline-offset-4 hover:underline"
+              >
                 {copy.nav.privacy}
               </Link>
-              <Link to="/limits" className="underline-offset-4 hover:underline">
+              <Link
+                to="/limits"
+                className="inline-flex min-h-11 min-w-11 items-center justify-center underline-offset-4 hover:underline"
+              >
                 {copy.nav.limits}
               </Link>
             </div>

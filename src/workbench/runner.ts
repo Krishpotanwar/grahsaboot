@@ -279,6 +279,16 @@ export function createRunner(
   }
 
   /**
+   * Frees a date's full photo and its mask (about 5 MiB at 1024 px) once the person has moved on, so resting on a hundred dates
+   * does not hold them all. Not while its load is in flight; a later `requestFull` loads it again.
+   */
+  const releaseFull = (date: string) => {
+    const e = entry(date)
+    if (!e || !e.full || fullBusy.has(date)) return
+    patchEntry(date, { full: null, invalid: null })
+  }
+
+  /**
    * Quality check of a date still waiting in the sweep, next, ahead of the rest. Idempotent: the date's own slot in the
    * queue finds it no longer `queued` and does nothing, and a date that is checking, checked or failed is left alone.
    */
@@ -324,5 +334,5 @@ export function createRunner(
     queue.length = 0
   }
 
-  return { start, requestFull, requestThumb, requestCheck, retry, dispose }
+  return { start, requestFull, releaseFull, requestThumb, requestCheck, retry, dispose }
 }

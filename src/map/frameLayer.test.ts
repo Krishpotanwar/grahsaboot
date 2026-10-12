@@ -4,7 +4,9 @@ import { makeDisplayGrid } from '../evidence/display.ts'
 import { removeFrameLayer, setFrameLayer } from './frameLayer.ts'
 
 const grid = makeDisplayGrid([79.0832, 21.1408, 79.0932, 21.1508], 256)
-const url = 'data:image/png;base64,AA'
+// ImageData is a browser class: the fake map only keeps what it is handed, so any object stands for the pixels.
+const image = { width: 2, height: 2 } as unknown as ImageData
+const other = { width: 2, height: 2, other: true } as unknown as ImageData
 
 // A map that only remembers the sources and layers it is given, so no WebGL is needed.
 function fakeMap(layers: string[] = []) {
@@ -30,28 +32,29 @@ function fakeMap(layers: string[] = []) {
 describe('setFrameLayer', () => {
   it('puts the photo on the map at the grid corners, under the outline', () => {
     const m = fakeMap(['bg', 'gs-aoi-fill', 'gs-aoi-line'])
-    setFrameLayer(m.map, url, grid)
+    setFrameLayer(m.map, image, grid)
     expect(m.layers).toEqual(['bg', 'gs-frame', 'gs-aoi-fill', 'gs-aoi-line'])
-    expect(m.sources.get('gs-frame')).toEqual({ type: 'image', url, coordinates: grid.cornersLonLat })
+    // no url: the pixels are handed over with the corners, and nothing is fetched
+    expect(m.sources.get('gs-frame')).toEqual({ image, coordinates: grid.cornersLonLat })
   })
 
   it('goes on top while there is no outline yet', () => {
     const m = fakeMap(['bg'])
-    setFrameLayer(m.map, url, grid)
+    setFrameLayer(m.map, image, grid)
     expect(m.layers).toEqual(['bg', 'gs-frame'])
   })
 
   it('changes the image of a photo that is already there, and adds nothing', () => {
     const m = fakeMap()
-    setFrameLayer(m.map, url, grid)
-    setFrameLayer(m.map, 'data:image/png;base64,BB', grid)
-    expect(m.calls).toEqual(['addSource', 'addLayer', 'update'])
+    setFrameLayer(m.map, image, grid)
+    setFrameLayer(m.map, other, grid)
+    expect(m.calls).toEqual(['addSource', 'update', 'addLayer', 'update'])
     expect(m.layers).toEqual(['gs-frame'])
   })
 
   it('takes the photo off for no url, and removing from a map without one is harmless', () => {
     const m = fakeMap(['bg'])
-    setFrameLayer(m.map, url, grid)
+    setFrameLayer(m.map, image, grid)
     setFrameLayer(m.map, null, grid)
     expect(m.layers).toEqual(['bg'])
     expect(m.sources.has('gs-frame')).toBe(false)

@@ -30,6 +30,7 @@ describe('worker entry', () => {
     })
     const res = await worker.fetch(new Request('https://app.example/api/tle'), { ASSETS }, ctx)
     expect(res.status).toBe(200)
+    expect(res.headers.get('x-content-type-options')).toBe('nosniff')
     expect(store.size).toBe(1)
   })
   it('falls back to the bundled snapshot when CelesTrak is down and nothing is cached', async () => {
@@ -39,6 +40,7 @@ describe('worker entry', () => {
     const res = await worker.fetch(new Request('https://down.example/api/tle'), { ASSETS: snap }, ctx)
     expect(res.status).toBe(200)
     expect(res.headers.get('x-gs-stale')).toBe('1')
+    expect(res.headers.get('x-content-type-options')).toBe('nosniff') // the snapshot answer too
     expect(await res.json()).toEqual(SATS)
   })
   it('answers from the snapshot after 0.8 s when the refresh is slow, and lets the refresh finish in the background', async () => {
@@ -69,6 +71,7 @@ describe('worker entry', () => {
       const res = await worker.fetch(new Request(`https://app.example${path}`), { ASSETS }, ctx)
       expect(res.status, path).toBe(404)
       expect(res.headers.get('content-type')).toContain('application/json')
+      expect(res.headers.get('x-content-type-options')).toBe('nosniff')
       expect(await res.json()).toEqual({ error: 'NOT_FOUND' })
     }
     expect(ASSETS.fetch).not.toHaveBeenCalled()
@@ -81,6 +84,7 @@ describe('worker entry', () => {
       const res = await worker.fetch(new Request('https://app.example/api/tle', { method }), { ASSETS }, ctx)
       expect(res.status, method).toBe(405)
       expect(res.headers.get('allow')).toBe('GET, HEAD')
+      expect(res.headers.get('x-content-type-options')).toBe('nosniff')
       expect(await res.json()).toEqual({ error: 'METHOD_NOT_ALLOWED' })
     }
     expect(up).not.toHaveBeenCalled()

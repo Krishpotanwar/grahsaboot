@@ -92,6 +92,7 @@ export function useEvidence(
   const api = useMemo(
     () => ({
       requestFull: (date: string) => runner.current?.requestFull(date),
+      releaseFull: (date: string) => runner.current?.releaseFull(date),
       requestThumb: (date: string) => runner.current?.requestThumb(date),
       requestCheck: (date: string) => runner.current?.requestCheck(date),
       retry: (date?: string) => runner.current?.retry(date),

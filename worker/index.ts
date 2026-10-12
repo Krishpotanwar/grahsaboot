@@ -10,7 +10,7 @@ interface Env {
 const error = (status: number, code: string, headers: Record<string, string> = {}) =>
   new Response(JSON.stringify({ error: code }), {
     status,
-    headers: { 'content-type': 'application/json', ...headers },
+    headers: { 'content-type': 'application/json', 'x-content-type-options': 'nosniff', ...headers },
   })
 
 // How long a visitor waits for the cache or CelesTrak before getting the bundled snapshot instead. From some Cloudflare
@@ -70,6 +70,7 @@ export default {
             headers: {
               'content-type': 'application/json',
               'access-control-allow-origin': '*',
+              'x-content-type-options': 'nosniff',
               'cache-control': 'public, max-age=300',
               'x-gs-stale': '1',
             },

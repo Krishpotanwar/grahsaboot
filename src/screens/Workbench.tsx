@@ -4,9 +4,9 @@ import { createPortal } from 'react-dom'
 import { loadAccounts } from '../accounts/enabled.ts'
 import { setBeforeAfter, togglePin, verificationFor, type Investigation } from '../data/investigation.ts'
 import { useInvestigation } from '../data/useInvestigation.ts'
-import { rgbaToPngDataUrl } from '../lib/canvas.ts'
 import { fmtDate } from '../lib/format.ts'
 import { Link } from '../lib/router.tsx'
+import { useToast } from '../ui/toast.tsx'
 import { useRested } from '../lib/useRested.ts'
 import { accentColor, fitAoi, removeAoiLayer, setAoiLayer } from '../map/aoiLayer.ts'
 import { removeFrameLayer, setFrameLayer } from '../map/frameLayer.ts'
@@ -20,6 +20,7 @@ import { canPickDefaults, isUsable, pickDefaults } from '../workbench/defaults.t
 import { EvidenceViewer, MapTool, type Slot } from '../workbench/EvidenceViewer.tsx'
 import { NotesPanel } from '../workbench/NotesPanel.tsx'
 import type { DateEntry } from '../workbench/runner.ts'
+import { trimRing } from '../workbench/ring.ts'
 import { saveWait } from '../workbench/saveReady.ts'
 import { GridSkeleton, SectionGrid } from '../workbench/SectionGrid.tsx'
 import { Timeline, TimelineSkeleton } from '../workbench/Timeline.tsx'
@@ -69,6 +70,11 @@ const slot = (e: DateEntry | undefined, verification: Investigation['verificatio
 
 export default function Workbench({ id }: { id: string }) {
   const { inv, update, error } = useInvestigation(id)
+  // A failed save is said where the person is (the page header is far above the notes and the grid), once per failure.
+  const toast = useToast()
+  useEffect(() => {
+    if (error === 'SAVE_FAILED') toast(flow.workbench.errors.SAVE_FAILED)
+  }, [error, toast])
   const { map, tier, layout, stage, installLayers } = useMapStage()
   const [mapOpen, setMapOpen] = useState(false)
   // One identity for the life of the page: the viewer is memoised and must not render again for a slider step.
@@ -78,10 +84,8 @@ export default function Workbench({ id }: { id: string }) {
   const [maxSide] = useState(() =>
     matchMedia('(min-width: 1024px)').matches ? (tier >= 2 ? 1024 : 768) : 512,
   )
-  const { state, grid, thumbGrid, summary, requestFull, requestThumb, requestCheck, retry } = useEvidence(
-    inv,
-    maxSide,
-  )
+  const { state, grid, thumbGrid, summary, requestFull, releaseFull, requestThumb, requestCheck, retry } =
+    useEvidence(inv, maxSide)
   const entries = state.entries
   const byDate = useMemo(() => new Map(entries.map((e) => [e.date, e])), [entries])
   const beforeEntry = inv?.before ? byDate.get(inv.before) : undefined
@@ -173,19 +177,30 @@ export default function Workbench({ id }: { id: string }) {
   useEffect(() => {
     if (mapOpen && tier > 0 && shown && isUsable(shown) && !shown.full) requestFull(shown.date)
   }, [mapOpen, tier, shown, requestFull])
-  const frameUrl = useMemo(
+  // Full photos of dates the person has moved on from are released (about 5 MiB each): the last few rested dates stay, and the
+  // before and after photos and the pinned dates always do.
+  const ring = useRef<string[]>([])
+  useEffect(() => {
+    if (!mapDate || !inv) return
+    const protect = new Set([inv.before, inv.after, ...inv.pinned].filter((d): d is string => !!d))
+    const r = trimRing(ring.current, mapDate, 6, protect)
+    ring.current = r.ring
+    for (const d of r.release) releaseFull(d)
+  }, [mapDate, inv?.before, inv?.after, inv?.pinned, releaseFull]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Decoded pixels for the map (no PNG encode, no data: URL): the same `ImageData` while the photo is.
+  const frameImage = useMemo(
     () =>
       mapOpen && tier > 0 && shown?.full && grid
-        ? rgbaToPngDataUrl(shown.full.display.rgba, grid.width, grid.height)
+        ? new ImageData(new Uint8ClampedArray(shown.full.display.rgba), grid.width, grid.height)
         : null,
     [mapOpen, tier, shown?.full, grid],
   )
   useEffect(
     () =>
       map && grid
-        ? installLayers('frame', (m) => setFrameLayer(m, frameUrl, grid), removeFrameLayer)
+        ? installLayers('frame', (m) => setFrameLayer(m, frameImage, grid), removeFrameLayer)
         : undefined,
-    [map, grid, frameUrl, installLayers],
+    [map, grid, frameImage, installLayers],
   )
   // Once the stage has the corner box (a layout later than `mapOpen`), so the fit is to that size and not to the hidden map's.
   useEffect(() => {
@@ -300,7 +315,8 @@ export default function Workbench({ id }: { id: string }) {
       </header>
       <div className="grid lg:grid-cols-[minmax(0,1fr)_440px]">
         <div className="grid min-w-0 content-start gap-3 px-4 pb-5 pt-3 lg:px-8">
-          {error && !pinError && !noteError && !claimError && (
+          {/* SAVE_FAILED is the toast's (above): said where the person is, once. */}
+          {error && error !== 'SAVE_FAILED' && !pinError && !noteError && !claimError && (
             <p role="alert" className="text-sm text-bad">
               {flow.workbench.errors[error] ?? error}
             </p>

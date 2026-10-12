@@ -25,7 +25,7 @@ export const config = {
   testMode: env.MODE !== 'production' || env.VITE_TEST_HOOKS === '1',
 } as const
 
-const ASSET_HOSTS = [
+export const ASSET_HOSTS = [
   'sentinel-cogs.s3.us-west-2.amazonaws.com',
   'e84-earth-search-sentinel-data.s3.us-west-2.amazonaws.com',
   'sentinel2l2a01.blob.core.windows.net',

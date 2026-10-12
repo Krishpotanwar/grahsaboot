@@ -11,7 +11,12 @@ export interface TleCache {
 const json = (body: string, status: number, extra: Record<string, string> = {}) =>
   new Response(body, {
     status,
-    headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*', ...extra },
+    headers: {
+      'content-type': 'application/json',
+      'access-control-allow-origin': '*',
+      'x-content-type-options': 'nosniff',
+      ...extra,
+    },
   })
 
 // An empty body is a back-off entry written after a failure with nothing cached to fall back on.

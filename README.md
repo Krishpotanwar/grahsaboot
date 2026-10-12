@@ -35,7 +35,16 @@ GrahSaboot turns a place and a set of dates into dated, cloud-checked satellite 
 
 ![Next pass over a searched place](docs/screenshots/next-pass.png)
 
-**Not in this prototype yet:** the investigation workbench (drawing an outline, comparing dated photos, making a report) and accounts. "Start an investigation" currently opens a page that says so. The evidence engine behind the workbench is already built and tested; see [Roadmap](#roadmap).
+### Investigations
+
+- **Start an investigation** from the globe or at `/new`: pick a place, outline a site or a road on the map (or paste coordinates), choose the dates, review, open.
+- **A workbench for the evidence.** Compare a before and an after photo with a swipe, side by side or as a brightness difference, with a mini map of the outline. Each photo shows its date, the satellite, how much of the outline it sees clearly, and a SHA-256 of the pixels.
+- **A photo timeline.** Every pass in the range is a tick: tall when it sees the outline clearly, short when clouds hide it. Press or drag along it to move through the dates; pin the ones that matter.
+- **Roads in sections.** A road is cut into sections and a grid shows how clearly each one is seen on each pinned date.
+- **Notes and a claim.** Write what you see, and the claim you are testing and the criterion for it.
+- **A report.** One self-contained HTML file with the photos, the table of dates, the notes and the claim, the limits, and a provenance block with every file, window and hash, so someone else can check it.
+
+Everything stays in your browser: investigations are kept on this device. Accounts are built but switched off; see [Accounts](#accounts-built-switched-off).
 
 ## How it works
 
@@ -112,7 +121,9 @@ npm run deploy         # runs npm run check (type check, unit tests, production 
 
 `npm run e2e` builds into `dist-e2e/` and `dist-accounts-e2e/`, never into `dist/`, so a test build cannot be deployed by mistake. `npm run deploy` rebuilds `dist/` as part of the check.
 
-Pushing to GitHub does not deploy anything; you deploy by running `npm run deploy`.
+Pushing to GitHub does not deploy anything; you deploy by running `npm run deploy`. The full procedure, the smoke checklist and the rollback are in [`docs/ops/deploy.md`](docs/ops/deploy.md).
+
+The build writes `dist/_headers`, the page's content security policy and security headers, from the hosts the code really talks to (`scripts/csp.ts`); `npm run check` holds the built file to it.
 
 Refresh the bundled orbit snapshot now and then:
 
@@ -135,11 +146,18 @@ src/
   stac/               Sentinel-2 STAC search (Earth Search, with Planetary Computer as fallback)
   workers/            imagery Web Worker
   geo/                coordinates and outline limits
+  new/                the new-investigation steps (place, outline, dates, review)
+  workbench/          the workbench: viewer, timeline, road grid, notes, claim, the checks runner
+  report/             the report: HTML, provenance, escaping
+  data/               the investigation model and the on-device store
+  accounts/           sign-in, save and verify (built, switched off; reached only through one flag)
 worker/               Cloudflare Worker: /api/tle (edge cache, back-off, snapshot fallback)
+supabase/             database migrations and the verify and delete-account functions (not deployed)
+scripts/              checks that run in `npm run check`: bundle budget and guard, content security policy
 public/               icons and tle-snapshot.json
 tests/e2e/            Playwright end-to-end and accessibility tests
 tests/fixtures/       fixture server and data for end-to-end tests
-docs/                 design mockups, plans, research, probes
+docs/                 design mockups, plans, research, probes, ops runbooks
 ```
 
 ## Roadmap
@@ -148,7 +166,7 @@ docs/                 design mockups, plans, research, probes
 | ------------------ | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
 | A: Foundation      | Done                | Toolchain, geometry, the evidence engine (COG reads, SHA-256 frames, `scl-v2` cloud stats, reprojection, difference), STAC clients, imagery worker |
 | B: Shell and globe | Done, live          | Design system, router and shell, globe with device tiers, place search, live satellites and next pass                                              |
-| C: Workbench       | Next                | New-investigation flow, workbench (swipe, side by side, difference), timeline, road sections, notes, report export                                 |
+| C: Workbench       | Done, live          | New-investigation flow, workbench (swipe, side by side, difference), timeline, road sections, notes, report export                                 |
 | D: Accounts        | Built, switched off | Google sign-in, saving, server re-verification of every frame, privacy controls                                                                    |
 
 ## Accounts (built, switched off)
