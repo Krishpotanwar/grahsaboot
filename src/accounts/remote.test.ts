@@ -304,16 +304,25 @@ describe('account calls', () => {
     await expect(deleteAccount(bad.sb)).rejects.toThrow('DELETE_FAILED')
   })
 
-  it('deleteRemote deletes one investigation by id and throws when refused', async () => {
-    const ok = wire(() => ({ status: 204 }))
-    await deleteRemote('srv-1', ok.sb)
-    expect([ok.log[0]!.method, ok.log[0]!.path, ok.log[0]!.query.get('id')]).toEqual([
-      'DELETE',
-      '/rest/v1/investigations',
-      'eq.srv-1',
-    ])
+  it('deleteRemote deletes one investigation by id, says how many rows went, and throws when refused', async () => {
+    const gone = wire(() => ({ body: [{ id: 'srv-1' }] }))
+    expect(await deleteRemote('srv-1', gone.sb)).toBe(1)
+    const r = gone.log[0]!
+    expect([r.method, r.path, r.query.get('id')]).toEqual(['DELETE', '/rest/v1/investigations', 'eq.srv-1'])
+    // the rows come back, so a delete that matched nothing can be told from one that removed the row
+    expect(r.query.get('select')).toBe('id')
+    expect(r.headers.get('prefer')).toContain('return=representation')
+    // already gone (deleted on another device): nothing matched, which is not an error
+    const none = wire(() => ({ body: [] }))
+    expect(await deleteRemote('srv-1', none.sb)).toBe(0)
+    // and a server that answers no body at all (204) is the same: nothing matched
+    const empty = wire(() => ({ status: 204 }))
+    expect(await deleteRemote('srv-1', empty.sb)).toBe(0)
     const bad = wire(() => ({ status: 400, body: { message: 'nope' } }))
     await expect(deleteRemote('srv-1', bad.sb)).rejects.toThrow('nope')
+    // a refused session is the one failure the caller can name
+    const expired = wire(() => JWT_EXPIRED)
+    expect(await caught(deleteRemote('srv-1', expired.sb))).toBeInstanceOf(SessionExpiredError)
   })
 
   it('listRemote lists the newest first and throws on an error rather than showing an empty list', async () => {

@@ -33,3 +33,12 @@ export async function giveConsent(
     // the server has it
   }
 }
+
+/** Forgets one user's agreement in this browser (account deletion, sign-out). A storage that cannot be written is not an error. */
+export function clearConsent(userId: string, store: Pick<Storage, 'removeItem'> = localStorage): void {
+  try {
+    store.removeItem(consentKey(userId))
+  } catch {
+    // nothing to forget that could be read back
+  }
+}

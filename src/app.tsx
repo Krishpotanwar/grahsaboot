@@ -20,9 +20,9 @@ export function screenFor(r: Route): ReactNode {
     case 'globe':
       return <GlobeScreen />
     case 'privacy':
-      return <TextPage page={copy.pages.privacy} />
+      return <TextPage page={copy.pages.privacy} extra="privacyItems" />
     case 'limits':
-      return <TextPage page={copy.pages.limits} />
+      return <TextPage page={copy.pages.limits} extra="limitsItems" />
     case 'new':
       return <NewInvestigation />
     case 'investigation':

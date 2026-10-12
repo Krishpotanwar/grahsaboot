@@ -1,11 +1,18 @@
 import { Moon, Sun } from '@phosphor-icons/react'
-import { useEffect, useRef, type ReactNode } from 'react'
+import { lazy, Suspense, useEffect, useRef, type ReactNode } from 'react'
+import { loadAccounts } from '../accounts/enabled.ts'
 import { config } from '../config.ts'
 import { Link, type Route } from '../lib/router.tsx'
 import { copy } from './copy.ts'
 import { IconButton } from './kit.tsx'
+import { Optional } from './Optional.tsx'
 import { useTheme } from './theme.ts'
 import { Wordmark } from './Wordmark.tsx'
+
+// Null in a build without accounts: the menu is then not rendered, requested or loaded at all, and the header is what it was
+// before accounts existed. The one import() lives in src/accounts/enabled.ts (the bundle guard proves it).
+const load = loadAccounts
+const LazyAccountMenu = load ? lazy(() => load().then((m) => ({ default: m.AccountMenu }))) : null
 
 /** The page title a route shows; null keeps the home title from index.html (the globe). */
 function pageTitle(r: Route): string | null {
@@ -66,6 +73,17 @@ export function Shell({ route, children }: { route: Route; children: ReactNode }
               </Link>
               <span aria-hidden className="mx-1.5 hidden h-[22px] w-px bg-line sm:block" />
             </>
+          )}
+          {LazyAccountMenu && (
+            // The box is held here whatever is in it (nothing yet, the sign-in, the menu): 44 px for the glyph on a phone, 80 px
+            // for the word from `sm`, so the links beside it do not move when the code and the session arrive.
+            <span className="inline-flex h-8 w-11 shrink-0 items-center sm:w-20">
+              <Optional>
+                <Suspense fallback={null}>
+                  <LazyAccountMenu />
+                </Suspense>
+              </Optional>
+            </span>
           )}
           <IconButton
             label={copy.nav.themeToggle}

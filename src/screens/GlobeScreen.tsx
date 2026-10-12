@@ -1,5 +1,6 @@
 import type { Marker } from 'maplibre-gl'
-import { useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
+import { loadAccounts } from '../accounts/enabled.ts'
 import { Link } from '../lib/router.tsx'
 import { useMediaQuery } from '../lib/useMediaQuery.ts'
 import { flyToPlace, placeToQuery } from '../map/camera.ts'
@@ -15,8 +16,13 @@ import type { Place } from '../search/nominatim.ts'
 import { useSatellites } from '../sats/useSatellites.ts'
 import { copy } from '../ui/copy.ts'
 import { Button } from '../ui/kit.tsx'
+import { Optional } from '../ui/Optional.tsx'
 import { SatellitesPanel } from '../ui/SatellitesPanel.tsx'
 import { SearchBox } from '../ui/SearchBox.tsx'
+
+// Null in a build without accounts: the list is then not rendered, requested or loaded at all.
+const load = loadAccounts
+const LazyMine = load ? lazy(() => load().then((m) => ({ default: m.MyInvestigations }))) : null
 
 const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches
 
@@ -146,6 +152,14 @@ export default function GlobeScreen() {
             {copy.nav.example}
           </Link>
         </div>
+        {LazyMine && (
+          // Signed in: what this account has saved. Nothing at all (no gap) while signed out or before the list arrives.
+          <Optional>
+            <Suspense fallback={null}>
+              <LazyMine />
+            </Suspense>
+          </Optional>
+        )}
         {tier === 0 && (
           <p className="max-w-[60ch] text-sm text-fg-2" role="status">
             {copy.map.staticNotice}

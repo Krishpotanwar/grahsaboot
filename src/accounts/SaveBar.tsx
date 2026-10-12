@@ -6,6 +6,7 @@ import { flow } from '../ui/copy-flow.ts'
 import type { DateEntry } from '../workbench/runner.ts'
 import { signInWithGoogle, useSession } from './auth.ts'
 import { giveConsent, hasConsent } from './consent.ts'
+import { mark, stale } from './left.ts'
 import { ConsentDialog } from './ConsentDialog.tsx'
 import { recordConsent, remoteDeps } from './remote.ts'
 import {
@@ -77,6 +78,14 @@ export function SaveBar({
   const reasonId = useId()
 
   const signingIn = useRef(false)
+  // Back from Google can hand this very page back from the browser's cache: nothing is leaving any more.
+  useEffect(() => {
+    const back = (e: PageTransitionEvent) => {
+      if (e.persisted) signingIn.current = false
+    }
+    window.addEventListener('pageshow', back)
+    return () => window.removeEventListener('pageshow', back)
+  }, [])
   const signIn = (path = location.pathname) => {
     // Once: two clicks would start two sign-ins and the second would overwrite the first's code verifier.
     if (signingIn.current) return
@@ -94,15 +103,19 @@ export function SaveBar({
     // The page this save is for: the run may outlive a navigation, and the sign-in must come back to THIS investigation.
     const path = location.pathname
     const { inv: sent, entries: held } = latest.current
+    // Signed out or deleted while this runs: it must not write the copy back or send the person to Google.
+    const since = mark()
+    const gone = () => stale(since, sent.id)
     setBusy({ total: 0, done: 0 })
     setDone(null)
     setFailed(false)
     let expired = false
     try {
       // The row id is kept the moment it exists (E6), so a failure after it cannot orphan the row.
-      const out = await saveAndVerify(remoteDeps(), sent, held, setBusy, (id) =>
-        update((i) => setServerId(i, id)),
-      )
+      const out = await saveAndVerify(remoteDeps(), sent, held, setBusy, (id) => {
+        if (!gone()) update((i) => setServerId(i, id))
+      })
+      if (gone()) return
       // Also when the run stopped early (a limit, the session): what was saved and checked is real and stays.
       update((i) => setServerNoteIds(setVerification(i, out.verification), out.noteIds))
       const merged = setVerification(setServerId(sent, out.serverId), out.verification)
@@ -116,13 +129,14 @@ export function SaveBar({
       })
     } catch (e) {
       // Never an Error.message here: it is the database's or the network's text.
+      if (gone()) return
       if (e instanceof SessionExpiredError) expired = true
       else setFailed(true)
     } finally {
       running.current = false
       setBusy(null)
     }
-    if (!expired) return
+    if (!expired || gone()) return
     if (afterSignIn.current) {
       setDone(null) // not "Saved" and "Could not save" together
       setFailed(true)

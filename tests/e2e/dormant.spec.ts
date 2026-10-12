@@ -4,7 +4,14 @@ import { openFixtureSite, waitForPhotos } from './helpers.ts'
 
 // Accounts are dormant: a build without the flag does nothing of them. This runs in the main suite, on the build that
 // proves it, and fails the moment an accounts word, request or storage key reaches it (dormant-addendum.md).
-const ACCOUNT_WORDS = ['Sign in', 'Save and verify', 'My investigations', 'Delete my account']
+const ACCOUNT_WORDS = [
+  'Sign in',
+  'Account',
+  'Save and verify',
+  'My investigations',
+  'Delete my account',
+  'Delete investigation',
+]
 // Found by grep, not guessed: localStorage in src/ui/theme.ts and src/map/MapStage.tsx; IndexedDB in src/data/store.ts and
 // src/lib/byte-cache.ts. A new key means a new thing the app stores, which an accounts build must not add to this one.
 const LOCAL_KEYS = ['gs-theme', 'gs-tier-override']

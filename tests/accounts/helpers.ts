@@ -59,6 +59,8 @@ export interface SupabaseCall {
   headers: Record<string, string>
   body: unknown
 }
+/** What a call is answered with: a status and body, or `'drop'` for a connection that dies before any answer. */
+export type Answer = { status: number; body?: unknown } | 'drop'
 export interface MockOptions {
   /** Rows of `public.investigations` as PostgREST returns them (with geom_geojson). */
   investigations?: Array<Record<string, unknown>>
@@ -73,6 +75,11 @@ export interface MockOptions {
     status: number
     body: unknown
   }
+  /**
+   * Answers a call itself, ahead of the defaults below; nothing falls through to them. It may wait (a held answer). The call
+   * is already in the log when this runs.
+   */
+  override?: (call: SupabaseCall) => Answer | undefined | Promise<Answer | undefined>
 }
 
 const json = (route: Route, status: number, body: unknown) =>
@@ -97,12 +104,18 @@ export async function mockSupabase(page: Page, opts: MockOptions = {}) {
       headers: req.headers(),
       body: req.postData() ? req.postDataJSON() : undefined,
     })
+    const call = calls[calls.length - 1]!
+    const over = await opts.override?.(call)
+    if (over === 'drop') return route.abort('connectionreset')
+    if (over) return over.status === 204 ? nothing(route) : json(route, over.status, over.body ?? {})
     const eq = (col: string) => url.searchParams.get(col)?.replace(/^eq\./, '')
     const rowsOf = (rows: Array<Record<string, unknown>> = [], col: string) =>
       rows.filter((r) => eq(col) === undefined || r[col] === eq(col))
     const get = req.method() === 'GET'
 
     if (path === '/auth/v1/user') return json(route, 200, USER)
+    if (path === '/auth/v1/logout') return nothing(route)
+    if (path === '/functions/v1/delete-account') return json(route, 200, { ok: true })
     // supabase-js sends the browser here (window.location.assign): a page of its own, so a spec can read the redirect it holds.
     if (path === '/auth/v1/authorize')
       return route.fulfill({
@@ -136,6 +149,8 @@ export async function mockSupabase(page: Page, opts: MockOptions = {}) {
       if (get) return json(route, 200, rowsOf(opts.investigations, 'id'))
       if (req.method() === 'POST') return json(route, 201, { id: opts.insertedId ?? INSERTED_ID })
       if (req.method() === 'PATCH') return json(route, 200, [{ id: eq('id') }])
+      // `.delete().select('id')` asks for the removed rows back, as PostgREST gives them
+      if (req.method() === 'DELETE') return json(route, 200, [{ id: eq('id') }])
       return nothing(route)
     }
     if (path === '/rest/v1/annotations')
@@ -145,3 +160,70 @@ export async function mockSupabase(page: Page, opts: MockOptions = {}) {
   })
   return calls
 }
+
+// Seeding and reading this page's own IndexedDB (the app's store: tests/e2e/helpers.ts has readStored/editStored).
+const SITE = {
+  kind: 'site',
+  geometry: {
+    type: 'Polygon',
+    coordinates: [
+      [
+        [79.0834, 21.1413],
+        [79.093, 21.1413],
+        [79.093, 21.1503],
+        [79.0834, 21.1503],
+        [79.0834, 21.1413],
+      ],
+    ],
+  },
+}
+/** A stored investigation. Without a `serverId` it is local work that exists nowhere else. */
+export const stored = (id: string, patch: Record<string, unknown> = {}) => ({
+  id,
+  serverId: null,
+  name: `Copy ${id.slice(-4)}`,
+  aoi: SITE,
+  dateFrom: '2025-01-01',
+  dateTo: '2025-12-31',
+  before: null,
+  after: null,
+  pinned: [],
+  notes: [],
+  claim: null,
+  createdAt: '2026-10-05T10:00:00.000Z',
+  updatedAt: '2026-10-05T10:00:00.000Z',
+  ...patch,
+})
+
+/** Puts investigations into the app's IndexedDB the way the app's own store keeps them. Run on a page of the app's origin. */
+export const seed = (page: Page, ...invs: Array<ReturnType<typeof stored>>) =>
+  page.evaluate(async (list) => {
+    const db = await new Promise<IDBDatabase>((res, rej) => {
+      const r = indexedDB.open('gs-investigations', 1)
+      r.onupgradeneeded = () => {
+        if (!r.result.objectStoreNames.contains('investigations'))
+          r.result.createObjectStore('investigations')
+      }
+      r.onsuccess = () => res(r.result)
+      r.onerror = () => rej(r.error)
+    })
+    const tx = db.transaction('investigations', 'readwrite')
+    for (const i of list) tx.objectStore('investigations').put(i, i.id)
+    await new Promise((res) => (tx.oncomplete = res))
+    db.close()
+  }, invs)
+
+/** The ids of everything this browser holds, sorted. */
+export const storedIds = (page: Page) =>
+  page.evaluate(async () => {
+    const db = await new Promise<IDBDatabase>((res) => {
+      const r = indexedDB.open('gs-investigations')
+      r.onsuccess = () => res(r.result)
+    })
+    const keys = await new Promise<IDBValidKey[]>((res) => {
+      const g = db.transaction('investigations').objectStore('investigations').getAllKeys()
+      g.onsuccess = () => res(g.result)
+    })
+    db.close()
+    return keys.map(String).sort()
+  })

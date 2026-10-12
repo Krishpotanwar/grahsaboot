@@ -7,10 +7,19 @@ const FRAME_CAP = LIMITS.pinnedDates * 2 + 2
 // without the accounts flag holds none of it (scripts/check-bundle.ts looks for "Sign in with Google").
 export const account = {
   signIn: 'Sign in with Google',
+  // What the header shows beside the wordmark: a prefix of `signIn`, which stays the control's name (label in name).
+  signInShort: 'Sign in',
+  signInFailed: 'Could not start sign-in. Try again.',
   signOut: 'Sign out',
+  // Said before sign-out removes the saved copies from this browser (the local store is not per user).
+  signOutConfirm: (n: number) =>
+    `Signing out removes ${n} saved investigation${n === 1 ? '' : 's'} from this browser; ${n === 1 ? 'it stays' : 'they stay'} in your account. Anything you changed since the last save is lost. Save first?`,
+  signOutFailed:
+    'Could not remove the saved copies from this browser, so you are still signed in. Try again.',
   menu: 'Account',
   mine: 'My investigations',
   none: 'Nothing saved yet.',
+  listFailed: 'Could not load your saved investigations.',
   save: 'Save and verify',
   savedLabel: 'Saved to your account',
   // Said until the first answer says how many dates there are to verify.
@@ -52,6 +61,8 @@ export const account = {
     investigation: 'Delete investigation',
     confirmInvestigation:
       'Delete this investigation from this browser and from your account? This cannot be undone.',
+    confirmLocal: 'Delete this investigation from this browser? This cannot be undone.',
+    signInFirst: 'Sign in to delete this from your account too. It is still in this browser.',
     account: 'Delete my account and data',
     confirmAccount: 'Delete your account and everything saved with it? This cannot be undone.',
     confirm: 'Delete',
@@ -63,6 +74,9 @@ export const account = {
   privacyItems: [
     'If you sign in to save, we store your Google name and email, your outlines, dates, notes and claims, and a log of actions with IDs only. The log is kept for one year; the record that you agreed is kept while your account exists.',
     'You can delete any investigation, or your whole account, at any time. Saved investigations are removed 12 months after your last sign-in; your Google name and email stay until you delete your account.',
+    // The notice needs a named contact (DPDP). The owner supplies it at activation (docs/ops/accounts-test.md lists it as a
+    // blocker); the placeholder shows only in a build with accounts, and copy-account.test.ts fails when it is replaced.
+    'Questions or complaints: [name and email of the grievance contact]. You can also complain to the Data Protection Board of India.',
   ],
   /** The limits page's sentence about accounts, with the numbers the server enforces. Appended in builds with accounts (D9). */
   limitsItems: [

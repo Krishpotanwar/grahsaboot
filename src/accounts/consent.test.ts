@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CONSENT_VERSION, consentKey, giveConsent, hasConsent } from './consent.ts'
+import { clearConsent, CONSENT_VERSION, consentKey, giveConsent, hasConsent } from './consent.ts'
 
 // A storage that logs what it is asked, so the order of the server call and the local key can be read back.
 function storage(log: string[] = [], over: Partial<Storage> = {}) {
@@ -10,6 +10,7 @@ function storage(log: string[] = [], over: Partial<Storage> = {}) {
       log.push(`local:${k}`)
       m.set(k, v)
     },
+    removeItem: (k: string) => void m.delete(k),
     ...over,
   }
   return Object.assign(s, { size: () => m.size })
@@ -69,5 +70,24 @@ describe('consent', () => {
       },
     })
     expect(hasConsent('u1', unreadable)).toBe(false)
+  })
+
+  it("forgets one user's agreement when they leave, and only theirs", async () => {
+    const s = storage()
+    await giveConsent('u1', async () => {}, s)
+    await giveConsent('u2', async () => {}, s)
+    clearConsent('u1', s)
+    expect(hasConsent('u1', s)).toBe(false)
+    // counter-case: another user's agreement on this browser is not touched
+    expect(hasConsent('u2', s)).toBe(true)
+  })
+
+  it('does not fail a sign-out because this browser cannot write its storage', () => {
+    const blocked = storage([], {
+      removeItem: () => {
+        throw new DOMException('blocked', 'SecurityError')
+      },
+    })
+    expect(() => clearConsent('u1', blocked)).not.toThrow()
   })
 })

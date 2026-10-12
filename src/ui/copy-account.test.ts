@@ -18,7 +18,7 @@ describe('account copy', () => {
 
   it('moves both sign-in privacy items to account.privacyItems, with how long each record is kept', () => {
     const text = account.privacyItems.join(' ')
-    expect(account.privacyItems).toHaveLength(2)
+    expect(account.privacyItems).toHaveLength(3) // the two, then the grievance contact (below)
     expect(text).toContain('log is kept for one year') // E10
     expect(text).toContain('record that you agreed is kept while your account exists') // E10
     expect(text).toContain('removed 12 months after your last sign-in')
@@ -70,5 +70,33 @@ describe('account copy', () => {
     expect(account.waiting.photos).toMatch(/photos/i)
     expect(account.consent.failed).toMatch(/nothing was saved/i)
     expect(account.consent.cancel).not.toBe(account.delete.cancel) // "Keep" is for an investigation, not a notice
+  })
+
+  // The notice needs a named contact (DPDP). The owner supplies it at activation: until then the sentence carries a marked
+  // placeholder, shown only in a build with accounts. Replacing the placeholder is a deliberate act, so this test changes with it.
+  it('keeps the grievance contact a marked placeholder until the owner supplies it', () => {
+    expect(account.privacyItems.at(-1)).toBe(
+      'Questions or complaints: [name and email of the grievance contact]. You can also complain to the Data Protection Board of India.',
+    )
+    // the live privacy page does not have it: it says nothing of accounts
+    expect(copy.pages.privacy.items.join(' ')).not.toContain('grievance')
+  })
+
+  it('asks before sign-out removes saved copies, naming how many, in the singular for one', () => {
+    expect(account.signOutConfirm(1)).toBe(
+      'Signing out removes 1 saved investigation from this browser; it stays in your account. Anything you changed since the last save is lost. Save first?',
+    )
+    expect(account.signOutConfirm(3)).toBe(
+      'Signing out removes 3 saved investigations from this browser; they stay in your account. Anything you changed since the last save is lost. Save first?',
+    )
+  })
+
+  it('has its own line for a sign-out that could not remove the copies, a list that did not load and a sign-in that did not start', () => {
+    expect(account.signOutFailed).toMatch(/still signed in/i)
+    expect(account.listFailed).toMatch(/could not load/i)
+    expect(account.signInFailed).toMatch(/could not start/i)
+    // the sign-in sentinel the dormant guard looks for is still the full words; the short label is a prefix of it
+    expect(account.signIn).toBe('Sign in with Google')
+    expect(account.signIn.startsWith(account.signInShort)).toBe(true)
   })
 })

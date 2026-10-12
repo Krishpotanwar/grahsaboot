@@ -123,9 +123,14 @@ export async function listRemote(
   return data
 }
 
-export async function deleteRemote(id: string, sb: SupabaseClient = getSupabase()): Promise<void> {
-  const { error, status } = await sb.from('investigations').delete().eq('id', id)
+/**
+ * How many rows the delete removed: 1, or 0 when the row was already gone (deleted on another device). Zero is not an error, so
+ * deleting twice is the same as deleting once; the rows are asked back (`select`) because a DELETE alone answers 204 either way.
+ */
+export async function deleteRemote(id: string, sb: SupabaseClient = getSupabase()): Promise<number> {
+  const { data, error, status } = await sb.from('investigations').delete().eq('id', id).select('id')
   if (error) throw failure(error, status)
+  return data?.length ?? 0
 }
 
 /** Throws when the server did not record it: the caller must not remember consent that no server holds. */
@@ -135,7 +140,7 @@ export async function recordConsent(version: string, sb: SupabaseClient = getSup
 }
 
 export async function deleteAccount(sb: SupabaseClient = getSupabase()): Promise<void> {
-  const { error } = await sb.functions.invoke('delete-account', { body: {} })
+  const { error } = await sb.functions.invoke('delete-account', { body: {}, timeout: 30_000 })
   if (error) throw new Error('DELETE_FAILED')
   // The user no longer exists, so there is no server session to end: clear this browser's.
   await sb.auth.signOut({ scope: 'local' })

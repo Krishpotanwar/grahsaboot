@@ -14,6 +14,7 @@ import { useMapLayout, useMapStage } from '../map/MapStage.tsx'
 import { copy } from '../ui/copy.ts'
 import { flow } from '../ui/copy-flow.ts'
 import { Button, Skeleton } from '../ui/kit.tsx'
+import { Optional } from '../ui/Optional.tsx'
 import { ClaimPanel } from '../workbench/ClaimPanel.tsx'
 import { canPickDefaults, isUsable, pickDefaults } from '../workbench/defaults.ts'
 import { EvidenceViewer, MapTool, type Slot } from '../workbench/EvidenceViewer.tsx'
@@ -37,20 +38,12 @@ function NotSaved() {
     </span>
   )
 }
-/** What stands in for the save control when its code cannot be loaded (offline, a newer release): the workbench carries on. */
-const NoSaveBar = (_: Record<string, unknown>) => <NotSaved />
-
-// Null in a build without accounts: the save control below is then not rendered, requested or loaded at all, and the title block is
-// what it was before accounts existed. The one import() lives in src/accounts/enabled.ts (the bundle guard proves it).
+// Null in a build without accounts: the save control and the delete button below are then not rendered, requested or loaded at
+// all, and the title block is what it was before accounts existed. The one import() lives in src/accounts/enabled.ts (the
+// bundle guard proves it). Each sits in an `Optional`: code that cannot be loaded, or that throws, must not blank the workbench.
 const load = loadAccounts
-const LazySaveBar = load
-  ? lazy(() =>
-      load().then(
-        (m) => ({ default: m.SaveBar }),
-        () => ({ default: NoSaveBar }),
-      ),
-    )
-  : null
+const LazySaveBar = load ? lazy(() => load().then((m) => ({ default: m.SaveBar }))) : null
+const LazyDelete = load ? lazy(() => load().then((m) => ({ default: m.DeleteInvestigation }))) : null
 
 /** `verification`: the saved investigation's records. The photo's own check shows only for the exact pixels on screen. */
 const slot = (e: DateEntry | undefined, verification: Investigation['verification']): Slot =>
@@ -275,21 +268,25 @@ export default function Workbench({ id }: { id: string }) {
         {/* A row that takes one more control without wrapping: the status sits first, the buttons after it. */}
         <div className="flex flex-wrap items-center gap-2.5">
           {LazySaveBar ? (
-            <Suspense
-              fallback={
-                <>
-                  {/* Until the chunk arrives: the status it has now, and the button's place held (160 px by 44, as in SaveBar), so
+            <Optional fallback={<NotSaved />}>
+              <Suspense
+                fallback={
+                  <>
+                    {/* Until the chunk arrives: the status it has now, and the button's place held (160 px by 44, as in SaveBar), so
                       the row does not change size. A saved copy must not say "Not saved" meanwhile: its status (208 px wide, as
                       in SaveBar) is held blank. */}
-                  {inv.serverId ? <span aria-hidden className="invisible mr-2 w-52" /> : <NotSaved />}
-                  <span aria-hidden className="invisible h-11 w-40" />
-                  {/* The line SaveBar shows while the page is not ready: its place is held too, so nothing steps down. */}
-                  {wait !== null && <span aria-hidden className="invisible order-last h-5 w-0 min-w-full" />}
-                </>
-              }
-            >
-              <LazySaveBar inv={inv} entries={entries} ready={wait === null} why={wait} update={update} />
-            </Suspense>
+                    {inv.serverId ? <span aria-hidden className="invisible mr-2 w-52" /> : <NotSaved />}
+                    <span aria-hidden className="invisible h-11 w-40" />
+                    {/* The line SaveBar shows while the page is not ready: its place is held too, so nothing steps down. */}
+                    {wait !== null && (
+                      <span aria-hidden className="invisible order-last h-5 w-0 min-w-full" />
+                    )}
+                  </>
+                }
+              >
+                <LazySaveBar inv={inv} entries={entries} ready={wait === null} why={wait} update={update} />
+              </Suspense>
+            </Optional>
           ) : (
             <NotSaved />
           )}
@@ -411,6 +408,14 @@ export default function Workbench({ id }: { id: string }) {
             error={noteError}
           />
           <ClaimPanel inv={inv} update={update} error={claimError} />
+          {LazyDelete && (
+            // The only way to delete one: at the end of the column, quiet. In the page only in a build with accounts.
+            <Optional>
+              <Suspense fallback={null}>
+                <LazyDelete localId={inv.id} serverId={inv.serverId} />
+              </Suspense>
+            </Optional>
+          )}
         </aside>
       </div>
       {/* In the stage, so it sits inside the panel and on top of the canvas (the page itself is under the stage). */}

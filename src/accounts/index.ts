@@ -1,7 +1,10 @@
 // Everything the app takes from accounts, and the only module src/accounts/enabled.ts imports. Nothing outside src/accounts/
 // imports this file directly: it is reached through loadAccounts, which a build without the flag folds to null.
+export { AccountMenu } from './AccountMenu.tsx'
 export { signInWithGoogle, signOut, useSession } from './auth.ts'
 export { ConsentDialog } from './ConsentDialog.tsx'
+export { DeleteInvestigation } from './DeleteInvestigation.tsx'
+export { MyInvestigations } from './MyInvestigations.tsx'
 export {
   deleteAccount,
   deleteRemote,
