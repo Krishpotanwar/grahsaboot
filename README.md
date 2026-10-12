@@ -144,12 +144,16 @@ docs/                 design mockups, plans, research, probes
 
 ## Roadmap
 
-| Phase              | Status     | Delivers                                                                                                                                           |
-| ------------------ | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A: Foundation      | Done       | Toolchain, geometry, the evidence engine (COG reads, SHA-256 frames, `scl-v2` cloud stats, reprojection, difference), STAC clients, imagery worker |
-| B: Shell and globe | Done, live | Design system, router and shell, globe with device tiers, place search, live satellites and next pass                                              |
-| C: Workbench       | Next       | New-investigation flow, workbench (swipe, side by side, difference), timeline, road sections, notes, report export                                 |
-| D: Accounts        | Planned    | Google sign-in, saving, server re-verification of every frame, privacy controls                                                                    |
+| Phase              | Status              | Delivers                                                                                                                                           |
+| ------------------ | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A: Foundation      | Done                | Toolchain, geometry, the evidence engine (COG reads, SHA-256 frames, `scl-v2` cloud stats, reprojection, difference), STAC clients, imagery worker |
+| B: Shell and globe | Done, live          | Design system, router and shell, globe with device tiers, place search, live satellites and next pass                                              |
+| C: Workbench       | Next                | New-investigation flow, workbench (swipe, side by side, difference), timeline, road sections, notes, report export                                 |
+| D: Accounts        | Built, switched off | Google sign-in, saving, server re-verification of every frame, privacy controls                                                                    |
+
+## Accounts (built, switched off)
+
+The sign-in, save and verify code is written and tested, but it sits behind a build flag and is absent from production builds: a build without the flag holds no accounts code, words, requests or storage keys, and the bundle guard in `npm run check` proves it on every run. The owner switches it on only after a tester has tried it on a dev project ([`docs/ops/accounts-test.md`](docs/ops/accounts-test.md)), and `npm run deploy` never ships it. The live site has no accounts.
 
 ## Limits and honesty
 

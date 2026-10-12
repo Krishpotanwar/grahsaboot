@@ -177,3 +177,49 @@ describe('bundleProblems, flag on (dist-accounts/)', () => {
     expect(bundleProblems(files, on).join('\n')).toContain('over the 150 KB')
   })
 })
+
+// The grievance contact is an activation blocker (docs/ops/accounts-test.md): src/ui/copy-account.ts carries a marked placeholder
+// today, and only a release build (GS_ACCOUNTS_RELEASE=1) is held to its absence. A tester build may still show it.
+describe('bundleProblems, release build (GS_ACCOUNTS_RELEASE=1)', () => {
+  const PLACEHOLDER = '[name and email of the grievance contact]'
+  const release = { accounts: false, release: true }
+  const withChunk = (body: string): Files => ({ ...accountsOn(), 'assets/accounts-d.js': body })
+  const chunk = (contact: string) =>
+    `export const s = "${SENTINEL}"; /* supabase */ export const g = "Questions or complaints: ${contact}."`
+
+  it('fails while the placeholder is in a built file, naming the file and the placeholder', () => {
+    const problems = bundleProblems(withChunk(chunk(PLACEHOLDER)), release).join('\n')
+    expect(problems).toContain('assets/accounts-d.js')
+    expect(problems).toContain(PLACEHOLDER)
+  })
+
+  it('finds it in html, css, json and _headers as well as in a chunk, and in the flag-on build', () => {
+    for (const file of ['index.html', 'assets/index-a.css', 'data.json', '_headers']) {
+      const files = { ...accountsOn(), [file]: `${accountsOn()[file] ?? ''}\n${PLACEHOLDER}` }
+      expect(bundleProblems(files, release).join('\n'), file).toContain(`${file} holds`)
+    }
+    const both = { accounts: true, release: true }
+    expect(bundleProblems(withChunk(chunk(PLACEHOLDER)), both).join('\n')).toContain(PLACEHOLDER)
+  })
+
+  it('passes once the contact is named', () => {
+    expect(bundleProblems(withChunk(chunk('Asha Rao, asha@example.org')), release)).toEqual([])
+  })
+
+  it('leaves the flag-on build (dist-accounts/) alone: only a release build is held to it', () => {
+    expect(bundleProblems(withChunk(chunk(PLACEHOLDER)), on)).toEqual([])
+  })
+
+  it('reads built files, not source maps (a map holds the source text, comments included)', () => {
+    const files = {
+      ...accountsOn(),
+      'assets/accounts-d.js.map': JSON.stringify({
+        version: 3,
+        sources: ['../../src/accounts/remote.ts', '../../node_modules/@supabase/supabase-js/dist/index.mjs'],
+        sourcesContent: [`// ${PLACEHOLDER}`, ''],
+        mappings: '',
+      }),
+    }
+    expect(bundleProblems(files, release)).toEqual([])
+  })
+})

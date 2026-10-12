@@ -2,6 +2,9 @@ import { handleTle, type TleCache } from './tle.ts'
 
 interface Env {
   ASSETS: { fetch(req: Request): Promise<Response> }
+  // Set only when accounts go live (docs/ops/accounts-test.md). Without both, the daily ping does nothing.
+  SUPABASE_URL?: string
+  SUPABASE_PUBLISHABLE_KEY?: string
 }
 
 const error = (status: number, code: string, headers: Record<string, string> = {}) =>
@@ -13,6 +16,31 @@ const error = (status: number, code: string, headers: Record<string, string> = {
 // How long a visitor waits for the cache or CelesTrak before getting the bundled snapshot instead. From some Cloudflare
 // locations CelesTrak's origin never answers (522 after ~20 s), and nobody should stare at a spinner for that.
 const DEADLINE_MS = 800
+
+/**
+ * The daily ping that keeps a free Supabase project from being paused for inactivity. Inert until activation: Cloudflare
+ * calls `scheduled` only when wrangler.jsonc has a cron trigger (it has none), and this needs both variables and an https
+ * URL. It never throws: a failed ping is tried again tomorrow, and a cron that errors raises an alert.
+ */
+export async function keepAlive(
+  env: Pick<Env, 'SUPABASE_URL' | 'SUPABASE_PUBLISHABLE_KEY'>,
+  f: typeof fetch = fetch,
+): Promise<void> {
+  const { SUPABASE_URL: base, SUPABASE_PUBLISHABLE_KEY: key } = env
+  if (!base || !key) return
+  try {
+    const url = new URL('/rest/v1/rpc/keep_alive', base)
+    if (url.protocol !== 'https:') return
+    await f(url.href, {
+      method: 'POST',
+      headers: { apikey: key, 'content-type': 'application/json' },
+      body: '{}',
+      signal: AbortSignal.timeout(5000),
+    })
+  } catch {
+    // swallowed on purpose (see above)
+  }
+}
 
 export default {
   async fetch(req: Request, env: Env, ctx: { waitUntil(p: Promise<unknown>): void }): Promise<Response> {
@@ -50,5 +78,9 @@ export default {
     }
     if (url.pathname.startsWith('/api/')) return error(404, 'NOT_FOUND')
     return env.ASSETS.fetch(req)
+  },
+  // The cron trigger's entry point. Never called until wrangler.jsonc gets a trigger, at activation.
+  scheduled(_controller: unknown, env: Env, ctx: { waitUntil(p: Promise<unknown>): void }) {
+    ctx.waitUntil(keepAlive(env))
   },
 }

@@ -1,0 +1,40 @@
+name: ci
+
+# Checks only: no secrets, no deploy, no wrangler, no Supabase account. Deploys are run by the owner (docs/ops/runbook.md).
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # Types, unit and database tests, the build without accounts and its bundle guard, then the build with accounts and its guard.
+      - run: npm run check
+      # `check` regenerates the Deno copies of src/evidence first, so a stale committed copy only shows as a difference here.
+      # `git add -N` makes a copy that was never committed show up as one too.
+      - run: git add -N supabase/functions/_shared/evidence && git diff --exit-code supabase/functions/_shared/evidence
+      # The two function entry points are imported by no test: type-check them. Then every Deno test, with the network on
+      # (the first command fills the Deno cache) and without permission flags, as the tests are written to run.
+      - run: npm run check:deno
+      - run: DENO_NO_UPDATE_CHECK=1 npx deno test --config supabase/functions/deno.json supabase/functions
+      - run: npx playwright install --with-deps chromium
+      # Chromium and the mobile project, plus the accounts project (it needs Chromium only).
+      - run: npm run e2e
+        env:
+          E2E_BROWSERS: chromium

@@ -18,6 +18,8 @@ export interface Rules {
 export const BUDGET_KB = 150
 
 const SENTINEL = 'Sign in with Google'
+/** The marked stand-in in src/ui/copy-account.ts until the owner names the grievance contact (an activation blocker). */
+const PLACEHOLDER = '[name and email of the grievance contact]'
 /** A flag-off build holds none of these in any file the browser can load. */
 const FORBIDDEN: Array<[string, RegExp]> = [
   ['"supabase" (a VITE_SUPABASE_* value from .env.local or the shell is baked into the build)', /supabase/i],
@@ -109,6 +111,13 @@ export function bundleProblems(files: Files, rules: Rules): string[] {
         problems.push(`${m.js} (loaded with the first page) holds accounts code: ${s}`)
     for (const p of sentinelFiles.filter((p) => inEntry.has(p) || p === 'index.html'))
       problems.push(`${p} (loaded with the first page) holds the accounts copy ("${SENTINEL}").`)
+    // Only the deliberate activation build is held to it: the flag-on build a tester uses may still show the placeholder.
+    if (rules.release)
+      for (const p of Object.keys(files).filter((p) => TEXT.test(p)))
+        if (text(files[p]!).includes(PLACEHOLDER))
+          problems.push(
+            `${p} holds the grievance contact placeholder ("${PLACEHOLDER}"). Name the contact in src/ui/copy-account.ts before an activation build (docs/ops/accounts-test.md).`,
+          )
     return problems
   }
 
