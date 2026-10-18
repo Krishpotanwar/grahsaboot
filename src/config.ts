@@ -23,6 +23,12 @@ export const config = {
   ),
   /** Test hooks and localhost data hosts are allowed outside production builds or when explicitly enabled for e2e. */
   testMode: env.MODE !== 'production' || env.VITE_TEST_HOOKS === '1',
+  /**
+   * The satellite view (src/map/contextLayer.ts) is on unless the build says VITE_CONTEXT_IMAGERY=0. A MEMBER read of
+   * `import.meta.env`, which Vite replaces with a literal, so the off build can drop the switch (a read through `env` above is
+   * not replaced). The `?.` is for the scripts that import this file under tsx (scripts/csp.ts): they have no `import.meta.env`.
+   */
+  contextImagery: import.meta.env?.VITE_CONTEXT_IMAGERY !== '0',
 } as const
 
 export const ASSET_HOSTS = [

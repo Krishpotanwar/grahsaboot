@@ -153,7 +153,9 @@ export function MapStageProvider({ children }: { children: ReactNode }) {
     // Only if the person left it open: MapLibre keeps `open` and `compact-show` in step, and a closed one carrying the class is a
     // wide empty pill whose first click seems to do nothing.
     return () => {
-      if (a.hasAttribute('open')) a.classList.add('maplibregl-compact-show')
+      // The control may have been swapped meanwhile (the satellite view's credit): the live one is the one to give back.
+      const live = map.getContainer().querySelector('.maplibregl-ctrl-attrib.maplibregl-compact')
+      if (live?.hasAttribute('open')) live.classList.add('maplibregl-compact-show')
     }
   }, [map, layout])
 

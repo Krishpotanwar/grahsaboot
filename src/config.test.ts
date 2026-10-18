@@ -40,3 +40,19 @@ describe('isAllowedAssetUrl', () => {
     expect(isAllowedAssetUrl('http://localhost:4300/cog/TCI.tif')).toBe(false)
   })
 })
+
+describe('contextImagery', () => {
+  it('is on unless the build says VITE_CONTEXT_IMAGERY=0, and then it is off', async () => {
+    for (const [value, on] of [
+      [undefined, true],
+      ['1', true],
+      ['', true],
+      ['false', true], // only the exact 0 switches it off
+      ['0', false],
+    ] as const) {
+      vi.stubEnv('VITE_CONTEXT_IMAGERY', value)
+      vi.resetModules()
+      expect((await import('./config.ts')).config.contextImagery, String(value)).toBe(on)
+    }
+  })
+})

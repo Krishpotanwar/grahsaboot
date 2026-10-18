@@ -11,6 +11,12 @@ setWorkerUrl(workerUrl)
 
 export const styleUrl = (theme: Theme) => (theme === 'dark' ? config.styleDark : config.styleLight)
 
+// `customAttribution` is read only when an attribution control is built, so each map's control is kept here: the satellite view
+// swaps it for a new one with its extra credit (setContextCredit). `base` is what every view of the map credits.
+const attribution = new WeakMap<MlMap, { control: AttributionControl; base: string[]; credit?: string }>()
+const attributionControl = (base: string[], credit?: string) =>
+  new AttributionControl({ compact: true, customAttribution: credit ? [...base, credit] : base })
+
 export interface Camera {
   center: [number, number]
   zoom: number
@@ -38,18 +44,15 @@ export function createMap(
     pixelRatio: opts.tier <= 1 ? 1 : undefined,
     canvasContextAttributes: { antialias: opts.tier >= 3, failIfMajorPerformanceCaveat: false },
   })
-  map.addControl(
-    new AttributionControl({
-      compact: true,
-      customAttribution: [
-        copy.attribution.osm,
-        copy.attribution.openfreemap,
-        copy.attribution.gibs,
-        ...(opts.tier >= 3 ? [copy.attribution.terrain] : []),
-      ],
-    }),
-    'bottom-right',
-  )
+  const base = [
+    copy.attribution.osm,
+    copy.attribution.openfreemap,
+    copy.attribution.gibs,
+    ...(opts.tier >= 3 ? [copy.attribution.terrain] : []),
+  ]
+  const control = attributionControl(base)
+  attribution.set(map, { control, base })
+  map.addControl(control, 'bottom-right')
   map.addControl(new NavigationControl({ visualizePitch: true }), 'bottom-right')
   map.on('style.load', () => applyBaseLayers(map, opts.tier, opts.getTheme()))
   if (opts.tier >= 3) {
@@ -63,6 +66,31 @@ export function createMap(
     map.on('style.load', updateTerrain)
   }
   return map
+}
+
+/**
+ * The Copernicus credit follows the satellite picture: in the attribution control while the picture is on, gone when it is off.
+ * `year` is the year of the scene (its date), required for `on`. The control lives on the map, not in the style, so a theme
+ * switch keeps the credit. It is rebuilt in the same corner, under the zoom buttons, and folded if it was folded.
+ */
+export function setContextCredit(map: MlMap, on: boolean, year?: number): void {
+  const now = attribution.get(map)
+  // Not ours, or a removed map: Map.remove() already ended every control, and ending one twice throws.
+  if (!now || !map.hasControl(now.control)) return
+  if (on && !Number.isInteger(year))
+    throw new RangeError('setContextCredit: the credit needs the year of the scene')
+  const credit = on ? copy.attribution.sentinel(year as number) : undefined
+  if (credit === now.credit) return
+  // MapLibre opens a new control, and MapStage folds the one on the outline step: carry the state over.
+  const old = map.getContainer().querySelector('.maplibregl-ctrl-attrib.maplibregl-compact')
+  const folded = !!old && !old.classList.contains('maplibregl-compact-show')
+  map.removeControl(now.control)
+  const control = attributionControl(now.base, credit)
+  attribution.set(map, { control, base: now.base, credit })
+  map.addControl(control, 'bottom-right')
+  const el = map.getContainer().querySelector('.maplibregl-ctrl-attrib')
+  el?.parentElement?.append(el) // a control added to a bottom corner goes first in it; the zoom buttons were added after this one
+  if (folded) el?.classList.remove('maplibregl-compact-show')
 }
 
 /** Idempotent base layers on top of any OpenFreeMap style. Called on every style load. */
