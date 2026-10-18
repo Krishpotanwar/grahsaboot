@@ -4,6 +4,7 @@ import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { config } from '../config.ts'
 import { copy } from '../ui/copy.ts'
 import type { Theme } from '../ui/theme.ts'
+import { applyReadable, EXTRUSION } from './readable.ts'
 import type { Tier } from './tier.ts'
 
 setWorkerUrl(workerUrl)
@@ -75,6 +76,8 @@ export function applyBaseLayers(map: MlMap, tier: Tier, theme: Theme) {
       'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 0.5, 5, 0.25, 7, 0],
     })
   }
+  // Roads, footprints and labels readable on the dark style (src/map/readable.ts), before our own layers go on top.
+  applyReadable(map, theme)
   const firstSymbol = map.getStyle().layers.find((l) => l.type === 'symbol')?.id
   if (!map.getSource('gs-gibs'))
     map.addSource('gs-gibs', { type: 'raster', tiles: [config.gibsTiles], tileSize: 256, maxzoom: 8 })
@@ -112,7 +115,7 @@ export function applyBaseLayers(map: MlMap, tier: Tier, theme: Theme) {
           'source-layer': 'building',
           minzoom: 14,
           paint: {
-            'fill-extrusion-color': theme === 'dark' ? '#27272a' : '#e4e4e7',
+            'fill-extrusion-color': EXTRUSION[theme],
             'fill-extrusion-height': ['coalesce', ['get', 'render_height'], 6],
             'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], 0],
             'fill-extrusion-opacity': 0.9,

@@ -156,9 +156,17 @@ test('terrain attribution shows at tier 3 and not at tier 2', async ({ page }) =
 test('the Blue Marble draws over the basemap labels and under the satellite layers', async ({ page }) => {
   await page.goto('/?tier=2')
   test.skip(!(await hasWebgl2(page)), 'no WebGL2 in this engine')
+  // The fixture style also has land, water and road layers under the labels (the readable-map patch needs real ids): only the labels
+  // and our own layers are in the order that matters here.
   const order = () =>
-    page.evaluate(() => (window as any).__gs.map.getStyle().layers.map((l: any) => l.id) as string[])
-  const want = ['bg', 'labels', 'gs-gibs', 'gs-sat-swath', 'gs-sat-track']
+    page.evaluate(
+      () =>
+        (window as any).__gs.map
+          .getStyle()
+          .layers.map((l: any) => l.id)
+          .filter((id: string) => id === 'labels' || id.startsWith('gs-')) as string[],
+    )
+  const want = ['labels', 'gs-gibs', 'gs-sat-swath', 'gs-sat-track']
   await page.waitForFunction(() => !!(window as any).__gs?.map?.getLayer('gs-sat-track'))
   expect(await order()).toEqual(want)
   // A label near the horizon pokes out past the globe's edge, where no raster can cover it, so basemap labels only start at z5.

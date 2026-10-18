@@ -28,9 +28,23 @@ export const flow = {
     roadHelp: 'Draw along the centre of the road.',
     width: 'Road width (metres)',
     widthHelp: 'Full width including shoulders, 5 to 200. It decides which pixels count as road.',
-    drawSite: 'Click on the map to place corners. Click the first corner again to finish.',
-    drawRoad: 'Click along the road. Click the last point again to finish.',
+    drawSite:
+      'Click each corner of your site. Click the first corner again, double-click or press Enter to finish.',
+    drawRoad: 'Click along the road. Click the last point again, double-click or press Enter to finish.',
+    // What 10 m can show of the outline just drawn (src/new/sizeNote.ts): said, never a block.
+    sizeShows: (px: string) =>
+      `About ${px} pixels at 10 m. Large buildings, roads and land clearing will show at this size.`,
+    sizeSmall: (px: string) =>
+      `About ${px} pixels at 10 m. Single buildings and narrow lanes will not show; expect "not enough clear view". You can still continue.`,
+    roadShows: (widthM: number, px: number) =>
+      `${widthM} m wide is about ${px} pixels across at 10 m. A road this wide shows as a line of its own.`,
+    roadNarrow: (widthM: number, px: number) =>
+      `${widthM} m wide is about ${px} pixel${px === 1 ? '' : 's'} across. At 10 m a narrow road is mixed with what is beside it. You can still continue.`,
+    undo: 'Undo last corner',
+    finish: 'Finish outline',
     redraw: 'Draw again',
+    mapLoading: 'Loading the map',
+    mapFailed: 'The map could not load. Enter coordinates instead.',
     byCoords: 'Enter by coordinates instead',
     centre: 'Centre (lat, lon)',
     side: 'Square side (metres)',

@@ -23,6 +23,10 @@ interface MapStageValue {
   layout: Layout
   /** The stage's element, for a screen that puts a control inside it (the workbench's close button on the mini map). */
   stage: HTMLDivElement | null
+  /** The first `idle` after the current style loaded; false again while a new style loads and on a rebuilt map. */
+  mapReady: boolean
+  /** The style or its tiles have been failing for more than 10 s after a style load, with no `idle` since. */
+  mapFailed: boolean
   setLayout(l: Layout): void
   setTierOverride(t: Tier | null): void
   installLayers(id: string, install: (m: MlMap) => void, uninstall: (m: MlMap) => void): () => void
@@ -53,6 +57,7 @@ export function MapStageProvider({ children }: { children: ReactNode }) {
   const [map, setMap] = useState<MlMap | null>(null)
   const [layout, setLayout] = useState<Layout>('hidden')
   const [stage, setStage] = useState<HTMLDivElement | null>(null)
+  const [status, setStatus] = useState({ ready: false, failed: false })
   const [theme] = useTheme()
   const appliedTheme = useRef(currentTheme())
 
@@ -88,6 +93,22 @@ export function MapStageProvider({ children }: { children: ReactNode }) {
       map.getCanvas().addEventListener('webglcontextlost', () => !cancelled && setTier((t) => downgrade(t)), {
         once: true,
       })
+      // Ready on the first idle of a loaded style; failed when errors have gone on for 10 s with no idle in between.
+      let failTimer: ReturnType<typeof setTimeout> | undefined
+      const settle = () => {
+        clearTimeout(failTimer)
+        failTimer = undefined
+      }
+      map.on('idle', () => {
+        settle()
+        if (map.getStyle()) setStatus({ ready: true, failed: false })
+      })
+      map.on('error', () => {
+        failTimer ??= setTimeout(
+          () => !cancelled && setStatus((s) => (s.ready ? s : { ready: false, failed: true })),
+          10_000,
+        )
+      })
       map.once('idle', () => {
         probeFrameMs().then((ms) => {
           if (!cancelled && ms > 42 && overrideTier() === null) setTier((t) => downgrade(t))
@@ -104,12 +125,14 @@ export function MapStageProvider({ children }: { children: ReactNode }) {
       cancelled = true
       m?.remove()
       setMap(null)
+      setStatus({ ready: false, failed: false })
     }
   }, [tier])
 
   useEffect(() => {
     if (!map || theme === appliedTheme.current) return
     appliedTheme.current = theme
+    setStatus({ ready: false, failed: false }) // the new style is loading
     import('./createMap.ts').then(({ styleUrl }) => map.setStyle(styleUrl(theme)))
   }, [theme, map])
 
@@ -119,10 +142,11 @@ export function MapStageProvider({ children }: { children: ReactNode }) {
     return () => cancelAnimationFrame(id)
   }, [layout, map])
 
-  // MapLibre starts a compact attribution open until the first drag. The mini map is 360 px wide: there it starts as the "i"
-  // button, one click from the text (what its own drag handler does), and the other layouts get back what they had.
+  // MapLibre starts a compact attribution open until the first drag. The mini map is 360 px wide and the outline step's map is
+  // the one people draw on: there it starts as the "i" button, one click from the text (what its own drag handler does), and the
+  // other layouts get back what they had.
   useEffect(() => {
-    if (!map || layout !== 'mini') return
+    if (!map || (layout !== 'mini' && layout !== 'side')) return
     const a = map.getContainer().querySelector('.maplibregl-ctrl-attrib.maplibregl-compact')
     if (!a?.classList.contains('maplibregl-compact-show')) return
     a.classList.remove('maplibregl-compact-show')
@@ -157,8 +181,18 @@ export function MapStageProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const value = useMemo(
-    () => ({ map, tier, layout, stage, setLayout, setTierOverride, installLayers }),
-    [map, tier, layout, stage, setTierOverride, installLayers],
+    () => ({
+      map,
+      tier,
+      layout,
+      stage,
+      mapReady: status.ready,
+      mapFailed: status.failed,
+      setLayout,
+      setTierOverride,
+      installLayers,
+    }),
+    [map, tier, layout, stage, status, setTierOverride, installLayers],
   )
   return (
     <Ctx.Provider value={value}>

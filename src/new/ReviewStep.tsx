@@ -9,6 +9,7 @@ import { copy } from '../ui/copy.ts'
 import { flow } from '../ui/copy-flow.ts'
 import { Button, TextField } from '../ui/kit.tsx'
 import { draftToAoi } from './draft.ts'
+import { sizeNote } from './sizeNote.ts'
 import type { StepProps } from './PlaceStep.tsx'
 
 export function ReviewStep({ draft, setDraft, onBack }: StepProps) {
@@ -20,6 +21,8 @@ export function ReviewStep({ draft, setDraft, onBack }: StepProps) {
   if (!aoi || !r?.ok) return null
   const s = r.summary
   const est = estimateFirstView(s, draft.dateFrom, draft.dateTo)
+  // Repeated here only for the case that was warned about: a normal outline sees nothing extra.
+  const note = sizeNote(s, draft.widthM)
   const open = async () => {
     if (saving.current) return
     saving.current = true
@@ -70,7 +73,12 @@ export function ReviewStep({ draft, setDraft, onBack }: StepProps) {
         {rows.map(([k, v]) => (
           <div key={k} className="grid gap-1 bg-bg p-3 sm:grid-cols-[10rem_1fr]">
             <dt className="font-mono text-[0.75rem] uppercase tracking-[0.06em] text-fg-2">{k}</dt>
-            <dd className="num">{v}</dd>
+            <dd className="num">
+              {v}
+              {k === flow.review.labels.size && !note.willShow && (
+                <span className="mt-1 block text-warn">{note.text}</span>
+              )}
+            </dd>
           </div>
         ))}
       </dl>

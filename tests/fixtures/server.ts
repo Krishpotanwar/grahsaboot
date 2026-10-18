@@ -9,12 +9,22 @@ const BLANK_PNG = Buffer.from(
 )
 const TLE = readFileSync(new URL('./tle.json', import.meta.url))
 // `labels` stands in for OpenFreeMap's place labels, so tests can see where the app's own layers go relative to a symbol layer.
+// The other layers carry real OpenFreeMap ids, in their order, over an empty GeoJSON source: the readable-map patch
+// (src/map/readable.ts) then has something to patch, and the tests read the result with getPaintProperty.
 const style = (bg: string) =>
   JSON.stringify({
     version: 8,
-    sources: { labels: { type: 'geojson', data: { type: 'FeatureCollection', features: [] } } },
+    sources: {
+      labels: { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
+      shapes: { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
+    },
     layers: [
       { id: 'bg', type: 'background', paint: { 'background-color': bg } },
+      { id: 'landuse_residential', type: 'fill', source: 'shapes' },
+      { id: 'water', type: 'fill', source: 'shapes' },
+      { id: 'building', type: 'fill', source: 'shapes' },
+      { id: 'highway_minor', type: 'line', source: 'shapes' },
+      { id: 'highway_name_other', type: 'symbol', source: 'shapes' },
       { id: 'labels', type: 'symbol', source: 'labels' },
     ],
   })

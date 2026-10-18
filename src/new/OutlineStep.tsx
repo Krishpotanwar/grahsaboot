@@ -1,30 +1,37 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { parseCoordinates, type ParsedCoords } from '../geo/coords.ts'
 import { summarizeAoi } from '../geo/aoi.ts'
 import { fitAoi } from '../map/aoiLayer.ts'
-import { startDrawing } from '../map/draw.ts'
+import { MIN_CORNERS, startDrawing, type DrawSession } from '../map/draw.ts'
 import { useMapStage } from '../map/MapStage.tsx'
 import { copy, issueMessage } from '../ui/copy.ts'
 import { flow } from '../ui/copy-flow.ts'
 import { Button, TextField } from '../ui/kit.tsx'
 import { draftToAoi, type Draft } from './draft.ts'
+import { sizeNote } from './sizeNote.ts'
 import { squareAround } from '../geo/square.ts'
 import type { StepProps } from './PlaceStep.tsx'
 
 export function OutlineStep({ draft, setDraft, onBack, onNext }: StepProps) {
-  const { map, tier } = useMapStage()
+  const { map, tier, mapReady, mapFailed } = useMapStage()
   const [round, setRound] = useState(0)
+  // The corners placed so far, and the session that can take one back or finish the outline from them.
+  const [corners, setCorners] = useState(0)
+  const session = useRef<DrawSession | null>(null)
   const aoi = draftToAoi(draft)
   const result = aoi ? summarizeAoi(aoi) : null
 
   useEffect(() => {
     if (!map || tier === 0) return
-    let session: { stop(): void } | null = null
     // Restarts after a theme switch too: a new style drops the draw layers.
     const begin = () => {
-      session?.stop()
-      session = startDrawing(map, draft.kind, (coords) =>
-        setDraft((d) => (d.kind === 'site' ? { ...d, ring: coords } : { ...d, line: coords })),
+      session.current?.stop()
+      setCorners(0)
+      session.current = startDrawing(
+        map,
+        draft.kind,
+        (coords) => setDraft((d) => (d.kind === 'site' ? { ...d, ring: coords } : { ...d, line: coords })),
+        setCorners,
       )
     }
     // getStyle() is set as soon as the style JSON is in; isStyleLoaded() also waits for tiles, and a draw session asked for during a fly-to would never start.
@@ -32,7 +39,9 @@ export function OutlineStep({ draft, setDraft, onBack, onNext }: StepProps) {
     map.on('style.load', begin)
     return () => {
       map.off('style.load', begin)
-      session?.stop()
+      session.current?.stop()
+      session.current = null
+      setCorners(0)
     }
   }, [map, tier, draft.kind, round, setDraft])
 
@@ -48,6 +57,15 @@ export function OutlineStep({ draft, setDraft, onBack, onNext }: StepProps) {
   return (
     <div className="grid gap-6">
       <h1 className="text-3xl font-bold tracking-[-0.04em]">{flow.outline.title}</h1>
+      {/* One line, kept even when empty so nothing below it moves: the map failed > the map is loading. */}
+      {tier > 0 && (
+        <p
+          role={mapFailed ? 'alert' : 'status'}
+          className={`-mt-3 min-h-5 text-sm ${mapFailed ? 'text-bad' : 'text-fg-2'}`}
+        >
+          {mapFailed ? flow.outline.mapFailed : !mapReady ? flow.outline.mapLoading : ''}
+        </p>
+      )}
       <fieldset className="grid gap-2">
         <legend className="mb-2 text-sm font-medium">{flow.outline.kindLegend}</legend>
         {(['site', 'road'] as const).map((k) => (
@@ -90,21 +108,28 @@ export function OutlineStep({ draft, setDraft, onBack, onNext }: StepProps) {
           }}
         />
       )}
-      {tier > 0 && (
-        <div className="flex flex-wrap items-center gap-3 text-sm text-fg-2">
+      {tier > 0 && !mapFailed && (
+        <div className="grid gap-3 text-sm text-fg-2">
           <p>{draft.kind === 'site' ? flow.outline.drawSite : flow.outline.drawRoad}</p>
-          <Button
-            size="sm"
-            onClick={() => {
-              setDraft((d) => ({ ...d, ring: null, line: null }))
-              setRound((r) => r + 1)
-            }}
-          >
-            {flow.outline.redraw}
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button disabled={corners === 0} onClick={() => session.current?.undo()}>
+              {flow.outline.undo}
+            </Button>
+            <Button disabled={corners < MIN_CORNERS[draft.kind]} onClick={() => session.current?.finish()}>
+              {flow.outline.finish}
+            </Button>
+            <Button
+              onClick={() => {
+                setDraft((d) => ({ ...d, ring: null, line: null }))
+                setRound((r) => r + 1)
+              }}
+            >
+              {flow.outline.redraw}
+            </Button>
+          </div>
         </div>
       )}
-      <details open={tier === 0} className="border border-line p-3">
+      <details open={tier === 0 || mapFailed} className="border border-line p-3">
         {/* -m-3 p-3: the whole 48 px band is the touch target (44 px minimum), laid out exactly as a bare 24 px summary. */}
         <summary className="-m-3 cursor-pointer p-3 font-medium">{flow.outline.byCoords}</summary>
         <div className="mt-4">
@@ -118,11 +143,15 @@ export function OutlineStep({ draft, setDraft, onBack, onNext }: StepProps) {
       <div aria-live="polite" className="text-sm">
         {!result && <p className="text-fg-2">{flow.outline.none}</p>}
         {result?.ok && (
-          <p className="font-mono num">
-            {result.summary.kind === 'site'
-              ? flow.outline.summarySite(result.summary.areaKm2, result.summary.extentKm)
-              : flow.outline.summaryRoad(result.summary.lengthKm ?? 0, result.summary.parts.length)}
-          </p>
+          <>
+            <p className="font-mono num">
+              {result.summary.kind === 'site'
+                ? flow.outline.summarySite(result.summary.areaKm2, result.summary.extentKm)
+                : flow.outline.summaryRoad(result.summary.lengthKm ?? 0, result.summary.parts.length)}
+            </p>
+            {/* What 10 m can show of it: said, never a block. An outline the rules refuse gets that message instead. */}
+            <SizeLine note={sizeNote(result.summary, draft.widthM)} />
+          </>
         )}
         {result && !result.ok && (
           // role="alert" on the <ul> itself would replace its list role and fail axe's listitem rule, so the alert wraps it.
@@ -143,6 +172,10 @@ export function OutlineStep({ draft, setDraft, onBack, onNext }: StepProps) {
       </div>
     </div>
   )
+}
+
+function SizeLine({ note }: { note: ReturnType<typeof sizeNote> }) {
+  return <p className={`mt-1 ${note.willShow ? 'text-fg-2' : 'text-warn'}`}>{note.text}</p>
 }
 
 // A pair that looks reversed (lat 68-90, lon 6-37) is a question, never a silent fix: nothing is applied until one of the two buttons is pressed.
