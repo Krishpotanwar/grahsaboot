@@ -176,6 +176,19 @@ describe('the satellite view words', () => {
     expect(flow.context.legend).toBe('Basemap')
     expect(flow.context.map).toBe('Map')
   })
+  it('tells the limits page what the satellite view is, and the privacy page what it reads', () => {
+    const own = copy.pages.limits.pageOnly.join(' ')
+    expect(own).toContain('not evidence')
+    expect(own).toContain('one to three pixels')
+    expect(own).toContain('Runways and piers')
+    expect(own).toContain('75 days')
+    // a report prints `items` as its limits, and the view is never in a report: nothing about it may be in them
+    expect(copy.pages.limits.items.join(' ')).not.toMatch(/satellite view/i)
+    const privacy = copy.pages.privacy.items.join(' ')
+    expect(privacy).toContain('Earth Search')
+    expect(privacy).toContain('Planetary Computer')
+    expect(privacy).toContain('by itself when you left it on last time') // a remembered choice starts it
+  })
   it('calls a cloudy photo the clearest one checked, not the clearest of all recent photos (at most three are checked)', () => {
     expect(flow.context.cloudy(62)).toContain('the clearest photo we checked')
     expect(flow.context.cloudy(12)).not.toContain('clearest recent photo')

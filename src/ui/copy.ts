@@ -93,6 +93,11 @@ export const copy = {
         'The next-pass time is an estimate from orbit data. A pass is not a guaranteed usable photo.',
         'Verified means the pictures match the public source file at the time of checking. It does not prove any claim about a project.',
       ],
+      // Lines for this page only: a report prints `items` as its own limits, and the satellite view is never in a report.
+      pageOnly: [
+        'The satellite view in the outline step is one recent photo, 10 metres per pixel, to help you find your place. It is not evidence: it is not saved, hashed or put in a report.',
+        'In that photo a house is one to three pixels. Runways and piers are drawn over it, it can be months old (its age is shown once it is more than 75 days old), and clouds may remain (a photo that is less than 80% clear says so).',
+      ],
     },
     privacy: {
       title: 'Privacy',
@@ -102,6 +107,7 @@ export const copy = {
         'Place searches are sent to OpenStreetMap Nominatim.',
         'Map tiles come from OpenFreeMap, NASA GIBS and AWS; those requests reveal your IP address and the area you are viewing.',
         'Satellite photos are read directly from public Sentinel-2 files on Amazon Web Services. Those requests reveal an approximate area, never your name or email.',
+        'The optional satellite view in the outline step asks the Earth Search catalogue for recent photos of a coarse version of the area on your map (Planetary Computer is the fallback) and reads one of them from the same public files. It starts when you switch it on, or by itself when you left it on last time.',
         'Satellite positions come through our server from CelesTrak; nothing about you is sent.',
       ],
     },

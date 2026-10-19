@@ -17,4 +17,17 @@ describe('TextPage', () => {
       for (const t of page.items) expect(plain).toContain(t.replaceAll('"', '&quot;'))
     }
   })
+
+  it("lists a page's own lines after its items, and only on that page", () => {
+    const limits = renderToString(createElement(TextPage, { page: copy.pages.limits }))
+    const last = copy.pages.limits.items.at(-1)!.replaceAll('"', '&quot;')
+    for (const t of copy.pages.limits.pageOnly) {
+      expect(limits).toContain(t)
+      expect(limits.indexOf(t)).toBeGreaterThan(limits.indexOf(last))
+    }
+    // counter-case: the privacy page has no such lines, and a page without them renders exactly its items
+    expect(renderToString(createElement(TextPage, { page: copy.pages.privacy }))).not.toContain(
+      copy.pages.limits.pageOnly[0],
+    )
+  })
 })

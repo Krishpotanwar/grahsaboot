@@ -5,6 +5,7 @@ import { buildReportHtml, type ReportImage } from './html.ts'
 import { addNote, newInvestigation, setBeforeAfter, setClaim, togglePin } from '../data/investigation.ts'
 import { makeDisplayGrid } from '../evidence/display.ts'
 import type { AoiSummary } from '../geo/aoi.ts'
+import { copy } from '../ui/copy.ts'
 import { flow } from '../ui/copy-flow.ts'
 import type { QualityResult } from '../workers/imagery-core.ts'
 import { outlinePath } from '../workbench/overlay.ts'
@@ -331,6 +332,11 @@ describe('buildReportHtml', () => {
     expect(html).toContain('@media print')
     expect(html).toContain('data-theme="dark"')
     expect(html).toContain('<script type="application/json" id="provenance">')
+  })
+  it('lists the limits of the photos and says nothing of the satellite view, which is never in a report', () => {
+    for (const t of copy.pages.limits.items) expect(html).toContain(escapeHtml(t))
+    for (const t of copy.pages.limits.pageOnly) expect(html).not.toContain(escapeHtml(t))
+    expect(html).not.toMatch(/satellite view/i)
   })
   it('keeps the provenance JSON inert inside the page', () => {
     expect(html).not.toMatch(/<\/script>[^<]*roof/)
