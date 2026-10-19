@@ -508,3 +508,29 @@ Prepare six contacts (three site/civil engineers, three road/monitoring people) 
 2. Optional domain purchase (first paid item).
 3. Manual IP India trademark search for "GrahSaboot" (classes 9, 35, 42) before any spend.
 4. Grievance contact name/email for the privacy notice.
+
+---
+
+## Addendum, 2026-10-19: Phase E (clear imagery)
+
+Added after the build, not a rewrite: the sections above stand as written except where this says otherwise. The decisions are in `docs/designs/phase-e-clear-imagery.md` and the measurements in `docs/ops/probes.md` (G0, P11 to P16).
+
+### 7.2 Globe and map: what the outline step adds
+
+| Where | Layer | Notes |
+|---|---|---|
+| Outline step and workbench mini map | The OpenFreeMap style with a readable-map patch | `src/map/readable.ts` is a table of paint patches applied on every style load. Road lines and building outlines meet a contrast floor against the background (3:1 in the dark style, 2:1 in the light one; a test checks it), water, woods, parks, place names and road names are recoloured, and a `gs-building-outline` line is added. The table is checked against vendored copies of both styles (`tests/fixtures/styles/`) and probe P13 diffs the live styles; an id the style no longer has is skipped, so an upstream rename leaves today's map. |
+| Outline step, opt-in, a view of at most 12 km | `gs-context`: one recent Sentinel-2 L2A scene as an image source | Above land, water and building fills, below roads, railways and labels. Symbol layers and `gs-building*` are lifted over it; the opaque `aeroway-area` and `road_area_pier` fills stay above it, so runways and piers cover the photo. It reaches the map as decoded pixels (`updateImage({ image })`), so the content security policy is unchanged. Map is the default on every device and the choice is remembered. A build with `VITE_CONTEXT_IMAGERY=0` holds none of its code (the words stay in the shared copy file). |
+
+The optional "Context imagery (2016)" toggle in the list above is not built. Only EOX's 2016 mosaic is licensable (CC BY 4.0), a ten-year-old picture; the satellite view reads the app's own recent Sentinel-2 scenes instead. Attribution: "Contains modified Copernicus Sentinel data <year>" joins the map credit while the picture is on and leaves it when it goes off.
+
+How the picture is chosen (`src/context/`): the current view (at most 12 km a side) -> one STAC search over the last 240 days with a coarsened area -> the best scene of each date that covers at least 90 % of the view, least cloud first, within 75 days, widening to 150 and then 240 days while none has 20 % cloud or less -> a cloud check on the best three, two at a time -> one read of the first scene that is 80 % clear (otherwise the clearest, flagged) at level 0 or 1 -> display pixels only. A 60-second deadline ends a stuck load and the person can cancel at any time. Nothing from this path reaches a report, a provenance record, a hash or a saved frame (`src/context/guard.test.ts`, `tests/unit/context-boundary.test.ts`).
+
+### 9 Privacy, security, licences
+
+- Third-party reads disclosed: the satellite view adds no host and no policy entry. Its STAC search sends a coarsened area to Earth Search (Planetary Computer is the fallback), and its reads go to the same Sentinel-2 buckets on AWS, or on Azure when Planetary Computer is the fallback. Those hosts see the visitor's IP address and an approximate area (the view, at most 12 km), never a name or an email. The reads happen when the person switches the view on, or when it was left on last time (the choice is remembered in the browser).
+- Sentinel row of the licence table: the credit shows in the map attribution while the picture is shown.
+
+### 10 Limits users see (`/limits`)
+
+The page gains lines of its own (they are not part of a report's "gaps and limits" list): the satellite view is a 10 m aid for finding a place, not evidence; a house is one to three pixels; runways and piers are drawn over the photo; the photo can be months old (its age shows when it is more than 75 days old or the search had to reach back for it) and may still have clouds (a photo less than 80 % clear says so and shows its clear share). When an outline is drawn the outline step also says what 10 m can show of it (a site under 5 ha or a road under 20 m wide is flagged).

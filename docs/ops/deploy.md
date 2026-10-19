@@ -69,3 +69,6 @@ To see a violation locally, serve `dist/` with the headers applied to every same
 | 2026-10-09 | The report screen | ac88dcf5-3eb4-4528-94cd-58eb46799dff |
 | 2026-10-11 | Workbench look, part 1 | 831537dd-fa06-48b9-bc50-f0778515a4d2 |
 | 2026-10-12 | Workbench look, part 2 (barcode, pinned dates, road grid) | 4809bf9b-ded1-4a2d-8a0a-920529708d87 |
+| 2026-10-12 | Tier-0 and accessibility checks, steadier notes, the content security policy | b21adcfb-d9fb-457b-a3c8-2e59f98d485b |
+| 2026-10-18 | A map you can read, drawing aids and a size note | ccf42f10-c512-46cc-8f7d-7f602148fa73 |
+| 2026-10-19 | The satellite view of the outline step, and its lines on the limits and privacy pages | ffe08aed-8db6-4f77-a18d-9328b8455dd0 |

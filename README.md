@@ -38,6 +38,8 @@ GrahSaboot turns a place and a set of dates into dated, cloud-checked satellite 
 ### Investigations
 
 - **Start an investigation** from the globe or at `/new`: pick a place, outline a site or a road on the map (or paste coordinates), choose the dates, review, open.
+- **A map you can read while you outline.** Roads, labels and building outlines stay legible in both themes, corners and a road's two points can be undone, and a size note says when what you drew is too small for 10 m photos to show.
+- **An optional satellite view.** Behind the outline map you can switch to one recent Sentinel-2 photo of the area on your screen, to find your place. It loads only when you switch it on, can take up to a minute on a slow connection, says how old the photo is, and is a 10 m orientation aid, not evidence: it is never saved, hashed or put in a report.
 - **A workbench for the evidence.** Compare a before and an after photo with a swipe, side by side or as a brightness difference, with a mini map of the outline. Each photo shows its date, the satellite, how much of the outline it sees clearly, and a SHA-256 of the pixels.
 - **A photo timeline.** Every pass in the range is a tick: tall when it sees the outline clearly, short when clouds hide it. Press or drag along it to move through the dates; pin the ones that matter.
 - **Roads in sections.** A road is cut into sections and a grid shows how clearly each one is seen on each pinned date.
@@ -98,7 +100,7 @@ npm run dev          # http://localhost:5173
 
 `npm run dev` has no Worker, so satellite positions come from the bundled `public/tle-snapshot.json` and nothing calls CelesTrak. For the real `/api/tle` route, run `npm run build && npx wrangler dev`. `npm run preview` has no Worker either.
 
-No environment variables are needed. Every service URL has a public default in `src/config.ts`, and you can override any of them with a `VITE_*` variable such as `VITE_NOMINATIM_URL` or `VITE_TLE_URL`.
+No environment variables are needed. Every service URL has a public default in `src/config.ts`, and you can override any of them with a `VITE_*` variable such as `VITE_NOMINATIM_URL` or `VITE_TLE_URL`. `VITE_CONTEXT_IMAGERY=0` builds without the satellite view (`npm run build:nocontext`); `npm run check` proves that build holds none of its code.
 
 | Script                 | What it does                                                                               |
 | ---------------------- | ------------------------------------------------------------------------------------------ |
@@ -145,6 +147,7 @@ src/
   evidence/           evidence engine: COG windows, SHA-256, cloud stats, reprojection, difference
   stac/               Sentinel-2 STAC search (Earth Search, with Planetary Computer as fallback)
   workers/            imagery Web Worker
+  context/            the satellite view: plan a region, rank scenes, read one picture (an orientation aid, never evidence)
   geo/                coordinates and outline limits
   new/                the new-investigation steps (place, outline, dates, review)
   workbench/          the workbench: viewer, timeline, road grid, notes, claim, the checks runner
@@ -168,6 +171,7 @@ docs/                 design mockups, plans, research, probes, ops runbooks
 | B: Shell and globe | Done, live          | Design system, router and shell, globe with device tiers, place search, live satellites and next pass                                              |
 | C: Workbench       | Done, live          | New-investigation flow, workbench (swipe, side by side, difference), timeline, road sections, notes, report export                                 |
 | D: Accounts        | Built, switched off | Google sign-in, saving, server re-verification of every frame, privacy controls                                                                    |
+| E: Clear imagery   | Done, live          | A readable outline map in both themes, drawing aids, a size note, and an optional recent satellite photo behind the map (10 m, not evidence)       |
 
 ## Accounts (built, switched off)
 
@@ -178,6 +182,7 @@ The sign-in, save and verify code is written and tested, but it sits behind a bu
 - **What the photos show:** they are 10 m per pixel and go back to 2017. Clouds often block the view, especially in the monsoon.
 - **What they cannot show:** quality, payments or who did the work. "No visible change" does not prove that nothing happened.
 - **Next-pass times are estimates** from orbit data. A pass is not a guaranteed usable photo.
+- **The satellite view is for finding your place.** A house is one to three pixels in it, runways and piers are drawn over it, it can be months old, and it is never saved, hashed or put in a report.
 - The full list is in the app at `/limits`.
 
 ## Privacy
@@ -185,11 +190,12 @@ The sign-in, save and verify code is written and tested, but it sits behind a bu
 - **Accounts:** the prototype has none, and no database. Your theme choice stays in your browser.
 - **Place searches** go to OpenStreetMap Nominatim.
 - **Satellite positions** come through our Worker from CelesTrak. Nothing about you is sent to CelesTrak.
+- **The satellite view** (off until you switch it on; a choice you made earlier is remembered and starts it by itself) searches Earth Search with a coarse area and reads one recent photo of the area on your map from public Sentinel-2 files on AWS (Planetary Computer and its Azure storage are the fallback). Those requests reveal your IP address and an approximate area, never your name or an email.
 - The full summary is in the app at `/privacy`.
 
 ## Data and credits
 
-- Contains modified Copernicus Sentinel data, used from Phase C onwards.
+- Contains modified Copernicus Sentinel data, used from Phase C onwards (and shown in the map credit while the satellite view is on).
 - Globe imagery: NASA GIBS Blue Marble.
 - Map data © OpenStreetMap contributors, styles by OpenFreeMap and OpenMapTiles.
 - Orbit data: CelesTrak. Place search: OpenStreetMap Nominatim. Terrain: AWS Terrain Tiles.
