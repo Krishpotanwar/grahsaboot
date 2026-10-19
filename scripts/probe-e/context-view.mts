@@ -13,6 +13,7 @@
 //   four times slower. The bytes still come over the VM's own link first and are then held back, so this is slower than 4G, never faster;
 //   the imagery worker's own CPU is NOT slowed (CDP throttles the main thread only). A real phone is still needed to decide.
 import { mkdirSync, readFileSync } from 'node:fs'
+import { gzipSync } from 'node:zlib'
 import { fileURLToPath } from 'node:url'
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright'
 import { copy } from '../../src/ui/copy.ts'
@@ -31,15 +32,30 @@ type W = Window & { __gs: { map: any }; __long: Array<{ start: number; ms: numbe
 const launch = () => chromium.launch({ args: ['--ignore-gpu-blocklist', '--enable-unsafe-swiftshader'] })
 const BYTES_PER_MS = 1.6e6 / 8 / 1000
 const RTT_MS = 150
+const kindOf = (u: string) =>
+  /earth-search|planetarycomputer.microsoft.com\/api/.test(u)
+    ? 'stac'
+    : /sentinel-cogs|sentinel2l2a01|e84-earth-search/.test(u)
+      ? 'cog'
+      : 'other'
+/** What crossed the wire while throttled, by kind (route.fetch hands back DECODED bodies, so the page's own sizes() cannot say). */
+const wire: Record<string, number> = { stac: 0, cog: 0, other: 0 }
 async function throttle(ctx: BrowserContext) {
   let linkFree = 0 // when the one shared pipe is free again
   await ctx.route('**/*', async (route) => {
-    const resp = await route.fetch()
-    const body = await resp.body()
-    const now = Date.now()
-    linkFree = Math.max(now, linkFree) + body.length / BYTES_PER_MS
-    await sleep(Math.max(0, linkFree + RTT_MS - now))
-    await route.fulfill({ response: resp, body })
+    try {
+      const resp = await route.fetch()
+      const body = await resp.body()
+      // a STAC page of 3.5 MB decoded is about 100 KB gzipped: the transfer time is the ENCODED size
+      const encoded = resp.headers()['content-encoding'] ? gzipSync(body).length : body.length
+      wire[kindOf(route.request().url())]! += encoded
+      const now = Date.now()
+      linkFree = Math.max(now, linkFree) + encoded / BYTES_PER_MS
+      await sleep(Math.max(0, linkFree + RTT_MS - now))
+      await route.fulfill({ response: resp, body })
+    } catch {
+      await route.abort().catch(() => {}) // a dropped connection, as it can be on a phone
+    }
   })
 }
 async function open(browser: Browser, viewport = { width: 1440, height: 900 }) {
@@ -60,7 +76,9 @@ async function open(browser: Browser, viewport = { width: 1440, height: 900 }) {
 async function goTo(page: Page, p: (typeof PLACES)[number], zoom: number) {
   await page.goto(`${BASE}/new?tier=2&lat=${p.lat}&lon=${p.lon}&name=${encodeURIComponent(p.name)}`)
   await page.getByRole('heading', { name: flow.outline.title }).waitFor()
-  await page.waitForFunction(() => (window as unknown as W).__gs?.map?.isStyleLoaded())
+  await page.waitForFunction(() => (window as unknown as W).__gs?.map?.isStyleLoaded(), null, {
+    timeout: THROTTLE ? 150_000 : 30_000, // a slow link and a slow CPU take longer to draw the map itself
+  })
   await jump(page, p, zoom)
 }
 const jump = (page: Page, p: (typeof PLACES)[number], zoom: number) =>
@@ -110,12 +128,7 @@ async function measure(
   }
   const net: Array<{ kind: string; bytes: number }> = []
   page.on('requestfinished', async (r) => {
-    const u = r.url()
-    const kind = /earth-search|planetarycomputer.microsoft.com\/api/.test(u)
-      ? 'stac'
-      : /sentinel-cogs|sentinel2l2a01|e84-earth-search/.test(u)
-        ? 'cog'
-        : 'other'
+    const kind = kindOf(r.url())
     const s = await r.sizes().catch(() => null)
     if (s) net.push({ kind, bytes: s.responseBodySize + s.responseHeadersSize })
   })
@@ -124,7 +137,7 @@ async function measure(
   await page.waitForFunction(
     () => !(document.querySelector('input[value="satellite"]') as HTMLInputElement).disabled,
     null,
-    { timeout: 60_000 },
+    { timeout: THROTTLE ? 150_000 : 60_000 },
   )
   await sleep(4000) // the map's own tiles settle first
   const view = await page.evaluate(() => {
@@ -139,26 +152,33 @@ async function measure(
   const h0 = await heap()
   const r0 = await rss(browser)
   net.length = 0
+  for (const k of Object.keys(wire)) wire[k] = 0
   const p0 = await page.evaluate(() => performance.now())
   const t0 = Date.now()
   await satellite(page).check()
-  const stages: Record<string, number> = {}
-  let last = ''
-  for (;;) {
-    const t = await statusText(page)
-    for (const [k, w] of Object.entries(flow.context.stages))
-      if (t.includes(w) && !(k in stages)) stages[k] = Date.now() - t0
-    // the picture, a line saying there is none, or an alert: the load is over
-    if (
-      /Satellite view · Sentinel-2|No recent photo/.test(t) ||
-      (await page.getByRole('alert').count()) > 0
-    ) {
-      last = t
-      break
+  /** Waits for the picture, a line saying there is none, or an alert, and says when each stage word appeared. */
+  const waitEnd = async (from: number) => {
+    const st: Record<string, number> = {}
+    let end = ''
+    for (;;) {
+      const t = await statusText(page)
+      for (const [k, w] of Object.entries(flow.context.stages))
+        if (t.includes(w) && !(k in st)) st[k] = Date.now() - from
+      if (
+        /Satellite view · Sentinel-2|No recent photo/.test(t) ||
+        (await page.getByRole('alert').count()) > 0
+      ) {
+        end = t
+        break
+      }
+      if (Date.now() - from > 130_000) break
+      await sleep(100)
     }
-    if (Date.now() - t0 > 100_000) break
-    await sleep(100)
+    return { st, end }
   }
+  const first = await waitEnd(t0)
+  const stages = first.st
+  const last = first.end
   const ms = Date.now() - t0
   const alert = await page.getByRole('alert').allInnerTexts()
   await sleep(2000)
@@ -167,7 +187,8 @@ async function measure(
   const long = (await page.evaluate(() => (window as unknown as W).__long)).filter(
     (e) => e.start >= p0 && e.ms > 50,
   )
-  const sum = (kind: string) => net.filter((n) => n.kind === kind).reduce((s, n) => s + n.bytes, 0)
+  const sum = (kind: string) =>
+    THROTTLE ? wire[kind]! : net.filter((n) => n.kind === kind).reduce((s, n) => s + n.bytes, 0)
   const result = {
     place: p.id,
     zoom,
@@ -191,6 +212,26 @@ async function measure(
     rssDeltaByKind: delta(r0, r1),
   }
   console.log(JSON.stringify(result))
+  if (THROTTLE && alert.length) {
+    // The load hit its hard stop: what does Try again cost? (the imagery worker keeps what it already read)
+    for (const k of Object.keys(wire)) wire[k] = 0
+    const t1 = Date.now()
+    await page.getByRole('button', { name: copy.common.retry }).click()
+    const second = await waitEnd(t1)
+    console.log(
+      JSON.stringify({
+        retry: true,
+        place: p.id,
+        zoom,
+        viewport: result.viewport,
+        ms: Date.now() - t1,
+        stages: second.st,
+        status: second.end,
+        alert: await page.getByRole('alert').allInnerTexts(),
+        wireMB: Math.round(((wire.stac! + wire.cog!) / 1e6) * 100) / 100,
+      }),
+    )
+  }
   await ctx.close()
   return result
 }
