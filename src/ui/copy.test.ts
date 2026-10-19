@@ -108,3 +108,76 @@ describe('copy', () => {
     }
   })
 })
+
+describe('the satellite view words', () => {
+  const all = () => {
+    const c = flow.context
+    return [
+      c.legend,
+      c.map,
+      c.satellite(3),
+      c.off,
+      c.tooWideOn,
+      c.tooWideUpdate,
+      ...Object.values(c.stages),
+      c.still,
+      c.on('20 Dec 2025'),
+      c.age(1),
+      c.age(101),
+      c.cloudy(12),
+      c.cloudy(62),
+      c.none,
+      c.offline,
+      c.failed,
+      c.update,
+    ]
+  }
+  it('never certify, prove or confirm anything: the picture is for finding a place', () => {
+    for (const line of all()) expect(line, line).not.toMatch(/verif|proof|prove|confirm|certif|genuine/i)
+  })
+  it('says on the label what the picture is, how sharp it is and that it is not evidence', () => {
+    expect(flow.context.on('20 Dec 2025')).toBe(
+      'Satellite view · Sentinel-2 · 20 Dec 2025 · 10 m · for finding your place, not evidence',
+    )
+  })
+  it('says the cost the way the person reads it, and the age in whole days', () => {
+    expect(flow.context.satellite(3)).toBe('Satellite · about 3 MB')
+    expect(flow.context.age(1)).toBe('1 day old.')
+    expect(flow.context.age(101)).toBe('101 days old.')
+  })
+  it('says "Clouds cover most of it" only below half clear, and always gives the figure', () => {
+    expect(flow.context.cloudy(0)).toContain('Clouds cover most of it.')
+    expect(flow.context.cloudy(49)).toContain('Clouds cover most of it.')
+    expect(flow.context.cloudy(50)).not.toContain('Clouds cover most of it')
+    expect(flow.context.cloudy(79)).not.toContain('Clouds cover most of it')
+    expect(flow.context.cloudy(62)).toContain('62% clear view')
+  })
+  it('keeps the failure lines apart: no connection says so, other failures neither say offline nor "no photo"', () => {
+    expect(flow.context.offline).toContain('Could not reach the photo service.')
+    expect(flow.context.failed).not.toMatch(/offline|no photo/i)
+    expect(flow.context.failed).toContain('The map still works.')
+    expect(flow.context.none).toBe('No recent photo covers this area. The map still works.')
+  })
+  it('puts the 10 m expectation, in the words of the design, on the off line', () => {
+    expect(flow.context.off).toBe(
+      'A recent 10 m photo behind the map: roads and large buildings show, houses do not.',
+    )
+  })
+  it('keeps the other words the design fixed (the tests read the rest from flow.context itself)', () => {
+    expect(flow.context.stages).toEqual({
+      searching: 'Searching for recent photos',
+      checking: 'Checking for clouds',
+      reading: 'Reading the photo',
+    })
+    expect(flow.context.tooWideOn).toBe('Zoom in to your place to use the satellite view.')
+    expect(flow.context.tooWideUpdate).toBe('Zoom in to your place to update the satellite view.')
+    expect(flow.context.still).toBe('Still working. A slow connection can take up to a minute.')
+    expect(flow.context.update).toBe('Update for this view')
+    expect(flow.context.legend).toBe('Basemap')
+    expect(flow.context.map).toBe('Map')
+  })
+  it('calls a cloudy photo the clearest one checked, not the clearest of all recent photos (at most three are checked)', () => {
+    expect(flow.context.cloudy(62)).toContain('the clearest photo we checked')
+    expect(flow.context.cloudy(12)).not.toContain('clearest recent photo')
+  })
+})

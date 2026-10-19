@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { Suspense, useEffect, useRef, useState, type FormEvent } from 'react'
+import { config } from '../config.ts'
 import { parseCoordinates, type ParsedCoords } from '../geo/coords.ts'
 import { summarizeAoi } from '../geo/aoi.ts'
 import { fitAoi } from '../map/aoiLayer.ts'
@@ -7,6 +8,8 @@ import { useMapStage } from '../map/MapStage.tsx'
 import { copy, issueMessage } from '../ui/copy.ts'
 import { flow } from '../ui/copy-flow.ts'
 import { Button, TextField } from '../ui/kit.tsx'
+import { Optional } from '../ui/Optional.tsx'
+import { LazyContextToggle } from './contextGate.ts'
 import { draftToAoi, type Draft } from './draft.ts'
 import { sizeNote } from './sizeNote.ts'
 import { squareAround } from '../geo/square.ts'
@@ -65,6 +68,24 @@ export function OutlineStep({ draft, setDraft, onBack, onNext }: StepProps) {
         >
           {mapFailed ? flow.outline.mapFailed : !mapReady ? flow.outline.mapLoading : ''}
         </p>
+      )}
+      {config.contextImagery && LazyContextToggle && tier > 0 && !mapFailed && (
+        // Directly under the title and the map's line, never over the map. Its room is kept whatever the state says, so nothing
+        // below it ever moves: the tallest state is a cloudy, old photo with the zoom-in sentence, and how tall that is depends on the
+        // width of THIS column (not the screen's: it is 380 px at 1024 px and 975 px at 1023). Measured: 214, 194, 174, 154 and 134 px
+        // from the narrowest column up (the first is a column under 291 px, a 320 px screen); tests/e2e/context-view.spec.ts holds
+        // every state to it and pins each band. The bands are in rem and the column in px, so text enlarged past about 125 % can still
+        // move the form in that tallest state. A new place starts the toggle afresh.
+        <div className="@container">
+          <div className="min-h-[13.5rem] @[18.25rem]:min-h-[12.25rem] @[24rem]:min-h-[10.9rem] @[31rem]:min-h-[9.7rem] @[61rem]:min-h-[8.4rem]">
+            {/* Code that cannot be loaded leaves the step as it was, not blank. */}
+            <Optional>
+              <Suspense fallback={null}>
+                <LazyContextToggle key={draft.place ? `${draft.place.lat},${draft.place.lon}` : ''} />
+              </Suspense>
+            </Optional>
+          </div>
+        </div>
       )}
       <fieldset className="grid gap-2">
         <legend className="mb-2 text-sm font-medium">{flow.outline.kindLegend}</legend>

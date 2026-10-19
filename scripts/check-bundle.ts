@@ -1,13 +1,13 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { BUDGET_KB, bundleProblems, entrySizes, type Files } from './bundle-rules.ts'
+import { BUDGET_KB, bundleProblems, entrySizes, targetFor, type Files } from './bundle-rules.ts'
 
-// `tsx scripts/check-bundle.ts` checks dist/ (the dormant build); `--accounts` checks dist-accounts/ (the flag-on build).
-// The rules are in bundle-rules.ts so tests/unit/bundle-rules.test.ts runs them on synthetic builds.
-const accounts = process.argv.includes('--accounts')
-const release = process.env.GS_ACCOUNTS_RELEASE === '1'
-const name = accounts ? 'dist-accounts' : 'dist'
+// `tsx scripts/check-bundle.ts` checks dist/ (the dormant build); `--accounts` checks dist-accounts/ (the flag-on build);
+// `--no-context` checks dist-nocontext/ (built with VITE_CONTEXT_IMAGERY=0: no satellite view in it).
+// The rules and which folder an argument selects are in bundle-rules.ts so tests/unit/bundle-rules.test.ts runs them on synthetic builds.
+const { name, rules } = targetFor(process.argv, process.env.GS_ACCOUNTS_RELEASE === '1')
+const { accounts, release } = rules
 const dir = fileURLToPath(new URL(`../${name}/`, import.meta.url))
 const fail = (msg: string): never => {
   console.error(`check-bundle: ${msg}`)
@@ -23,7 +23,9 @@ try {
       files[path] = readFileSync(join(dir, path))
     }
 } catch {
-  fail(`cannot read ${name}/. Run "npm run ${accounts ? 'build:accounts' : 'build'}" first.`)
+  fail(
+    `cannot read ${name}/. Run "npm run ${accounts ? 'build:accounts' : name === 'dist-nocontext' ? 'build:nocontext' : 'build'}" first.`,
+  )
 }
 
 console.log(
@@ -33,5 +35,5 @@ for (const e of entrySizes(files)) console.log(`  ${e.path}  ${kb(e.gzip)} KB gz
 const total = entrySizes(files).reduce((n, e) => n + e.gzip, 0)
 console.log(`entry JS: ${kb(total)} KB gzip (budget ${BUDGET_KB} KB)`)
 
-const problems = bundleProblems(files, { accounts, release })
+const problems = bundleProblems(files, rules)
 if (problems.length) fail(`${name}/ fails:\n  - ${problems.join('\n  - ')}`)

@@ -13,8 +13,8 @@ const files = (readdirSync(root, { recursive: true }) as string[])
 const IMPORT = /\b(?:from|import)\s*\(?\s*['"]([^'"]+)['"]/g
 const CONTEXT = /^context(?:\/|$)/
 const LAYER = /^map\/contextLayer(?:\.[cm]?[jt]sx?)?$/
-/** The folders that may use src/context (it may use itself). */
-const MAY = /^(?:context|map|new)\//
+/** The files that may use src/context (it may use itself): the switch, its state types and the map layer, nothing else. */
+const MAY = /^(?:context\/|map\/contextLayer\.ts$|new\/(?:ContextToggle\.tsx|contextState\.ts)$)/
 /** Where the evidence, the report and the accounts live: none of it may see the picture. */
 const EVIDENCE_SIDE = /^(?:report\/|workbench\/|screens\/Report\.tsx$|data\/|accounts\/)/
 /** Built in pieces so that this file passes its own scan. */
@@ -58,6 +58,10 @@ describe('context imagery module boundary', () => {
     expect(strangers('screens/Workbench.tsx', load)).toEqual(['context/load.ts'])
     expect(strangers('stac/search.ts', `export * from '../context/rank.ts'`)).toEqual(['context/rank.ts'])
     expect(strangers('app.tsx', `import './context/load.ts'`)).toEqual(['context/load.ts'])
+    // the folders it used to be open to: only the switch, its state and the layer need it, not the rest of src/new and src/map
+    expect(strangers('new/ReviewStep.tsx', load)).toEqual(['context/load.ts'])
+    expect(strangers('new/OutlineStep.tsx', load)).toEqual(['context/load.ts'])
+    expect(strangers('map/createMap.ts', load)).toEqual(['context/load.ts'])
     expect(strangers('report/html.ts', `const m = import('../context/region')`)).toEqual(['context/region'])
     expect(leaks('report/html.ts', `const m = import('../context/region')`)).toEqual(['context/region'])
     const layer = `import { setContextLayer } from '../map/contextLayer.ts'`
@@ -87,7 +91,7 @@ describe('context imagery module boundary', () => {
       ]).toEqual([])
   })
 
-  it('lets only src/map and src/new import src/context', () => {
+  it('lets only the switch, its state and the map layer import src/context', () => {
     expect(found(strangers)).toEqual([])
   })
 

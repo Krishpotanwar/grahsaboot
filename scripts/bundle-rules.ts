@@ -12,6 +12,18 @@ export interface Rules {
   accounts: boolean
   /** GS_ACCOUNTS_RELEASE=1: the plain dist/ is the deliberate activation build, so it is held to the flag-on rules. */
   release: boolean
+  /** The VITE_CONTEXT_IMAGERY=0 build (dist-nocontext/): the satellite view is left out of it, bytes included. */
+  noContext?: boolean
+}
+
+/** Which build a `check-bundle.ts` call is about, from its arguments: the folder it reads and the rules that folder is held to. */
+export function targetFor(argv: string[], release = false): { name: string; rules: Rules } {
+  const accounts = argv.includes('--accounts')
+  const noContext = argv.includes('--no-context')
+  return {
+    name: accounts ? 'dist-accounts' : noContext ? 'dist-nocontext' : 'dist',
+    rules: { accounts, release, noContext },
+  }
 }
 
 /** Gzipped JS budget for what the browser fetches before the first render (index.html's module script and modulepreloads). */
@@ -28,6 +40,10 @@ const FORBIDDEN: Array<[string, RegExp]> = [
   ['the consent storage key "gs-consent"', /gs-consent/],
 ]
 const TEXT = /\.(?:m?js|html|css|json|svg|webmanifest|txt)$|(?:^|\/)_headers$/
+/** The satellite picture's source and layer id (src/map/contextLayer.ts): a build without the view holds it nowhere. */
+const CONTEXT_ID = 'gs-context'
+/** Module paths (map `sources`) that are the satellite view. src/new/contextGate.ts is the folded condition and is in every build. */
+const CONTEXT_SOURCE = /src\/context\/|src\/new\/(?:ContextToggle|contextState)|src\/map\/contextLayer/
 /** Module paths (map `sources`) that are accounts code. src/accounts/enabled.ts is the one switch and is allowed everywhere. */
 const ACCOUNTS_SOURCE = /src\/accounts\/(?!enabled\.ts)|\/@supabase\/|copy-account\.ts/
 
@@ -88,6 +104,19 @@ export function bundleProblems(files: Files, rules: Rules): string[] {
   const sentinelFiles = Object.keys(files).filter(
     (p) => /\.(?:js|html)$/.test(p) && text(files[p]!).includes(SENTINEL),
   )
+
+  if (rules.noContext) {
+    for (const p of Object.keys(files).filter((p) => /\.(?:m?js|html)$/.test(p)))
+      if (text(files[p]!).includes(CONTEXT_ID))
+        problems.push(`${p} holds "${CONTEXT_ID}": the satellite view is in a build made without it.`)
+    for (const m of maps) {
+      const bad = m.sources.filter((src) => CONTEXT_SOURCE.test(src))
+      if (bad.length)
+        problems.push(
+          `${m.map} lists the satellite view's code: ${bad.slice(0, 3).join(', ')}${bad.length > 3 ? ', ...' : ''}`,
+        )
+    }
+  }
 
   if (rules.accounts || rules.release) {
     // Flag-on: not vacuous (Supabase and the remote module are in a chunk), and none of it in the first page's files.

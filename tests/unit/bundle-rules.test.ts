@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
-import { bundleProblems, entryFiles, entrySizes, type Files } from '../../scripts/bundle-rules.ts'
+import { bundleProblems, entryFiles, entrySizes, targetFor, type Files } from '../../scripts/bundle-rules.ts'
 
 const SENTINEL = 'Sign in with Google'
 const html = (entry: string, preload: string[] = []) =>
@@ -221,5 +221,91 @@ describe('bundleProblems, release build (GS_ACCOUNTS_RELEASE=1)', () => {
       }),
     }
     expect(bundleProblems(files, release)).toEqual([])
+  })
+})
+
+// VITE_CONTEXT_IMAGERY=0 removes the satellite switch at build time (src/new/contextGate.ts): the switch, the loader and the map
+// layer are lazy chunks that the folded condition leaves out, so that build must hold none of them.
+describe('bundleProblems, build without the satellite view (dist-nocontext/)', () => {
+  const off = { accounts: false, release: false, noContext: true }
+  const withView = (): Files => ({
+    ...dormant(),
+    'assets/ContextToggle-e.js': 'export const id = "gs-context"',
+    'assets/ContextToggle-e.js.map': map('../../src/new/ContextToggle.tsx', '../../src/context/load.ts'),
+  })
+
+  it('passes a build that holds none of it', () => {
+    expect(bundleProblems(dormant(), off)).toEqual([])
+  })
+
+  it('fails the map layer id in any chunk or in index.html, naming the file', () => {
+    for (const file of [
+      'assets/ContextToggle-e.js',
+      'assets/Workbench-c.js',
+      'assets/index-a.js',
+      'index.html',
+    ]) {
+      const files = { ...withView(), [file]: `${(withView()[file] as string | undefined) ?? ''} gs-context` }
+      expect(bundleProblems(files, off).join('\n'), file).toContain(`${file} holds "gs-context"`)
+    }
+  })
+
+  it('fails the toggle, the loader or the layer in a map, even without the id in the code', () => {
+    for (const source of [
+      '../../src/new/ContextToggle.tsx',
+      '../../src/new/contextState.ts',
+      '../../src/context/rank.ts',
+      '../../src/map/contextLayer.ts',
+    ]) {
+      const files = {
+        ...dormant(),
+        'assets/Workbench-c.js.map': map('../../src/screens/Workbench.tsx', source),
+      }
+      expect(bundleProblems(files, off).join('\n'), source).toContain('Workbench-c.js.map')
+    }
+  })
+
+  it('lets the gate through: src/new/contextGate.ts is in every build, the folded condition and nothing else', () => {
+    const files = {
+      ...dormant(),
+      'assets/index-a.js.map': map('../../src/main.tsx', '../../src/new/contextGate.ts'),
+    }
+    expect(bundleProblems(files, off)).toEqual([])
+  })
+
+  it('does not hold the normal build to it: that one carries the view in a lazy chunk', () => {
+    expect(bundleProblems(withView(), rules)).toEqual([])
+  })
+
+  it('still applies every other rule to this build', () => {
+    expect(
+      bundleProblems({ ...dormant(), 'assets/Workbench-c.js': 'https://x.supabase.co' }, off).join('\n'),
+    ).toContain('supabase')
+    expect(
+      bundleProblems({ ...dormant(), 'assets/index-a.js': randomBytes(160_000) }, off).join('\n'),
+    ).toContain('over the 150 KB')
+  })
+})
+
+// scripts/check-bundle.ts reads its folder and its rules from targetFor: a leg of `npm run check` that does not pass the rule it
+// names (the no-context leg without noContext) would check nothing and still print green.
+describe('targetFor: what each leg of npm run check is held to', () => {
+  it('points each argument at its own folder and rules', () => {
+    expect(targetFor([])).toEqual({
+      name: 'dist',
+      rules: { accounts: false, release: false, noContext: false },
+    })
+    expect(targetFor(['--accounts']).name).toBe('dist-accounts')
+    expect(targetFor(['--accounts']).rules.accounts).toBe(true)
+    expect(targetFor(['--no-context'])).toEqual({
+      name: 'dist-nocontext',
+      rules: { accounts: false, release: false, noContext: true },
+    })
+  })
+
+  it('carries the release flag to whichever build is checked', () => {
+    expect(targetFor([], true).rules.release).toBe(true)
+    expect(targetFor(['--no-context'], true).rules.release).toBe(true)
+    expect(targetFor([]).rules.release).toBe(false)
   })
 })

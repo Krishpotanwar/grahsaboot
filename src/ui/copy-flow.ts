@@ -59,6 +59,33 @@ export const flow = {
       `Length ${km.toFixed(2)} km · ${plural(n, 'section', 'sections')} of up to 2 km`,
     none: 'No outline yet.',
   },
+  // The Map | Satellite control of the outline step (src/new/ContextToggle.tsx) and the one line under it. The picture is a
+  // 10 m photo to find a place by: every line that shows it says so, and none of them speaks of evidence being checked.
+  context: {
+    legend: 'Basemap',
+    map: 'Map',
+    satellite: (mb: number) => `Satellite · about ${mb} MB`,
+    off: 'A recent 10 m photo behind the map: roads and large buildings show, houses do not.',
+    tooWideOn: 'Zoom in to your place to use the satellite view.',
+    tooWideUpdate: 'Zoom in to your place to update the satellite view.',
+    stages: {
+      searching: 'Searching for recent photos',
+      checking: 'Checking for clouds',
+      reading: 'Reading the photo',
+    },
+    still: 'Still working. A slow connection can take up to a minute.',
+    on: (date: string) =>
+      `Satellite view · Sentinel-2 · ${date} · 10 m · for finding your place, not evidence`,
+    age: (days: number) => `${plural(days, 'day', 'days')} old.`,
+    // The clearest of the few photos that were checked (at most three), shown although it is not clear. Below half it says so plainly.
+    // Short on purpose: this line is in the tallest state of the toolbar, whose reserved room is measured (OutlineStep.tsx).
+    cloudy: (clearPct: number) =>
+      `${clearPct < 50 ? 'Clouds cover most of it. ' : ''}This is the clearest photo we checked (${clearView(clearPct)}).`,
+    none: 'No recent photo covers this area. The map still works.',
+    offline: 'Could not reach the photo service. The map still works.',
+    failed: 'Could not get a satellite photo. The map still works.',
+    update: 'Update for this view',
+  },
   dates: {
     title: 'Which dates?',
     from: 'From',

@@ -15,6 +15,9 @@ const sidesKm = ([w, s, e, n]: Bbox): [number, number] => [
 /** The region is within the cap the loader plans for (the caller clamps with `regionFor`; this is the loader's own defence). */
 export const regionFits = (region: Bbox, maxKm = 12): boolean => Math.max(...sidesKm(region)) <= maxKm + 0.01
 
+/** The view is wider than the picture can cover: its longer side is over `maxKm`. A view that cannot be measured counts as too wide. */
+export const viewTooWide = (view: Bbox, maxKm = 12): boolean => !(Math.max(...sidesKm(view)) <= maxKm)
+
 /** The view, cut around its centre to at most `maxKm` on each side; `clamped` when anything was cut. */
 export function regionFor(view: Bbox, maxKm = 12): { bbox: Bbox; clamped: boolean } {
   const [wKm, hKm] = sidesKm(view)

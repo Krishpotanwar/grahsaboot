@@ -3,7 +3,7 @@ import { makeDisplayGrid } from '../evidence/display.ts'
 import { haversineM } from '../evidence/geodesy.ts'
 import type { DisplayGrid } from '../evidence/types.ts'
 import type { Bbox } from '../geo/aoi.ts'
-import { gridFor, levelFor, regionFits, regionFor } from './region.ts'
+import { gridFor, levelFor, regionFits, regionFor, viewTooWide } from './region.ts'
 
 const NAGPUR: [number, number] = [79.0882, 21.1458]
 /** A box `wKm` x `hKm` around a centre, built with a flat-earth step (the tests measure it back with haversine). */
@@ -101,5 +101,42 @@ describe('regionFits', () => {
     expect(regionFits(regionFor([78.9, 21.0, 79.3, 21.4]).bbox)).toBe(true) // clamped to 12 km
     expect(regionFits([78.9, 21.0, 79.3, 21.4])).toBe(false) // about 41 km wide
     expect(regionFits([79.0, 21.1, 79.05, 21.15])).toBe(true)
+  })
+})
+
+describe('viewTooWide', () => {
+  it('is false up to 12 km on either side and true beyond', () => {
+    expect(viewTooWide(around(NAGPUR, 11, 5))).toBe(false)
+    expect(viewTooWide(around(NAGPUR, 5, 11))).toBe(false)
+    expect(viewTooWide(around(NAGPUR, 13, 5))).toBe(true)
+    expect(viewTooWide(around(NAGPUR, 5, 13))).toBe(true)
+    expect(viewTooWide(around(NAGPUR, 40, 30))).toBe(true)
+  })
+
+  it('counts kilometres at the latitude of the view, like regionFor', () => {
+    // 0.2 degrees of longitude: 22 km at the equator, 11 km at 60 degrees north
+    expect(viewTooWide([0, -0.05, 0.2, 0.05])).toBe(true)
+    expect(viewTooWide([0, 59.95, 0.2, 60.05])).toBe(false)
+  })
+
+  it('takes another limit', () => {
+    expect(viewTooWide(around(NAGPUR, 5, 5), 4)).toBe(true)
+    expect(viewTooWide(around(NAGPUR, 3, 3), 4)).toBe(false)
+  })
+
+  it('says yes to a view it cannot measure, never a silent no', () => {
+    expect(viewTooWide([Number.NaN, 21, 79, 22])).toBe(true)
+    expect(viewTooWide([78, 21, Number.POSITIVE_INFINITY, 22])).toBe(true)
+  })
+
+  it('agrees with regionFor on whether the view had to be cut', () => {
+    for (const [w, h] of [
+      [3, 3],
+      [11.9, 2],
+      [12.1, 2],
+      [2, 12.1],
+      [30, 30],
+    ] as const)
+      expect(viewTooWide(around(NAGPUR, w, h)), `${w} x ${h}`).toBe(regionFor(around(NAGPUR, w, h)).clamped)
   })
 })
