@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 import { copy } from '../../src/ui/copy.ts'
+import { tabKey } from './helpers.ts'
 
 const hasWebgl2 = (page: Page) => page.evaluate(() => !!document.createElement('canvas').getContext('webgl2'))
 const styleReady = (page: Page) => page.waitForFunction(() => (window as any).__gs?.map?.isStyleLoaded())
@@ -263,7 +264,7 @@ test('the first Tab stop is the skip link, not the map', async ({ page }) => {
   await page.goto('/?tier=2')
   test.skip(!(await hasWebgl2(page)), 'no WebGL2 in this engine')
   await styleReady(page)
-  await page.keyboard.press('Tab')
+  await page.keyboard.press(tabKey(page))
   await expect(page.getByRole('link', { name: copy.common.skip })).toBeFocused()
 })
 
