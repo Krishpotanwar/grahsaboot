@@ -50,8 +50,8 @@ export function withTimeout(s?: AbortSignal): AbortSignal | undefined {
   const t = typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(TIMEOUT_MS) : undefined
   return s && t ? AbortSignal.any([s, t]) : (s ?? t)
 }
-const isAbort = (e: unknown, s?: AbortSignal) =>
-  !!s?.aborted || (e as { name?: string })?.name === 'AbortError'
+/** A caller abort is the caller's own signal firing, never the error's name: WebKit rejects a timed-out fetch with an AbortError too. */
+const isAbort = (s?: AbortSignal) => !!s?.aborted
 const fatal = (e: unknown) => e instanceof StacError && e.status < 500 && e.status !== 429
 
 interface Req {
@@ -80,7 +80,7 @@ async function fetchJson(req: Req, a: SearchArgs): Promise<Json> {
       last = new StacError(res.status)
       if (fatal(last)) throw last
     } catch (e) {
-      if (isAbort(e, a.signal) || fatal(e)) throw e
+      if (isAbort(a.signal) || fatal(e)) throw e
       last = e
     }
     a.signal?.throwIfAborted()
@@ -170,7 +170,7 @@ export async function searchSentinel2(a: SearchArgs): Promise<SearchResult> {
   try {
     return await searchEndpoint(config.stacUrl, 'sentinel-2-l2a', a, true)
   } catch (e) {
-    if (isAbort(e, a.signal) || fatal(e)) throw e
+    if (isAbort(a.signal) || fatal(e)) throw e
     return await searchEndpoint(config.pcStacUrl, 'pc:sentinel-2-l2a', a, false)
   }
 }
