@@ -7,6 +7,7 @@ import { copy } from '../../src/ui/copy.ts'
 // every width, and with no map (tier 0, from the override the app keeps in localStorage) it is only text.
 const FLAG = 'gs-stale-reload'
 const HOME_CHUNK = '**/assets/GlobeScreen-*.js'
+const HOME_FILE = /GlobeScreen-[\w-]+\.js/g
 const GONE = { status: 200, contentType: 'text/html', body: '<!doctype html><title>GrahSaboot</title>' }
 
 /** How many times the tab has loaded its page: 1 after the first load, 2 after one reload. */
@@ -40,8 +41,18 @@ test.beforeEach(async ({ page }) => {
 
 test('a page file a deploy deleted opens after one reload the tab does by itself', async ({ page }) => {
   const loads = pageLoads(page)
-  // Gone for the page as it was loaded; the reloaded page, as a new deploy would give it, finds the file.
-  await page.route(HOME_CHUNK, (route) => (loads.count < 2 ? route.fulfill(GONE) : route.continue()))
+  // A deploy changes the file's name. The page as it was loaded asks for the old name (its entry file is rewritten here to say so) and
+  // is answered as for a deleted file; the reloaded page, as the new deploy gives it, asks for the name the files have. One name
+  // answered "gone" and then "found" would not do: WebKit keeps the failed file in its memory cache and answers the reload from it.
+  await page.route('**/assets/index-*.js', async (route) => {
+    const response = await route.fetch()
+    const body = await response.text()
+    await route.fulfill({
+      response,
+      body: loads.count < 2 ? body.replace(HOME_FILE, 'GlobeScreen-old.js') : body,
+    })
+  })
+  await page.route('**/assets/GlobeScreen-old.js', (route) => route.fulfill(GONE))
   await page.goto('/limits')
   await expect(page.getByRole('heading', { level: 1, name: copy.pages.limits.title })).toBeVisible()
   expect(await flag(page)).toBeNull()
