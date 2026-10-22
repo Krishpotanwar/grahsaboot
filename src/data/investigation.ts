@@ -1,5 +1,6 @@
 import type { AoiInput } from '../geo/aoi.ts'
 import { LIMITS } from '../geo/limits.ts'
+import { realDate } from '../lib/dates.ts'
 
 export type NoteKind = 'change' | 'no_clear_change' | 'unsure'
 export interface Note {
@@ -78,9 +79,15 @@ export function newInvestigation(
     createdAt: iso(now),
     updatedAt: iso(now),
   }
-  // A known pair (a worked example's) is applied, and pinned, only when both are in order and inside the dates; otherwise it is dropped, never an error.
+  // A known pair (a worked example's) is applied, and pinned, only when both are real days, in order and inside the dates; otherwise it is dropped, never an error.
   const { before, after } = input
-  return before && after && before < after && before >= input.dateFrom && after <= input.dateTo
+  return before &&
+    after &&
+    realDate(before) &&
+    realDate(after) &&
+    before < after &&
+    before >= input.dateFrom &&
+    after <= input.dateTo
     ? setBeforeAfter(inv, before, after, now)
     : inv
 }

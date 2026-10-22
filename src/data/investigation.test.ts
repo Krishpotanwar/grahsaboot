@@ -90,6 +90,10 @@ describe('investigation model', () => {
     ['after the range ends', '2025-06-01', '2026-01-01'],
     ['only half given', '2025-06-01', null],
     ['not given', null, null],
+    // Each of these is in order and inside the range as text, so only the real-day check stops it (D11).
+    ['not a real day (30 February)', '2025-02-30', '2025-06-01'],
+    ['not a real day (31 November)', '2025-06-01', '2025-11-31'],
+    ['a real day with text after it', '2025-12-30junk', '2025-12-31'],
   ])('ignores a pair that is %s, and does not throw', (_why, before, after) => {
     const inv = newInvestigation(
       { name: 'x', aoi: AOI, dateFrom: '2025-01-01', dateTo: '2025-12-31', before, after },
@@ -97,6 +101,40 @@ describe('investigation model', () => {
       '00000000-0000-4000-8000-000000000001',
     )
     expect(inv).toMatchObject({ before: null, after: null, pinned: [] })
+  })
+  it('ignores a pair with a month 13, which would otherwise be stored and then break every page that shows the date', () => {
+    const inv = newInvestigation(
+      {
+        name: 'x',
+        aoi: AOI,
+        dateFrom: '2025-01-01',
+        dateTo: '2026-06-30', // '2025-13-01' is inside this range as text
+        before: '2025-06-01',
+        after: '2025-13-01',
+      },
+      T,
+      '00000000-0000-4000-8000-000000000001',
+    )
+    expect(inv).toMatchObject({ before: null, after: null, pinned: [] })
+  })
+  it('keeps a pair that holds a real leap day', () => {
+    const inv = newInvestigation(
+      {
+        name: 'x',
+        aoi: AOI,
+        dateFrom: '2024-01-01',
+        dateTo: '2024-12-31',
+        before: '2024-02-29',
+        after: '2024-03-01',
+      },
+      T,
+      '00000000-0000-4000-8000-000000000001',
+    )
+    expect(inv).toMatchObject({
+      before: '2024-02-29',
+      after: '2024-03-01',
+      pinned: ['2024-02-29', '2024-03-01'],
+    })
   })
   it('sets before/after in order and always pins them', () => {
     const inv = setBeforeAfter(base(), '2025-01-10', '2025-12-20', T)
