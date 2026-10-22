@@ -534,6 +534,8 @@ test('says it is still working after a while, inside the same line, and has no f
 })
 
 test('a switch whose code cannot be loaded leaves the outline step working, not blank', async ({ page }) => {
+  // A tab reloads once by itself when a page file will not load (src/main.tsx). This test is of the page that carries on, so that reload is spent already.
+  await page.addInitScript(() => sessionStorage.setItem('gs-stale-reload', '1'))
   await page.route('**/assets/ContextToggle-*.js', (route) => route.abort())
   await startAt(page, NAGPUR)
   test.skip(!(await hasWebgl2(page)), 'no WebGL2')

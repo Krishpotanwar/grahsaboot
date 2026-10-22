@@ -329,6 +329,8 @@ test('the report of an investigation that was never saved says what it always ha
 test('if the save control cannot be loaded, the workbench carries on with its plain status', async ({
   page,
 }) => {
+  // A tab reloads once by itself when a page file will not load (src/main.tsx). This test is of the page that carries on, so that reload is spent already.
+  await page.addInitScript(() => sessionStorage.setItem('gs-stale-reload', '1'))
   await page.route('**/assets/accounts-*.js', (route) => route.abort())
   await mockSupabase(page)
   await openFixtureSite(page)
