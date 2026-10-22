@@ -317,6 +317,7 @@ test("the report prints the note as the person's own words, escaped, and not as 
   await openFixtureSite(page)
   await waitForPhotos(page)
   await helper(page).click()
+  await expect(what(page)).toBeFocused() // the box takes the focus once the phrase is in it
   await page.keyboard.type('March 2023 <b>new</b> wall')
   await notesOf(page).getByRole('button', { name: flow.notes.add }).click()
   await expect(notesOf(page).getByRole('listitem')).toContainText('Street View, March 2023 <b>new</b> wall')

@@ -1,5 +1,4 @@
 import { memo, useEffect, useRef, useState } from 'react'
-import { flushSync } from 'react-dom'
 import {
   addNote,
   removeNote,
@@ -60,14 +59,11 @@ export const NotesPanel = memo(function NotesPanel({ inv, parts, current, update
   })
 
   // The ground-note helper: the text with "Street View, " added, or null when that would pass the cap (the button is then off).
-  const bodyBox = useRef<HTMLTextAreaElement>(null)
   const withGround = withGroundNote(body)
   const startGroundNote = () => {
     if (withGround === null) return
-    // Committed first, so the caret can go after the phrase: the date is the next thing the person types.
-    flushSync(() => setBody(withGround))
-    bodyBox.current?.focus()
-    bodyBox.current?.setSelectionRange(withGround.length, withGround.length)
+    setBody(withGround)
+    focusNext.current = 'note-body' // the date is the next thing typed: the effect above focuses the box once the text is in it
   }
 
   const add = () => {
@@ -114,7 +110,6 @@ export const NotesPanel = memo(function NotesPanel({ inv, parts, current, update
             {flow.notes.what}
           </label>
           <textarea
-            ref={bodyBox}
             id="note-body"
             value={body}
             maxLength={LIMITS.notes.maxChars}
