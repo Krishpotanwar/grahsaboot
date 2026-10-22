@@ -27,10 +27,10 @@ export interface ImageryClient {
   /**
    * The change rule (src/evidence/change.ts) on two display pictures.
    *
-   * The request is posted by structured clone, a copy (about 0.8 ms at 400 by 400), and nothing is transferred (ruling R42,
-   * which replaced the transfer of D14): `req.first.rgba`, `req.last.rgba`, `req.first.invalid`, `req.last.invalid` and
-   * `req.inside` are left exactly as they were. A caller can keep showing a picture, hold its pinned pair, or send the same
-   * arrays again, without copying them first.
+   * The request is posted by structured clone, a copy, and nothing is transferred (ruling R42, which replaced the transfer of
+   * D14): `req.first.rgba`, `req.last.rgba`, `req.first.invalid`, `req.last.invalid` and `req.inside` are left exactly as they
+   * were. A caller can keep showing a picture, hold its pinned pair, or send the same arrays again, without copying them first.
+   * The copy took about 0.3 ms at 400 by 400 and about 3 ms at 1024 by 1024 (Node, a busy Mac; F15 measures a phone).
    */
   change(req: ChangeRequest, signal?: AbortSignal): Promise<ChangeResult>
   dispose(): void
