@@ -27,6 +27,14 @@ describe('copy', () => {
     for (const host of ['OpenFreeMap', 'NASA GIBS', 'AWS']) expect(text, host).toContain(host)
     expect(text).toContain('IP address')
   })
+  it('tells the privacy page that a click on a Look closer link sends the place to Google, and that nothing goes before one', () => {
+    const privacy = copy.pages.privacy.items.join(' ')
+    expect(privacy).toContain('Look closer links')
+    expect(privacy).toContain('Nothing is sent to Google until you click one.')
+    expect(privacy).toContain(
+      'A click sends the middle of your outline, as latitude and longitude, to Google',
+    )
+  })
   it('credits Sentinel data once per year shown, oldest first', () => {
     expect(copy.attribution.sentinelYears([2025])).toBe('Contains modified Copernicus Sentinel data 2025')
     expect(copy.attribution.sentinelYears([2025, 2018, 2025])).toBe(
@@ -188,14 +196,6 @@ describe('the satellite view words', () => {
     expect(privacy).toContain('Earth Search')
     expect(privacy).toContain('Planetary Computer')
     expect(privacy).toContain('by itself when you left it on last time') // a remembered choice starts it
-  })
-  it('tells the privacy page that a click on a Look closer link sends the place to Google, and that nothing goes before one', () => {
-    const privacy = copy.pages.privacy.items.join(' ')
-    expect(privacy).toContain('Look closer links')
-    expect(privacy).toContain('Nothing is sent to Google until you click one.')
-    expect(privacy).toContain(
-      'A click sends the middle of your outline, as latitude and longitude, to Google',
-    )
   })
   it('calls a cloudy photo the clearest one checked, not the clearest of all recent photos (at most three are checked)', () => {
     expect(flow.context.cloudy(62)).toContain('the clearest photo we checked')

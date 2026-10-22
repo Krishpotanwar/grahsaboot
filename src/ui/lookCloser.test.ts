@@ -59,7 +59,7 @@ describe('the Look-closer links', () => {
     expect(links?.earth).toBe(earthUrl(21.1458, 79.0882))
   })
 
-  it("for a road, the box is the line's box widened evenly, so its middle is the road's middle", () => {
+  it("for a road, takes the middle of the summary's box: its line's box widened evenly, which for this straight two-point road is its midpoint", () => {
     const road = summarizeAoi({
       kind: 'road',
       geometry: {
