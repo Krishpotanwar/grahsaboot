@@ -173,6 +173,20 @@ describe('pickSeason: the count, the tie-breaks and the grid', () => {
     expect(season.cluster).toHaveLength(2)
   })
 
+  it('does not count a scene 21 days from the target day: two scenes 41 days apart never share a cluster', () => {
+    // 21 Jan and 3 Mar are 41 days apart, so no target day is within 20 days of both (11 Feb is 21 from the first)
+    const season = pickSeason([scene('2026-01-21', 5), scene('2026-03-03', 5)], NOW)!
+    expect(dates(season.cluster)).toEqual(['2026-03-03']) // two equal clusters of one: the later target day wins
+  })
+
+  it('can target the day of now itself: scenes 3, 8, 13 and 18 days old all fit in its window', () => {
+    // every target from now back to 20 days before it holds all four, and a tie goes to the latest: 20 Aug, not 15 Aug
+    const recent = [3, 8, 13, 18].map((days) => scene(add('2026-08-20', -days), 5))
+    const season = pickSeason(recent, NOW)!
+    expect(season.monthDay).toBe('08-20')
+    expect(season.cluster).toHaveLength(4)
+  })
+
   it('only ever targets the 5-day grid that counts back from now', () => {
     // Nine scenes centred on 13 Feb, which is not on the grid: 11 Feb and 16 Feb each hold 8, and the later wins
     const centred = every('2026-01-24', '2026-03-05', 5, 5)
