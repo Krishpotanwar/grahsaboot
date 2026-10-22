@@ -28,9 +28,11 @@ function download(name: string, type: string, body: string) {
 }
 
 /**
- * How long the report waits for the change rule. The rule runs in tens of milliseconds in the worker (58 ms on a 1024 by 1024 grid in
- * Node), so a wait this long means a worker that is stuck or dead: the report is built without its "What we measured" block rather
- * than keep the person waiting for the imagery client's own limit, 120 s (src/workers/imagery-client.ts).
+ * How long the report waits for the change rule. On a 1024 by 1024 grid the rule takes about 70 ms (69 ms in Node, 59 ms from the
+ * post to the answer in Chromium in T3's run, 73 ms in tests/e2e/report.spec.ts), so a wait this long means a worker that is stuck or
+ * dead: the report is built without its "What we measured" block rather than keep the person waiting for the imagery client's own
+ * limit, 120 s (src/workers/imagery-client.ts). A phone is not measured (F15). A shorter bound would risk losing the block on a slow
+ * one and gain nothing, because the wait costs the person time only when the worker is dead.
  */
 export const MEASURE_DEADLINE_MS = 10_000
 
