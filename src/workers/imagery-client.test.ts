@@ -146,7 +146,7 @@ describe('imagery client', () => {
 })
 
 describe('imagery client: the change request', () => {
-  // A worker that does what the platform does with a transfer list: the buffers listed leave the sender, the rest is copied.
+  // A worker that does what the platform does: a transfer list moves the buffers it lists, the rest of the message is cloned.
   class CloningWorker extends FakeWorker {
     received: any[] = []
     transfers: Array<Transferable[] | undefined> = []
@@ -181,64 +181,26 @@ describe('imagery client: the change request', () => {
       vi.unstubAllGlobals()
     }
   })
-  // The contract of `change` (ruling R36, plan D14): the arrays the caller passes are DETACHED by the call, so callers pass copies.
-  it('detaches the arrays it is given: the worker has the data and the caller has empty arrays', async () => {
+  // The contract of `change` (ruling R42, which replaced R36's transfer): the request is cloned, the caller's arrays are untouched.
+  it('leaves the arrays it is given as they were, and they can be sent again', async () => {
     const w = new CloningWorker()
+    const c = createImageryClient(() => w)
     const r = changeReq()
     const arrays = [r.first.rgba, r.last.rgba, r.first.invalid, r.last.invalid, r.inside]
-    const buffers = arrays.map((a) => a.buffer)
-    await createImageryClient(() => w).change(r)
-    expect(w.transfers[0]).toEqual(buffers)
-    for (const a of arrays) {
-      expect(a).toHaveLength(0)
-      expect(a.byteLength).toBe(0)
-      expect(a.buffer.byteLength).toBe(0)
-    }
-    expect([...w.received[0].req.first.rgba]).toEqual(Array.from({ length: 16 }, (_, i) => i))
-    expect([...w.received[0].req.inside]).toEqual([1, 1, 1, 0])
-  })
-  it('fails loudly, rather than compare empty pictures, when it is given arrays it already took', async () => {
-    const c = createImageryClient(() => new CloningWorker())
-    const r = changeReq()
+    const before = arrays.map((a) => [...a])
     await c.change(r)
-    await expect(c.change(r)).rejects.toMatchObject({ name: 'DataCloneError' })
-  })
-  it('detaches nothing of a request it refuses before posting', async () => {
-    const r = changeReq()
-    await expect(
-      createImageryClient(() => new CloningWorker()).change(r, AbortSignal.abort()),
-    ).rejects.toThrow()
-    expect(r.first.rgba).toHaveLength(16)
-    expect(r.inside).toHaveLength(4)
-  })
-  it('lists a buffer once, and copies a view of part of a larger buffer instead of detaching it', async () => {
-    const w = new CloningWorker()
-    const r = changeReq()
-    const shared = new Uint8ClampedArray(16)
-    const big = new ArrayBuffer(32)
-    const part = new Uint8Array(big, 8, 4).fill(1)
-    await createImageryClient(() => w).change({
-      first: { rgba: shared },
-      last: { rgba: shared },
-      grid: r.grid,
-      inside: part,
+    expect(w.transfers[0]).toBeUndefined() // no transfer list
+    arrays.forEach((a, i) => {
+      expect(a).toHaveLength(before[i]!.length) // same length
+      expect(a.buffer.byteLength).toBe(before[i]!.length) // not detached: still the whole buffer
+      expect([...a]).toEqual(before[i]) // same bytes
     })
-    expect(w.transfers[0]).toEqual([shared.buffer])
-    expect(big.byteLength).toBe(32)
-    expect([...w.received[0].req.inside]).toEqual([1, 1, 1, 1])
-  })
-  it('rejects, rather than throws, for a request it cannot hand over, and leaves no timer or listener behind', async () => {
-    vi.useFakeTimers()
-    try {
-      const ac = new AbortController()
-      const bad = { first: undefined, last: undefined, grid: {} } as any
-      const p = createImageryClient(() => new FakeWorker()).change(bad, ac.signal)
-      await expect(p).rejects.toBeInstanceOf(TypeError)
-      expect(vi.getTimerCount()).toBe(0)
-      expect(held(ac.signal)).toBe(0)
-    } finally {
-      vi.useRealTimers()
-    }
+    // the worker was given copies of its own, with the same bytes
+    expect(w.received[0].req.first.rgba).not.toBe(r.first.rgba)
+    expect([...w.received[0].req.first.rgba]).toEqual(before[0])
+    expect([...w.received[0].req.inside]).toEqual(before[4])
+    await expect(c.change(r)).resolves.toEqual({ state: 'nothing' }) // the same arrays go again
+    expect(w.received).toHaveLength(2)
   })
   it('rejects with the worker error', async () => {
     const w = new FakeWorker()

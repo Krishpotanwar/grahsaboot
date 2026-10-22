@@ -17,7 +17,7 @@ export type WorkerRequest =
 export interface WorkerLike {
   onmessage: ((e: MessageEvent) => void) | null
   onerror?: ((e: unknown) => void) | null
-  postMessage(msg: unknown, transfer?: Transferable[]): void
+  postMessage(msg: unknown): void
   terminate(): void
 }
 
@@ -27,29 +27,16 @@ export interface ImageryClient {
   /**
    * The change rule (src/evidence/change.ts) on two display pictures.
    *
-   * This call DETACHES the buffers it is given (plan D14, ruling R36): `req.first.rgba`, `req.last.rgba`, `req.first.invalid`,
-   * `req.last.invalid` and `req.inside` are transferred to the worker, not copied, so once the request is posted they are empty
-   * (length 0) in the caller, and passing the same arrays again rejects with a DataCloneError. Callers MUST pass copies of
-   * every array they still need afterwards, for example `rgba.slice()` of a picture the player shows again. A typed array that
-   * is only a view of part of a larger buffer is copied instead and detaches nothing; so does a call refused before it is
-   * posted (an aborted signal, a disposed client).
+   * The request is posted by structured clone, a copy (about 0.8 ms at 400 by 400), and nothing is transferred (ruling R42,
+   * which replaced the transfer of D14): `req.first.rgba`, `req.last.rgba`, `req.first.invalid`, `req.last.invalid` and
+   * `req.inside` are left exactly as they were. A caller can keep showing a picture, hold its pinned pair, or send the same
+   * arrays again, without copying them first.
    */
   change(req: ChangeRequest, signal?: AbortSignal): Promise<ChangeResult>
   dispose(): void
 }
 
 const abortError = () => new DOMException('Aborted', 'AbortError')
-
-/** The buffers of a change request the worker may take: whole buffers only, each once (a repeat would fail the whole message). */
-function handOver({ first, last, inside }: ChangeRequest): ArrayBuffer[] {
-  const whole = [first.rgba, last.rgba, first.invalid, last.invalid, inside].flatMap((a) =>
-    a && a.buffer instanceof ArrayBuffer && a.byteOffset === 0 && a.byteLength === a.buffer.byteLength
-      ? [a.buffer]
-      : [],
-  )
-  return [...new Set(whole)]
-}
-
 /**
  * Longest a request may wait: a stalled network or a silent worker ends in TimeoutError, never a spinner.
  * ponytail: total time, not stall time (geotiff reports no progress); a 4.7 MB road frame still fits at 40 KB/s.
@@ -125,7 +112,7 @@ export function createImageryClient(
           : Promise.resolve(req)
       ready
         .then((r) => {
-          if (pending.has(id)) worker.postMessage({ id, op, req: r }, 'first' in r ? handOver(r) : [])
+          if (pending.has(id)) worker.postMessage({ id, op, req: r })
         })
         .catch((e) => {
           pending.delete(id)
