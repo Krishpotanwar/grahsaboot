@@ -1,15 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { realDate } from '../lib/dates.ts'
 import { SCENE_ID } from '../stac/search.ts'
-import {
-  decodeShare,
-  encodeShare,
-  MAX_FRAMES,
-  SIDE,
-  type Share,
-  type ShareNotice,
-  type ShareRead,
-} from './share.ts'
+import { decodeShare, encodeShare, MAX_FRAMES, SIDE, type Share, type ShareRead } from './share.ts'
 
 // An address is text anyone can edit, so most of this file is bad text. `today` is fixed: no test depends on the day it runs.
 const TODAY = new Date('2026-10-22T09:00:00Z')
@@ -49,6 +41,14 @@ const deepFreeze = <T>(x: T): T => {
   }
   return x
 }
+
+describe('what a read can say', () => {
+  it('is never date-fallback, by type as well as by value: only rebuildFrames can say it', () => {
+    // @ts-expect-error a read has no such code: the compiler tells the page that only the rebuild says date-fallback
+    const impossible: ShareRead['notices'][number] = 'date-fallback'
+    expect(decodeShare(LINK, TODAY).notices).not.toContain(impossible)
+  })
+})
 
 describe('the limits it exports', () => {
   it("are the brief's: a size from 500 to 2900 and at most 8 frames", () => {
@@ -606,7 +606,7 @@ describe('decodeShare on random text', () => {
   ]
   const KEYS = ['name', 'notes', 'claim', 'token', '__proto__', 'constructor', 'x', 'v', 'lat', 'd', 's', '']
 
-  const codes: ShareNotice[] = ['unknown-version', 'unreadable', 'missing-frame'] // never date-fallback: only rebuildFrames says it
+  const codes: ShareRead['notices'][number][] = ['unknown-version', 'unreadable', 'missing-frame'] // never date-fallback: only rebuildFrames says it
   /** What a read must always satisfy, whatever the text was. */
   function check(read: ShareRead, text: string): void {
     for (const n of read.notices) expect(codes, text).toContain(n)

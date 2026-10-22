@@ -142,12 +142,6 @@ describe('rebuildFrames', () => {
       const cat = catalogue([])
       expect(await rebuildFrames([{ date: A.date, id: null }], cat)).toEqual(result([], ['missing-frame']))
     })
-
-    it('gives nothing, and says missing-frame, when every frame is lost: the page offers a retry', async () => {
-      expect(await rebuildFrames(frames(A, B), { byId: down, byDate: down })).toEqual(
-        result([], ['missing-frame'], 2),
-      )
-    })
   })
 
   describe('a lookup that threw, against a clean answer of none', () => {
@@ -170,9 +164,15 @@ describe('rebuildFrames', () => {
       expect(out).toEqual(result([], ['missing-frame'], 1))
     })
 
-    it('does not count a lookup by id that threw when the day search answers: its clean "none" stands', async () => {
+    it('counts a frame lost after a lookup by id that threw, though the day search says none: the catalogue that named the scene was not reached', async () => {
       const out = await rebuildFrames(frames(A, B), { byId: down, byDate: async () => null })
-      expect(out).toEqual(result([], ['missing-frame'], 0))
+      expect(out).toEqual(result([], ['missing-frame'], 2))
+    })
+
+    it('counts only the frames that had a lookup throw, not those whose answers were all clean', async () => {
+      const byId = vi.fn(async (id: string) => (id === A.id ? down() : null)) // A: the lookup threw; B: the catalogue has no such scene
+      const out = await rebuildFrames(frames(A, B), { byId, byDate: async () => null })
+      expect(out).toEqual(result([], ['missing-frame'], 1))
     })
 
     it('does not count a frame that was found, whatever failed on the way', async () => {
@@ -420,14 +420,15 @@ describe('a share link rebuilt through decodeShare and the real getItemById', ()
     )
   })
 
-  it('counts every frame as failed, not as missing for want of a scene, when nothing answers at all', async () => {
+  it('counts every frame as failed when the lookups by id fail and the day search then says none: Earth Search was not reached', async () => {
     const fetchImpl = vi.fn(async () => json({}, 503))
     const read = decodeShare(link, TODAY)
     const out = await rebuildFrames(read.share!.frames, {
       byId: (id) => getItemById(id, { fetchImpl, sleep: async () => {} }),
-      byDate: down,
+      byDate: async () => null, // the day search, answered by the other catalogue, finds nothing: it says nothing of Earth Search
     })
     expect(out).toEqual(result([], ['missing-frame'], 3))
+    expect(fetchImpl).toHaveBeenCalledTimes(9)
   })
 
   it('still ends at once on a caller abort in the middle of a lookup: no day is asked', async () => {

@@ -41,10 +41,13 @@ export interface Share {
  *   before the lookups have answered, so a frame with no scene id is not a notice here.
  */
 export type ShareNotice = 'unknown-version' | 'unreadable' | 'missing-frame' | 'date-fallback'
-/** `share` is null for a link that cannot be opened; with no notice either, the address held no share link at all (no `v`). */
+/**
+ * `share` is null for a link that cannot be opened; with no notice either, the address held no share link at all (no `v`). A read
+ * never says `date-fallback`, which only `rebuildFrames` can: the type says so too.
+ */
 export interface ShareRead {
   share: Share | null
-  notices: readonly ShareNotice[]
+  notices: readonly Exclude<ShareNotice, 'date-fallback'>[]
 }
 
 const clamp = (x: number, lo: number, hi: number) => Math.min(Math.max(x, lo), hi)

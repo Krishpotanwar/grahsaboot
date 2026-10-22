@@ -3,8 +3,9 @@ import type { ShareFrame, ShareNotice } from './share.ts'
 
 // The date fallback of a share link: the frames `decodeShare` read, turned into scenes. A frame is asked for by the id the link names;
 // a miss, a failed lookup, or a frame that has no id (an old link that named days only, or one made on the other catalogue, whose
-// ids a link cannot carry) is asked for by its day instead, and says so. Pure: the two lookups are the caller's (`getItemById` in
-// src/stac/search.ts, and a one-day search) and there is no text: a notice is a code, and the page says it.
+// ids a link cannot carry) is asked for by its day instead, and says so unless the day's scene is the very one named. Pure: the two
+// lookups are the caller's (`getItemById` in src/stac/search.ts, and a one-day search) and there is no text: a notice is a code, and
+// the page says it.
 
 export interface Lookups {
   /** The scene with this id, or null when there is none (`getItemById`). */
@@ -32,8 +33,9 @@ export interface Rebuilt {
    */
   notices: readonly ShareNotice[]
   /**
-   * How many of the frames without a scene lost it to a day search that threw (offline, a failing catalogue), not to a clean answer
-   * of none. They are in `missing-frame` too; the page words the two apart, and offers a retry for these.
+   * How many of the frames without a scene had a lookup that threw (offline, a failing catalogue), by id or by day, as against clean
+   * answers of none only. The day search that says none after Earth Search failed says nothing of Earth Search's holdings: it falls
+   * back to the other catalogue. They are in `missing-frame` too; the page words the two apart, and offers a retry for these.
    */
   failed: number
 }
@@ -43,6 +45,7 @@ interface Answer {
   item: S2Item | null
   failed: boolean
 }
+const NO_ANSWER: Answer = { item: null, failed: false } // for a frame that named no scene: nothing was asked by id
 
 /** An answer. A failed lookup is a miss that says it failed, unless the caller has gone: that no lookup may hide. */
 async function ask(lookup: () => Promise<S2Item | null>, signal?: AbortSignal): Promise<Answer> {
@@ -68,14 +71,20 @@ export async function rebuildFrames(
   { byId, byDate, signal }: Lookups,
 ): Promise<Rebuilt> {
   const one = async ({ date, id }: ShareFrame): Promise<{ frame: RebuiltFrame | null; failed: boolean }> => {
-    // A lookup by id that threw only sends the frame to its day: the day search decides if the frame is lost, and why.
-    const named = id === null ? null : (await ask(() => byId(id), signal)).item
+    const first = id === null ? NO_ANSWER : await ask(() => byId(id), signal)
+    const named = first.item
     // Exact is the scene the link named, of the day it gave: any other answer is a miss, so a stand-in is never passed off as it.
     if (named?.id === id && named.date === date)
       return { frame: { date, item: named, exact: true }, failed: false }
-    const { item, failed } = await ask(() => byDate(date), signal)
-    // The day's scene may be the very one named (the lookup by id failed, say): it is exact then, and no fallback.
-    return { frame: item && { date, item, exact: item.id === id }, failed }
+    // A lookup by id that threw only sends the frame to its day, which may find it, and then it is exact if it is the very scene named.
+    const day = await ask(() => byDate(date), signal)
+    const item = day.item
+    // A frame that is lost is failed if either lookup threw: a day search that says none after Earth Search failed was most likely
+    // answered by the other catalogue, so its none says nothing of the catalogue that named the scene.
+    return {
+      frame: item && { date, item, exact: item.id === id },
+      failed: !item && (first.failed || day.failed),
+    }
   }
   const found = await Promise.all(frames.map(one))
   const kept = found.flatMap((f) => (f.frame ? [f.frame] : []))
