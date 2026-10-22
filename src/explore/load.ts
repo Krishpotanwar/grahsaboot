@@ -203,7 +203,11 @@ function gridFor(square: Bbox): DisplayGrid | null {
     : makeDisplayGrid(square, Math.round((DISPLAY_PER_NATIVE * metres) / NATIVE_M), 0)
 }
 
-/** The best scene of each day in a range, with whether it holds the whole square. */
+/**
+ * The best scene of each day in a range, with whether it holds the whole square.
+ * shortcut: `limited` (the search ran out of pages) is not looked at, as in the satellite view; a 41-day window is about one page and
+ * the 12-month one about three of five, so look at it only if a place with many overlapping tiles shows scenes missing.
+ */
 async function scenesIn(c: Ctx, s: Scope, from: string, to: string): Promise<DateCandidate[]> {
   const found = await s.run(() => c.deps.search({ bbox: c.bbox, from, to, signal: s.signal }))
   return selectPerDate(found.items, c.corners)

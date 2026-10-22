@@ -44,9 +44,7 @@ const failed = (reason: string) => ({ ok: false, reason })
 /** The scenes of one year that were checked, in the order of the calls. */
 const checked = (w: World, year: number) => w.ids('quality').filter((id) => id.includes(`_${year}`))
 const timeout = (m: string) => Object.assign(new Error(m), { name: 'TimeoutError' })
-afterEach(() => {
-  vi.useRealTimers()
-})
+/** Holds the west half of the square only: it covers two corners and not the other two. */
 const HALF: LonLat[][] = [
   [
     [72.9, 18.8],
@@ -56,6 +54,10 @@ const HALF: LonLat[][] = [
     [72.9, 18.8],
   ],
 ]
+
+afterEach(() => {
+  vi.useRealTimers()
+})
 
 describe('loadTimeLapse: the last frame (the anchor)', () => {
   it('searches the last 12 months once, with the coarsened square and a signal, before anything else', async () => {
