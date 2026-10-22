@@ -189,6 +189,14 @@ describe('the satellite view words', () => {
     expect(privacy).toContain('Planetary Computer')
     expect(privacy).toContain('by itself when you left it on last time') // a remembered choice starts it
   })
+  it('tells the privacy page that a click on a Look closer link sends the place to Google, and that nothing goes before one', () => {
+    const privacy = copy.pages.privacy.items.join(' ')
+    expect(privacy).toContain('Look closer links')
+    expect(privacy).toContain('Nothing is sent to Google until you click one.')
+    expect(privacy).toContain(
+      'A click sends the middle of your outline, as latitude and longitude, to Google',
+    )
+  })
   it('calls a cloudy photo the clearest one checked, not the clearest of all recent photos (at most three are checked)', () => {
     expect(flow.context.cloudy(62)).toContain('the clearest photo we checked')
     expect(flow.context.cloudy(12)).not.toContain('clearest recent photo')

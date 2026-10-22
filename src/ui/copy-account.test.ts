@@ -4,8 +4,11 @@ import { account } from './copy-account.ts'
 import { flow } from './copy-flow.ts'
 import { copy } from './copy.ts'
 
-// The words of signing in are only for a build with accounts (copy-account.ts). The live pages say nothing about them.
-const SIGN_IN = /sign.?in|signed.?in|Google|your (whole )?account/i
+// The words of signing in are only for a build with accounts (copy-account.ts). The live pages say nothing about them. Google is
+// one of them as the way in, or as the owner of the person's name, email and profile; the Look closer line names it only as the
+// place a link opens.
+const SIGN_IN =
+  /sign.?in|signed.?in|Google (name|account|email|profile|identity|log.?in)|(with|via|using|through) Google|your (whole )?account/i
 
 describe('account copy', () => {
   it('leaves every sign-in word out of the live privacy and limits pages', () => {
@@ -14,6 +17,18 @@ describe('account copy', () => {
     // counter-case: the pattern does match the words moved to copy-account, and "without an account" stays allowed
     expect(account.privacyItems.join('\n')).toMatch(SIGN_IN)
     expect(copy.pages.privacy.items.join(' ')).toContain('without an account')
+    // Google as the way in is banned however it is put, and Google as the place a link opens is not
+    for (const t of [
+      'Sign in with Google',
+      'Log in via Google',
+      'Continue using Google',
+      'Authenticate through Google',
+      'Google login',
+      'your Google email',
+      'your Google profile',
+    ])
+      expect(t, t).toMatch(SIGN_IN)
+    expect('Nothing is sent to Google until you click one.').not.toMatch(SIGN_IN)
   })
 
   it('moves both sign-in privacy items to account.privacyItems, with how long each record is kept', () => {

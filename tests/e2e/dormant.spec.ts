@@ -16,7 +16,8 @@ const ACCOUNT_WORDS = [
 // src/lib/byte-cache.ts. A new key means a new thing the app stores, which an accounts build must not add to this one.
 const LOCAL_KEYS = ['gs-theme', 'gs-tier-override']
 const DATABASES = ['gs-investigations', 'gs-bytes']
-const SIGN_IN_TALK = /sign.?in|signed.?in|Google|your (whole )?account/i
+const SIGN_IN_TALK =
+  /sign.?in|signed.?in|Google (name|account|email|profile|identity|log.?in)|(with|via|using|through) Google|your (whole )?account/i
 
 /** Every URL the page and its workers request from now on. */
 function requests(page: Page) {

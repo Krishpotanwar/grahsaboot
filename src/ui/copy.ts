@@ -108,6 +108,7 @@ export const copy = {
         'Map tiles come from OpenFreeMap, NASA GIBS and AWS; those requests reveal your IP address and the area you are viewing.',
         'Satellite photos are read directly from public Sentinel-2 files on Amazon Web Services. Those requests reveal an approximate area, never your name or email.',
         'The optional satellite view in the outline step asks the Earth Search catalogue for recent photos of a coarse version of the area on your map (Planetary Computer is the fallback) and reads one of them from the same public files. It starts when you switch it on, or by itself when you left it on last time.',
+        'The Look closer links in the outline step and the workbench open Google Street View and Google Earth in a new tab. Nothing is sent to Google until you click one. A click sends the middle of your outline, as latitude and longitude, to Google; what Google does with it is set by its own privacy policy.',
         'Satellite positions come through our server from CelesTrak; nothing about you is sent.',
       ],
     },
