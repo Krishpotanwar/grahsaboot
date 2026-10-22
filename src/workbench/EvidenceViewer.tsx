@@ -8,7 +8,7 @@ import {
   Warning,
 } from '@phosphor-icons/react'
 import { animate } from 'motion/react'
-import { memo, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { FrameVerification } from '../data/investigation.ts'
 import { brightnessDiff } from '../evidence/diff.ts'
 import type { DisplayGrid, QualityStats } from '../evidence/types.ts'
@@ -18,7 +18,7 @@ import { copy } from '../ui/copy.ts'
 import { flow } from '../ui/copy-flow.ts'
 import { Button, QualityTag, Skeleton } from '../ui/kit.tsx'
 import type { FrameResult } from '../workers/imagery-core.ts'
-import { FrameCanvas } from './FrameCanvas.tsx'
+import { FrameCanvas, SharperFilter } from './FrameCanvas.tsx'
 import { outlinePath, pointAlong } from './overlay.ts'
 import { scaleBar } from './scale.ts'
 
@@ -174,12 +174,14 @@ function Photo({
   grid,
   aoi,
   marks,
+  sharper,
 }: {
   slot: NonNullable<Slot>
   role: string
   grid: DisplayGrid
   aoi: AoiInput | null
   marks: Marks | null
+  sharper: boolean
 }) {
   if (!slot.frame)
     return slot.failed ? <div className="h-full w-full bg-panel" /> : <Skeleton className="h-full w-full" />
@@ -194,6 +196,7 @@ function Photo({
           fmtDate(slot.date),
           slot.stats ? pct(slot.stats.clearFraction) : undefined,
         )}
+        sharper={sharper}
       />
       {aoi && <Outline aoi={aoi} grid={grid} marks={marks} />}
     </div>
@@ -270,6 +273,36 @@ function Waiting({
   )
 }
 
+/** An on/off switch of the viewer's row: a real checkbox in a label, only its look is a switch. The label's words are `children`. */
+function Switch({
+  checked,
+  disabled,
+  onChange,
+  children,
+}: {
+  checked: boolean
+  disabled: boolean
+  onChange: (on: boolean) => void
+  children: ReactNode
+}) {
+  return (
+    <label className="relative inline-flex h-11 cursor-pointer items-center gap-2 px-2 text-sm text-fg-2 hover:text-fg has-[:disabled]:cursor-default has-[:disabled]:opacity-60 has-[:disabled]:hover:text-fg-2">
+      <input
+        type="checkbox"
+        disabled={disabled}
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="peer absolute inset-0 h-full w-full cursor-pointer opacity-0 disabled:cursor-default"
+      />
+      <span
+        aria-hidden
+        className="relative h-[18px] w-[30px] shrink-0 rounded-full bg-control transition-colors before:absolute before:left-0.5 before:top-0.5 before:h-3.5 before:w-3.5 before:rounded-full before:bg-bg before:transition-transform peer-checked:bg-accent peer-checked:before:translate-x-3 peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent"
+      />
+      {children}
+    </label>
+  )
+}
+
 /**
  * Show map / Hide map: the viewer's row holds it; `Workbench` puts it alone where there is no viewer. The label says what
  * pressing does, so it is not also a toggle button (a screen reader would say the state twice).
@@ -302,6 +335,9 @@ interface ViewerProps {
   /** The map tool in the tool row: the open state and its toggle, which exists only where there is a map. Stable between slider steps. */
   mapOpen: boolean
   onToggleMap?: () => void
+  /** The "Sharper" viewing aid: on or off, and its switch in the tool row, which exists only where there is a handler. Stable between slider steps. */
+  sharper?: boolean
+  onSharper?: (on: boolean) => void
   onRetry: (date: string) => void
 }
 
@@ -315,6 +351,8 @@ function EvidenceViewerBody({
   searching,
   mapOpen,
   onToggleMap,
+  sharper = false,
+  onSharper,
   onRetry,
 }: ViewerProps) {
   const [mode, setMode] = useState<Mode>(() => (matchMedia('(max-width: 599px)').matches ? 'side' : 'swipe'))
@@ -354,6 +392,7 @@ function EvidenceViewerBody({
 
   return (
     <div className="grid gap-3">
+      {sharper && <SharperFilter />}
       <div className="flex flex-wrap items-center justify-between gap-x-3">
         {/* Real radios in one group (arrow keys move between them); only their look is a row of tabs. */}
         <fieldset disabled={!before || !after} className="flex min-w-0 items-center gap-0.5 sm:gap-1">
@@ -380,20 +419,16 @@ function EvidenceViewerBody({
           })}
         </fieldset>
         <div className="ml-auto flex flex-wrap items-center gap-x-1">
-          <label className="relative inline-flex h-11 cursor-pointer items-center gap-2 px-2 text-sm text-fg-2 hover:text-fg has-[:disabled]:cursor-default has-[:disabled]:opacity-60 has-[:disabled]:hover:text-fg-2">
-            <input
-              type="checkbox"
-              disabled={!before || !after}
-              checked={showOutline}
-              onChange={(e) => setShowOutline(e.target.checked)}
-              className="peer absolute inset-0 h-full w-full cursor-pointer opacity-0 disabled:cursor-default"
-            />
-            <span
-              aria-hidden
-              className="relative h-[18px] w-[30px] shrink-0 rounded-full bg-control transition-colors before:absolute before:left-0.5 before:top-0.5 before:h-3.5 before:w-3.5 before:rounded-full before:bg-bg before:transition-transform peer-checked:bg-accent peer-checked:before:translate-x-3 peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent"
-            />
+          <Switch checked={showOutline} disabled={!before || !after} onChange={setShowOutline}>
             {flow.workbench.outlineToggle}
-          </label>
+          </Switch>
+          {onSharper && (
+            <Switch checked={sharper} disabled={!before || !after} onChange={onSharper}>
+              {flow.sharper.label}
+              {/* What a screen reader says of it; the sentence is on show under the photos while it is on. */}
+              <span className="sr-only">{`: ${flow.sharper.aid}`}</span>
+            </Switch>
+          )}
           {onToggleMap && <MapTool open={mapOpen} onToggle={onToggleMap} />}
         </div>
       </div>
@@ -422,10 +457,24 @@ function EvidenceViewerBody({
             <div className="relative select-none" style={aspect}>
               <div className="absolute inset-0 overflow-hidden border border-line">
                 <div className="absolute inset-0">
-                  <Photo slot={before} role={flow.workbench.before} grid={grid} aoi={outline} marks={marks} />
+                  <Photo
+                    slot={before}
+                    role={flow.workbench.before}
+                    grid={grid}
+                    aoi={outline}
+                    marks={marks}
+                    sharper={sharper}
+                  />
                 </div>
                 <div className="absolute inset-0" style={{ clipPath: `inset(0 0 0 ${pos}%)` }}>
-                  <Photo slot={after} role={flow.workbench.after} grid={grid} aoi={outline} marks={marks} />
+                  <Photo
+                    slot={after}
+                    role={flow.workbench.after}
+                    grid={grid}
+                    aoi={outline}
+                    marks={marks}
+                    sharper={sharper}
+                  />
                 </div>
               </div>
               <Chrome
@@ -480,7 +529,7 @@ function EvidenceViewerBody({
                 <figure key={role} className="grid gap-2">
                   <div className={BOX} style={aspect}>
                     <div className="absolute inset-0">
-                      <Photo slot={s} role={role} grid={grid} aoi={outline} marks={marks} />
+                      <Photo slot={s} role={role} grid={grid} aoi={outline} marks={marks} sharper={sharper} />
                     </div>
                     <Chrome
                       grid={grid}
@@ -500,7 +549,14 @@ function EvidenceViewerBody({
             <figure className="grid gap-2">
               <div className={BOX} style={aspect}>
                 <div className="absolute inset-0 opacity-50">
-                  <Photo slot={before} role={flow.workbench.before} grid={grid} aoi={null} marks={null} />
+                  <Photo
+                    slot={before}
+                    role={flow.workbench.before}
+                    grid={grid}
+                    aoi={null}
+                    marks={null}
+                    sharper={sharper}
+                  />
                 </div>
                 {diff && (
                   <div className="absolute inset-0">
@@ -525,6 +581,7 @@ function EvidenceViewerBody({
               <Caption slot={after} right />
             </div>
           )}
+          {sharper && <p className="text-sm text-fg-2">{flow.sharper.note}</p>}
           {/* Its place is kept before the photos are in, so nothing below it moves when they arrive. */}
           <p className="min-h-5 text-sm text-fg-2">
             {years.length > 0 && copy.attribution.sentinelYears(years)}

@@ -12,6 +12,7 @@ const other = { width: 2, height: 2, other: true } as unknown as ImageData
 function fakeMap(layers: string[] = []) {
   const sources = new Map<string, unknown>()
   const calls: string[] = []
+  const specs: Array<{ id: string; paint?: Record<string, unknown> }> = []
   const map = {
     getSource: (id: string) =>
       sources.has(id)
@@ -19,14 +20,15 @@ function fakeMap(layers: string[] = []) {
         : undefined,
     addSource: (id: string, spec: unknown) => (calls.push('addSource'), sources.set(id, spec)),
     getLayer: (id: string) => (layers.includes(id) ? { id } : undefined),
-    addLayer: (layer: { id: string }, before?: string) => {
+    addLayer: (layer: { id: string; paint?: Record<string, unknown> }, before?: string) => {
       calls.push('addLayer')
+      specs.push(layer)
       layers.splice(before ? layers.indexOf(before) : layers.length, 0, layer.id)
     },
     removeLayer: (id: string) => layers.splice(layers.indexOf(id), 1),
     removeSource: (id: string) => sources.delete(id),
   }
-  return { map: map as unknown as MlMap, layers, sources, calls }
+  return { map: map as unknown as MlMap, layers, sources, calls, specs }
 }
 
 describe('setFrameLayer', () => {
@@ -59,5 +61,38 @@ describe('setFrameLayer', () => {
     expect(m.layers).toEqual(['bg'])
     expect(m.sources.has('gs-frame')).toBe(false)
     expect(() => removeFrameLayer(m.map)).not.toThrow()
+  })
+
+  it('draws the photo plain by default: no fade, and nothing that changes its colours or how it is resampled', () => {
+    const m = fakeMap()
+    setFrameLayer(m.map, image, grid)
+    setFrameLayer(m.map, null, grid)
+    setFrameLayer(m.map, image, grid, false)
+    expect(m.specs.map((s) => s.paint)).toEqual([
+      { 'raster-fade-duration': 0 },
+      { 'raster-fade-duration': 0 },
+    ])
+  })
+
+  it('with the viewing aid on, stretches the photo with a contrast on the layer, and sets no resampling key', () => {
+    const m = fakeMap(['bg', 'gs-aoi-fill'])
+    setFrameLayer(m.map, image, grid, true)
+    const paint = m.specs[0]!.paint!
+    expect(paint['raster-fade-duration']).toBe(0)
+    expect(paint['raster-contrast']).toBeGreaterThan(0)
+    expect(paint['raster-contrast']).toBeLessThanOrEqual(1) // the range MapLibre allows for the key
+    // No crisp squares: the display grid is 3 to 4 times the 10 m pixels, so nearest would draw 2 to 3 m stair-steps. And MapLibre
+    // 6.12 refuses a raster layer that sets both `resampling` and `raster-resampling`, so no key of that kind is set at all.
+    expect(Object.keys(paint).filter((k) => /resampling/.test(k))).toEqual([])
+    // the same layer, in the same place, under the outline
+    expect(m.layers).toEqual(['bg', 'gs-frame', 'gs-aoi-fill'])
+  })
+
+  it('follows the viewing aid each time the layer is put up (Workbench puts it up again when the switch changes)', () => {
+    const m = fakeMap()
+    setFrameLayer(m.map, image, grid, true)
+    removeFrameLayer(m.map)
+    setFrameLayer(m.map, image, grid, false)
+    expect(m.specs.map((s) => s.paint?.['raster-contrast'] !== undefined)).toEqual([true, false])
   })
 })

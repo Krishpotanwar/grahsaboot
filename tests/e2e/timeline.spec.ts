@@ -391,9 +391,10 @@ test('the slider is out of sight but is still the keyboard stop, and the barcode
   const barcode = s.locator('xpath=following-sibling::div[1]')
   await expect(barcode).toHaveCSS('outline-style', 'none')
   // Reached with Tab, as a keyboard user does (a focus() from a script is not "focus-visible" in every engine): from the
-  // outline switch, past the swipe slider where there is one (a phone starts in side by side).
+  // outline switch, past the Sharper switch, the map tool and the swipe slider where there are ones (a phone starts in side by
+  // side; a page with a map has all four stops, so up to four presses).
   await page.getByRole('checkbox', { name: flow.workbench.outlineToggle }).focus()
-  for (let i = 0; i < 3 && !(await s.evaluate((el) => el === document.activeElement)); i++)
+  for (let i = 0; i < 4 && !(await s.evaluate((el) => el === document.activeElement)); i++)
     await page.keyboard.press(tabKey(page))
   await expect(s).toBeFocused()
   await page.keyboard.press('ArrowLeft')

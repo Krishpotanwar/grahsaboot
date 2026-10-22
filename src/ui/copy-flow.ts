@@ -252,6 +252,14 @@ export const flow = {
     save: 'Save claim',
     remove: 'Remove claim',
   },
+  // The "Sharper" switch of the viewer (src/workbench/EvidenceViewer.tsx): a viewing aid that shows the same pixels with a little
+  // more contrast and a light unsharp mask. `aid` is the plan's wording, which the switch says to a screen reader; `note` is on
+  // show under the photos while it is on. Nothing of it reaches the report.
+  sharper: {
+    label: 'Sharper',
+    aid: 'viewing aid: the same pixels, shown more clearly',
+    note: 'Sharper is a viewing aid: the same pixels, shown more clearly.',
+  },
   report: {
     title: 'Evidence report',
     preparing: 'Preparing the report',

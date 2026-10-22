@@ -78,6 +78,9 @@ export default function Workbench({ id }: { id: string }) {
   }, [error, toast])
   const { map, tier, layout, stage, installLayers } = useMapStage()
   const [mapOpen, setMapOpen] = useState(false)
+  // The "Sharper" viewing aid, one switch for the viewer's photos and the map's photo. Off at every visit and kept nowhere, so
+  // nothing but the screen ever sees it: the report builds its pictures from the pixels.
+  const [sharper, setSharper] = useState(false)
   // One identity for the life of the page: the viewer is memoised and must not render again for a slider step.
   const toggleMap = useCallback(() => setMapOpen((o) => !o), [])
   useMapLayout(mapOpen && tier > 0 ? 'mini' : 'hidden')
@@ -199,9 +202,9 @@ export default function Workbench({ id }: { id: string }) {
   useEffect(
     () =>
       map && grid
-        ? installLayers('frame', (m) => setFrameLayer(m, frameImage, grid), removeFrameLayer)
+        ? installLayers('frame', (m) => setFrameLayer(m, frameImage, grid, sharper), removeFrameLayer)
         : undefined,
-    [map, grid, frameImage, installLayers],
+    [map, grid, frameImage, sharper, installLayers],
   )
   // Once the stage has the corner box (a layout later than `mapOpen`), so the fit is to that size and not to the hidden map's.
   useEffect(() => {
@@ -363,6 +366,8 @@ export default function Workbench({ id }: { id: string }) {
               searching={searching}
               mapOpen={mapOpen}
               onToggleMap={tier > 0 ? toggleMap : undefined}
+              sharper={sharper}
+              onSharper={setSharper}
               onRetry={retry}
             />
           )}
