@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 
 // The satellite view is a picture to find a place by, never evidence (src/context/load.ts). This is the source side of that
 // rule: who may reach the context code and its map layer, and that nothing in them digests pixels. Tests are not scanned.
+// The time-lapse (src/explore) is held to the same line on the evidence side: display only, never in a report or a record.
 const root = new URL('../../src/', import.meta.url)
 const files = (readdirSync(root, { recursive: true }) as string[])
   .map((f) => f.replaceAll('\\', '/'))
@@ -13,9 +14,10 @@ const files = (readdirSync(root, { recursive: true }) as string[])
 const IMPORT = /\b(?:from|import)\s*\(?\s*['"]([^'"]+)['"]/g
 const CONTEXT = /^context(?:\/|$)/
 const LAYER = /^map\/contextLayer(?:\.[cm]?[jt]sx?)?$/
+const EXPLORE = /^explore(?:\/|$)/
 /** The files that may use src/context (it may use itself): the switch, its state types and the map layer, nothing else. */
 const MAY = /^(?:context\/|map\/contextLayer\.ts$|new\/(?:ContextToggle\.tsx|contextState\.ts)$)/
-/** Where the evidence, the report and the accounts live: none of it may see the picture. */
+/** Where the evidence, the report and the accounts live: none of it may see the picture or the time-lapse. */
 const EVIDENCE_SIDE = /^(?:report\/|workbench\/|screens\/Report\.tsx$|data\/|accounts\/)/
 /** Built in pieces so that this file passes its own scan. */
 const NEEDLE = ['s', 'ha'].join('')
@@ -29,9 +31,11 @@ const targets = (file: string, src: string) =>
 /** Imports of src/context from a folder that may not use it. */
 const strangers = (file: string, src: string) =>
   MAY.test(file) ? [] : targets(file, src).filter((t) => CONTEXT.test(t))
-/** Imports of src/context or of the map layer from the evidence side. */
+/** Imports of src/context, of the map layer or of src/explore from the evidence side. */
 const leaks = (file: string, src: string) =>
-  EVIDENCE_SIDE.test(file) ? targets(file, src).filter((t) => CONTEXT.test(t) || LAYER.test(t)) : []
+  EVIDENCE_SIDE.test(file)
+    ? targets(file, src).filter((t) => CONTEXT.test(t) || LAYER.test(t) || EXPLORE.test(t))
+    : []
 const digestName = (src: string) => src.toLowerCase().includes(NEEDLE)
 
 const text = (f: string) => readFileSync(new URL(f, root), 'utf8')
@@ -44,6 +48,7 @@ describe('context imagery module boundary', () => {
       expect.arrayContaining([
         'context/load.ts',
         'context/rank.ts',
+        'explore/season.ts',
         'map/contextLayer.ts',
         'map/createMap.ts',
         'report/html.ts',
@@ -75,6 +80,23 @@ describe('context imagery module boundary', () => {
     expect(leaks('data/store.ts', layer)).toEqual(['map/contextLayer.ts'])
   })
 
+  it('catches the time-lapse code using the satellite code, and the evidence side importing the time-lapse', () => {
+    // src/explore is not on the list of places that may use src/context
+    expect(strangers('explore/load.ts', `import { loadContext } from '../context/load.ts'`)).toEqual([
+      'context/load.ts',
+    ])
+    const season = `import { pickSeason } from '../explore/season.ts'`
+    for (const f of [
+      'report/html.ts',
+      'workbench/Timeline.tsx',
+      'screens/Report.tsx',
+      'data/store.ts',
+      'accounts/save.ts',
+    ])
+      expect(leaks(f, season)).toEqual(['explore/season.ts'])
+    expect(leaks('report/html.ts', `const m = import('../explore')`)).toEqual(['explore']) // the folder itself
+  })
+
   it('does not flag the places that may, or names that only look alike', () => {
     const type = `import type { ContextImage } from '../context/load.ts'`
     expect(strangers('map/contextLayer.ts', type)).toEqual([])
@@ -84,7 +106,20 @@ describe('context imagery module boundary', () => {
       [],
     )
     expect(leaks('screens/Workbench.tsx', `import { x } from '../map/contextLayer.ts'`)).toEqual([]) // not in the list
-    for (const spec of ['../ui/context.ts', '../data/contexts.ts', '../map/contextLayers.ts', 'zod'])
+    // the screen that shows the time-lapse may use it, and the rule goes one way: it may use the workbench's canvas
+    expect(leaks('screens/ExploreScreen.tsx', `import { Player } from '../explore/Player.tsx'`)).toEqual([])
+    expect(leaks('explore/Player.tsx', `import { FrameCanvas } from '../workbench/FrameCanvas.tsx'`)).toEqual(
+      [],
+    )
+    for (const spec of [
+      '../ui/context.ts',
+      '../data/contexts.ts',
+      '../map/contextLayers.ts',
+      '../explorer/season.ts',
+      '../ui/explore.ts',
+      '../data/exploreStats.ts',
+      'zod',
+    ])
       expect([
         ...strangers('report/html.ts', `import { x } from '${spec}'`),
         ...leaks('report/html.ts', `import { x } from '${spec}'`),
@@ -95,7 +130,7 @@ describe('context imagery module boundary', () => {
     expect(found(strangers)).toEqual([])
   })
 
-  it('keeps the report, the workbench, the data layer and the accounts away from the picture and its layer', () => {
+  it('keeps the report, the workbench, the data layer and the accounts away from the picture, its layer and the time-lapse', () => {
     expect(found(leaks)).toEqual([])
   })
 
