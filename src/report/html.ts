@@ -1,4 +1,5 @@
 import { verificationFor, type Investigation } from '../data/investigation.ts'
+import type { ChangeResult } from '../evidence/change.ts'
 import type { DisplayGrid, QualityStats } from '../evidence/types.ts'
 import type { AoiSummary } from '../geo/aoi.ts'
 import { fmtDate, pct } from '../lib/format.ts'
@@ -7,6 +8,7 @@ import { flow } from '../ui/copy-flow.ts'
 import { outlinePath } from '../workbench/overlay.ts'
 import type { DateEntry } from '../workbench/runner.ts'
 import { escapeHtml as e, jsonForHtml } from './escape.ts'
+import { measuredText, type MeasuredPicture } from './measured.ts'
 import type { Provenance } from './provenance.ts'
 
 /** `displayUrl` and `nativeUrl` are data URLs the app made itself from the pixels it hashed. */
@@ -25,7 +27,7 @@ const CSS = `
 [data-theme="light"]{--bg:#fff;--panel:#fafafa;--line:#e4e4e7;--fg:#18181b;--fg2:#52525b;--accent:#a74e1b;color-scheme:light}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 ui-sans-serif,system-ui,sans-serif}
 main{max-width:1000px;margin:0 auto;padding:32px 20px}h1{font-size:2.25rem;letter-spacing:-.04em;line-height:1.1;margin:.5rem 0 1rem;overflow-wrap:anywhere}
-h2{font-size:1.125rem;font-weight:600;letter-spacing:-.01em;margin:0 0 .75rem}
+h2{font-size:1.125rem;font-weight:600;letter-spacing:-.01em;margin:0 0 .75rem}h3{font-size:1rem;font-weight:600;margin:1.25rem 0 .5rem}
 section{display:grid;grid-template-columns:2.75rem minmax(0,1fr);border-bottom:1px solid var(--line);padding:16px 0}h2+p{margin-top:0}section p:last-child{margin-bottom:0}
 .n{font:.875rem ui-monospace,monospace;color:var(--fg2);padding-top:2px}
 .mono{font-family:ui-monospace,monospace;font-size:.8rem;color:var(--fg2);overflow-wrap:anywhere}.eyebrow{text-transform:uppercase;letter-spacing:.14em;margin:0}
@@ -44,7 +46,7 @@ td,th{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-alig
 .badge{display:inline-block;border:1px solid var(--line);padding:2px 6px;font-family:ui-monospace,monospace;font-size:.75rem}
 .badge.accent{border-color:var(--accent);color:var(--accent);margin:0}
 details pre{white-space:pre-wrap;word-break:break-all;font-size:.7rem}
-@media print{:root,[data-theme="dark"],[data-theme="light"]{--bg:#fff;--panel:#fff;--line:#ccc;--fg:#000;--fg2:#333;--accent:#a74e1b;color-scheme:light}main{padding:0}.scroll{overflow:visible}table{min-width:0}figure,table,tr{break-inside:avoid}h2{break-after:avoid}details{display:none}}
+@media print{:root,[data-theme="dark"],[data-theme="light"]{--bg:#fff;--panel:#fff;--line:#ccc;--fg:#000;--fg2:#333;--accent:#a74e1b;color-scheme:light}main{padding:0}.scroll{overflow:visible}table{min-width:0}figure,table,tr,.measured{break-inside:avoid}h2{break-after:avoid}details{display:none}}
 `
 
 const none = flow.report.values.none
@@ -76,6 +78,34 @@ function dateCheck(
   return { status: 'none', at: '' }
 }
 
+/** A pinned picture's own numbers, for the measured sentences: the clear view the report's table shows, the sun height the catalogue gave. */
+const pictureOf = (entries: DateEntry[], date: string): MeasuredPicture => {
+  const x = entries.find((en) => en.date === date)
+  return {
+    date,
+    clearPct: x?.quality ? pct(x.quality.stats.clearFraction) : null,
+    sunElevation: x?.candidate.item.sunElevation ?? null,
+  }
+}
+
+/** The "What we measured" block (src/report/measured.ts), escaped: it sits at the end of the Evidence section and takes no number of its own. */
+function measuredHtml(a: {
+  change: ChangeResult
+  before: string
+  after: string
+  entries: DateEntry[]
+  grid?: DisplayGrid
+}): string {
+  const m = measuredText({
+    change: a.change,
+    before: pictureOf(a.entries, a.before),
+    after: pictureOf(a.entries, a.after),
+    grid: a.grid,
+  })
+  const p = (text: string, cls?: string) => `<p${cls ? ` class="${cls}"` : ''}>${e(text)}</p>`
+  return `<div class="measured"><h3>${e(flow.report.measured.title)}</h3>${p(m.lead, 'mono')}${[...m.pictures, ...m.findings].map((t) => p(t)).join('')}${p(m.record, 'mono')}</div>`
+}
+
 export function buildReportHtml(a: {
   inv: Investigation
   summary: AoiSummary
@@ -83,6 +113,8 @@ export function buildReportHtml(a: {
   grid?: DisplayGrid
   images: ReportImage[]
   entries: DateEntry[]
+  /** What the change rule found between the pinned pair (src/evidence/change.ts). Left out, the report has no "What we measured" block. */
+  change?: ChangeResult
   provenance: Provenance
   theme: 'dark' | 'light'
   preparedBy: string
@@ -135,11 +167,21 @@ export function buildReportHtml(a: {
   const native = (img: ReportImage) =>
     `<img class="native" src="${img.nativeUrl}" alt="${e(`${alt(img)} · ${R.nativeAlt}`)}">`
 
+  const measured =
+    a.change && inv.before && inv.after
+      ? measuredHtml({
+          change: a.change,
+          before: inv.before,
+          after: inv.after,
+          entries: a.entries,
+          grid: a.grid,
+        })
+      : ''
   const evidence = `<div class="grid two">${a.images.map(figure).join('')}</div>${
     a.images.length
       ? `<p class="mono">${e(R.nativeNote)}</p><div class="grid two">${a.images.map(native).join('')}</div>`
       : ''
-  }`
+  }${measured}`
 
   const scroll = (title: string, table: string) =>
     `<div class="scroll" tabindex="0" role="region" aria-label="${e(title)}">${table}</div>`

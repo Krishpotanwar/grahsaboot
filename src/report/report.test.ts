@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { escapeHtml } from './escape.ts'
+import { measuredText } from './measured.ts'
 import { buildProvenance } from './provenance.ts'
 import { buildReportHtml, type ReportImage } from './html.ts'
 import { addNote, newInvestigation, setBeforeAfter, setClaim, togglePin } from '../data/investigation.ts'
-import { CHANGE_RECIPE } from '../evidence/change.ts'
+import { CHANGE_CONSTANTS, CHANGE_RECIPE, type ChangeResult } from '../evidence/change.ts'
 import { makeDisplayGrid } from '../evidence/display.ts'
 import { RECIPES } from '../evidence/types.ts'
 import type { AoiSummary } from '../geo/aoi.ts'
@@ -601,5 +602,176 @@ describe('buildReportHtml: the server check of a saved investigation', () => {
     const table = tableOf(build({ inv: saved(...everyFrame), provenance }), 'dates')
     expect([...table.matchAll(/<th scope="col">(.*?)<\/th>/g)]).toHaveLength(6)
     expect(table.split('<tr>').slice(2)).toHaveLength(2)
+  })
+})
+
+describe('buildReportHtml: the "What we measured" block', () => {
+  const rest = { recipe: CHANGE_RECIPE, constants: CHANGE_CONSTANTS, clearPixels: 143_491 }
+  const shift = [0, 0, 0] as const
+  const outcomes: Record<ChangeResult['state'], ChangeResult> = {
+    'not-enough-ground': { ...rest, state: 'not-enough-ground' },
+    'outline-too-small': { ...rest, state: 'outline-too-small' },
+    'most-differs': { ...rest, state: 'most-differs', shift },
+    nothing: { ...rest, state: 'nothing', shift },
+    changed: { ...rest, state: 'changed', shift, patches: 3, hectares: 12.3 },
+  }
+  const states = Object.keys(outcomes) as ChangeResult['state'][]
+  const grid = makeDisplayGrid(summary.bbox, 64)
+  const photo = (role: 'before' | 'after', date: string): ReportImage => ({
+    date,
+    role,
+    displayUrl: 'data:image/png;base64,AAAA',
+    nativeUrl: 'data:image/png;base64,BBBB',
+    stats: entries[0]!.quality!.stats,
+    sha256: 'b'.repeat(64),
+  })
+  const blockOf = (html: string) => /<div class="measured">[\s\S]*?<\/div>/.exec(html)?.[0] ?? ''
+  const textsOf = (html: string) => [...blockOf(html).matchAll(/<p[^>]*>(.*?)<\/p>/g)].map((m) => m[1])
+  const withSun = (sun: number | null) =>
+    entries.map((x) => ({
+      ...x,
+      candidate: { ...x.candidate, item: { ...x.candidate.item, sunElevation: sun } },
+    }))
+
+  it('prints no block, and no heading for one, when it is given no result: the report as it was', () => {
+    expect(blockOf(build())).toBe('')
+    expect(build()).not.toContain(flow.report.measured.title)
+    expect(build()).not.toContain('<h3>')
+  })
+
+  it('prints the block in the Evidence section, after the photos, and adds no section of its own', () => {
+    const s = flow.report.sections
+    const out = build({
+      change: outcomes.changed,
+      grid,
+      images: [photo('before', '2025-01-10'), photo('after', '2025-12-20')],
+    })
+    expect(numbers(out)).toEqual(['01', '02', '03', '04', '05', '06', '07', '08'])
+    expect(headings(out)).toEqual([
+      s.looked,
+      s.evidence,
+      s.timeline,
+      s.notes,
+      s.claim,
+      s.gaps,
+      s.provenance,
+      s.attribution,
+    ])
+    const evidence = out.slice(out.indexOf(`<h2>${s.evidence}</h2>`), out.indexOf(`<h2>${s.timeline}</h2>`))
+    expect(evidence).toContain(`<h3>${flow.report.measured.title}</h3>`)
+    expect(evidence.indexOf('<h3>')).toBeGreaterThan(evidence.lastIndexOf('<img'))
+    const road = buildRoad({ change: outcomes.changed })
+    expect(numbers(road)).toEqual(['01', '02', '03', '04', '05', '06', '07', '08', '09'])
+    expect(headings(road)[3]).toBe(s.grid)
+  })
+
+  it('adds nothing else to the report: with the block taken out it is the report it was', () => {
+    for (const state of states) {
+      const out = build({ change: outcomes[state] })
+      expect(out.replace(blockOf(out), ''), state).toBe(build())
+    }
+  })
+
+  it('prints, in order, where the figures come from, a line per picture, what the rule found and the record', () => {
+    for (const state of states) {
+      const out = build({ change: outcomes[state], grid })
+      const m = measuredText({
+        change: outcomes[state],
+        before: { date: '2025-01-10', clearPct: 100, sunElevation: null },
+        after: { date: '2025-12-20', clearPct: 98, sunElevation: null },
+        grid,
+      })
+      expect(textsOf(out), state).toEqual([m.lead, ...m.pictures, ...m.findings, m.record].map(escapeHtml))
+    }
+  })
+
+  it('says it is computed, not seen, first of all', () => {
+    expect(textsOf(build({ change: outcomes.nothing }))[0]).toContain('not seen by a person')
+    expect(blockOf(build({ change: outcomes.nothing }))).toMatch(
+      /^<div class="measured"><h3>What we measured<\/h3><p class="mono">Computed from/,
+    )
+  })
+
+  it('names the date, the clear view and the sun height of each pinned picture, and leaves the sun out when it has none', () => {
+    const sunny = textsOf(build({ change: outcomes.changed, entries: withSun(41.2) }))
+    expect(sunny).toContain('Before, 10 Jan 2025: 100% clear view, sun 41° above the horizon.')
+    expect(sunny).toContain('After, 20 Dec 2025: 98% clear view, sun 41° above the horizon.')
+    for (const sun of [null, undefined]) {
+      const dark = textsOf(
+        build({ change: outcomes.changed, entries: sun === null ? withSun(null) : entries }),
+      )
+      expect(dark).toContain('Before, 10 Jan 2025: 100% clear view.')
+      expect(dark).toContain('After, 20 Dec 2025: 98% clear view.')
+    }
+  })
+
+  it("takes the sun height of each picture from that picture's own scene", () => {
+    const sunAt = (heights: number[]) =>
+      entries.map((x, i) => ({
+        ...x,
+        candidate: { ...x.candidate, item: { ...x.candidate.item, sunElevation: heights[i] } },
+      }))
+    const texts = textsOf(build({ change: outcomes.changed, entries: sunAt([41.2, 27.6]) }))
+    expect(texts).toContain('Before, 10 Jan 2025: 100% clear view, sun 41° above the horizon.')
+    expect(texts).toContain('After, 20 Dec 2025: 98% clear view, sun 28° above the horizon.')
+  })
+
+  it('does not state a clear view for a pinned date that has no check result', () => {
+    const waiting = { ...entry('2025-12-20', 'CLEAR', 1), quality: null, status: 'queued' as const }
+    const texts = textsOf(build({ change: outcomes.changed, entries: [entries[0]!, waiting] }))
+    expect(texts).toContain('After, 20 Dec 2025.')
+    expect(texts.join(' ')).not.toMatch(/(^|\D)0%/)
+  })
+
+  it('records the rule, the grid recipe and size and every setting, beside the figure', () => {
+    const record = textsOf(build({ change: outcomes.changed, grid })).at(-1)!
+    expect(record).toBe(
+      `Rule ${CHANGE_RECIPE}, grid ${RECIPES.display}, ${grid.width} × ${grid.height} pixels. Settings: ${Object.entries(
+        CHANGE_CONSTANTS,
+      )
+        .map(([k, v]) => `${k} ${v}`)
+        .join(', ')}.`,
+    )
+  })
+
+  it('adds the different-seasons sentence for 10 Jan and 20 Dec, which are 21 days apart round the year end', () => {
+    expect(textsOf(build({ change: outcomes.changed }))).toContain(flow.report.measured.differentSeasons)
+    const sameSeason = setBeforeAfter(inv, '2025-03-01', '2025-03-21', T)
+    const near = build({ inv: sameSeason, change: outcomes.changed })
+    expect(near).not.toContain(flow.report.measured.differentSeasons)
+  })
+
+  it('never prints the honest line of the time-lapse nor the whole words "no change", in any state', () => {
+    for (const state of states) {
+      const out = build({ change: outcomes[state], grid })
+      expect(out, state).not.toContain('Nothing you can claim')
+      expect(out, state).not.toMatch(/\bno change\b/i)
+    }
+  })
+
+  it('prints a figure and a patch count only for the state that has them, and the caution with every figure', () => {
+    for (const state of states) {
+      const out = textsOf(build({ change: outcomes[state] })).join(' ')
+      expect(/changed patches? of at least/.test(out) && /ha in all/.test(out), state).toBe(
+        state === 'changed',
+      )
+      expect(out.includes(flow.report.measured.caution), state).toBe(state === 'changed')
+    }
+  })
+
+  it('prints nothing without a pair to compare, even when it is given a result', () => {
+    const none = { ...inv, before: null, after: null }
+    expect(blockOf(build({ inv: none, change: outcomes.changed }))).toBe('')
+  })
+
+  it('escapes a date it was given as text that is not a day', () => {
+    const evil = '<img src=x onerror=alert(1)>'
+    const out = build({
+      inv: { ...inv, before: evil, pinned: [evil, '2025-12-20'] },
+      change: outcomes.changed,
+    })
+    expect(blockOf(out)).not.toContain('<img')
+    expect(blockOf(out)).toContain('&lt;img src=x onerror=alert(1)&gt;')
+    expect(out.match(/<script/g)).toHaveLength(1) // the data block, nothing else
   })
 })
