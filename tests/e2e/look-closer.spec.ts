@@ -102,10 +102,12 @@ test('a click opens Google in a new tab that cannot reach this page, and sends n
   page,
 }) => {
   const seen = await stubGoogle(page)
+  const requested = googleRequests(page)
   await startAt(page)
   await outlineSiteByCoords(page, 1000)
   await expect(streetView(page)).toBeVisible()
   expect(seen, 'nothing has gone to Google before a click').toEqual([])
+  expect(requested, 'nor has anything been asked of a Google host').toEqual([])
   for (const [link, href] of [
     [streetView(page), STREET_VIEW(SITE_MIDDLE)],
     [earth(page), EARTH(SITE_MIDDLE)],
@@ -120,6 +122,9 @@ test('a click opens Google in a new tab that cannot reach this page, and sends n
     { url: STREET_VIEW(SITE_MIDDLE), referer: undefined },
     { url: EARTH(SITE_MIDDLE), referer: undefined },
   ])
+  // Positive control: the listener that the "nothing is requested" test relies on does see Google's two requests, so a typo in
+  // GOOGLE cannot make an empty list there mean nothing.
+  expect(requested).toEqual([STREET_VIEW(SITE_MIDDLE), EARTH(SITE_MIDDLE)])
   // This page stayed where it was.
   await expect(page).toHaveURL(/\/new/)
   await expect(page.getByRole('heading', { name: flow.outline.title })).toBeVisible()
