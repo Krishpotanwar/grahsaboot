@@ -123,7 +123,8 @@ function changed(r: ChangeResult) {
   return r
 }
 function withShift(r: ChangeResult) {
-  if (r.state === 'not-enough-ground') throw new Error('no shift is estimated for not-enough-ground')
+  if (r.state === 'not-enough-ground' || r.state === 'outline-too-small')
+    throw new Error(`no shift is estimated for ${r.state}`)
   return r
 }
 /** Hectares of `pixels` display pixels on a grid of k display pixels per native pixel. */
@@ -144,11 +145,18 @@ describe('change-v1', () => {
       const p = pair(G)
       const results = [
         run({ first: p.first, last: clouded(p.last, G, allOf(G)) }),
+        run(p, G, { inside: mask(G, rect(AT, AT, 1, 1)) }),
         run(pair(G, only(rowsOf(0.6), same(FAR)))),
         run(p),
         run(pair(G, only(SITE, same(FAR)))),
       ]
-      expect(results.map((r) => r.state)).toEqual(['not-enough-ground', 'most-differs', 'nothing', 'changed'])
+      expect(results.map((r) => r.state)).toEqual([
+        'not-enough-ground',
+        'outline-too-small',
+        'most-differs',
+        'nothing',
+        'changed',
+      ])
       for (const r of results) {
         expect(r.recipe).toBe(CHANGE_RECIPE)
         expect(r.constants).toEqual(C)
@@ -535,8 +543,56 @@ describe('change-v1', () => {
       const r = run({ first: p.first, last: clouded(p.last, G, cloud) }, G, { inside: mask(G, left) })
       expect(r.state).toBe('not-enough-ground')
     })
-    it('says there is not enough ground for an empty outline', () => {
-      expect(run(site, G, { inside: mask(G, () => false) }).state).toBe('not-enough-ground')
+  })
+
+  describe('the outline is too small', () => {
+    // An outline that cannot hold a patch at all (0.3 ha that is 30 m across: AREA_MIN pixels, BLOCK across, on G) is said to
+    // be, rather than answered "nothing" for a patch that could never pass. With no outline the whole square is meant, which
+    // is never too small.
+    const rows = AREA_MIN / BLOCK // rows of a block BLOCK wide that make exactly the area minimum
+    const site = pair(G, only(SITE, same(FAR)))
+    const outline = (w: number, h: number) => mask(G, rect(AT, AT, w, h)) // inside the site, all of it changed
+
+    it('is said when the outline holds fewer pixels than the area minimum', () => {
+      expect(Number.isInteger(rows)).toBe(true) // the fixture needs whole rows: rebuild it if the minimum changes
+      const r = run(site, G, { inside: outline(BLOCK, rows - 1) })
+      expect(r.state).toBe('outline-too-small')
+      expect(r).not.toHaveProperty('shift')
+      expect(r).not.toHaveProperty('patches')
+      expect(r).not.toHaveProperty('hectares')
+      expect(r.clearPixels).toBe(BLOCK * (rows - 1))
+      expect(run(site, G, { inside: outline(1, 1) }).state).toBe('outline-too-small')
+    })
+    it('is not said at exactly the area minimum: the same site is counted in full', () => {
+      const r = changed(run(site, G, { inside: outline(BLOCK, rows) }))
+      expect(r.patches).toBe(1)
+      expect(r.hectares).toBeCloseTo(ha(AREA_MIN), 6)
+    })
+    it('is never said when there is no outline, not even on a grid smaller than the area minimum', () => {
+      const g = gridOf(10, K) // 100 pixels, under the minimum of 120
+      expect(g.width * g.height).toBeLessThan(AREA_MIN)
+      expect(run(pair(g), g).state).toBe('nothing')
+      expect(run(site).state).toBe('changed')
+    })
+    it('is said for an outline with the area but not the width: narrower than a block, however long', () => {
+      const thin = mask(G, rect(AT, 10, K, 120)) // one native pixel wide, 240 pixels
+      expect(240).toBeGreaterThanOrEqual(AREA_MIN)
+      expect(run(pair(G), G, { inside: thin }).state).toBe('outline-too-small')
+      const road = mask(G, rect(AT, 10, BLOCK, 120)) // a block wide: 720 pixels hold the blocks
+      expect(run(pair(G), G, { inside: road }).state).toBe('nothing')
+    })
+    it('is said for an empty outline, which holds no ground at all', () => {
+      const r = run(site, G, { inside: mask(G, () => false) })
+      expect(r.state).toBe('outline-too-small')
+      expect(r.clearPixels).toBe(0)
+    })
+    it('comes after not-enough-ground, and before most-differs', () => {
+      const tiny = outline(BLOCK, rows - 1)
+      const shifted = pair(G, () => same(C.shiftLimit))
+      expect(run(shifted).state).toBe('most-differs')
+      expect(run(shifted, G, { inside: tiny }).state).toBe('outline-too-small')
+      const cloudy = { first: shifted.first, last: clouded(shifted.last, G, allOf(G)) }
+      expect(run(cloudy, G, { inside: tiny }).state).toBe('not-enough-ground')
     })
   })
 

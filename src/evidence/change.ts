@@ -8,6 +8,8 @@
  *                quality()); `inside`: an outline mask (one byte a pixel), left out = the whole grid
  *     -> clear in both: alpha above 0 in both, marked in neither mask
  *        under half of the outline clear in both                                            -> "not-enough-ground"
+ *     -> an outline given: opened like the flags below, it must hold a patch of the area minimum, or it can never
+ *        show one (a road narrower than a block, an outline under 0.3 ha, an empty one)    -> "outline-too-small"
  *     -> normal shift, per band: median of (last - first) over ALL clear pixels of the grid (integer histogram); flag the
  *        pixels whose red, green and blue each differ from it by more than bandThreshold (38); estimate again on the
  *        pixels not flagged; `passes` (3) estimates at most
@@ -73,11 +75,13 @@ interface Recorded {
   clearPixels: number
 }
 /**
- * How a comparison ends. Only `changed` carries a patch count and an area, on purpose: no other state states one. `hectares` is
- * the ground area of the patches that count, measured on the opened mask.
+ * How a comparison ends, in the order the states are looked at. Only `changed` carries a patch count and an area, on purpose: no
+ * other state states one. `hectares` is the ground area of the patches that count, measured on the opened mask.
+ * `outline-too-small` is only ever said for an `inside` mask that was given, and carries no shift: nothing was compared.
  */
 export type ChangeResult =
   | (Recorded & { state: 'not-enough-ground' })
+  | (Recorded & { state: 'outline-too-small' })
   | (Recorded & { state: 'most-differs'; shift: Shift })
   | (Recorded & { state: 'nothing'; shift: Shift })
   | (Recorded & { state: 'changed'; shift: Shift; patches: number; hectares: number })
@@ -256,13 +260,18 @@ function dilate(src: Uint8Array, w: number, h: number, b: number): Uint8Array {
   return out
 }
 
-/** The 8-connected patches of `mask` with at least `minArea` pixels: how many, and their pixels in all. Clears `mask` as it goes. */
+/**
+ * The patches of `flags` once opened by a block of `b` x `b` (only blocks that lie wholly inside it stay, so nothing narrower
+ * than a block does): the 8-connected pieces of at least `minArea` pixels, how many and their pixels in all. `flags` is not changed.
+ */
 function countPatches(
-  mask: Uint8Array,
+  flags: Uint8Array,
   w: number,
   h: number,
+  b: number,
   minArea: number,
 ): { patches: number; pixels: number } {
+  const mask = dilate(erode(flags, w, h, b), w, h, b) // ours: it is cleared as the patches are walked
   const stack = new Int32Array(mask.length) // a pixel is pushed once, when it is cleared
   let patches = 0
   let pixels = 0
@@ -300,6 +309,7 @@ export function measureChange(input: ChangeInput): ChangeResult {
   const { first, last, grid } = input
   const n = checkSizes(input)
   const pxM = groundPixelM(grid)
+  const { blockPx, areaMinPx } = minimums(pxM)
   const inside = input.inside ?? new Uint8Array(n).fill(1)
   const { clear, count: clearCount } = clearInBoth(first, last, n)
 
@@ -311,8 +321,10 @@ export function measureChange(input: ChangeInput): ChangeResult {
       clearPixels += clear[i]!
     }
   const recorded = { recipe: CHANGE_RECIPE, constants: C, clearPixels }
-  if (!insidePixels || clearPixels < C.clearShare * insidePixels)
-    return { ...recorded, state: 'not-enough-ground' }
+  if (clearPixels < C.clearShare * insidePixels) return { ...recorded, state: 'not-enough-ground' }
+  // An outline that cannot hold a patch could never show one: say so, rather than "nothing". No outline is the whole square.
+  if (input.inside && !countPatches(inside, grid.width, grid.height, blockPx, areaMinPx).patches)
+    return { ...recorded, state: 'outline-too-small' }
 
   // The normal shift comes from every clear pixel of the grid: inside a tight outline the site itself can be the majority.
   const a = first.rgba
@@ -327,9 +339,7 @@ export function measureChange(input: ChangeInput): ChangeResult {
 
   // Only the area inside the outline is counted (`flagged` is ours: it is cut down in place).
   for (let i = 0; i < n; i++) if (!inside[i]) flagged[i] = 0
-  const { blockPx, areaMinPx } = minimums(pxM)
-  const opened = dilate(erode(flagged, grid.width, grid.height, blockPx), grid.width, grid.height, blockPx)
-  const { patches, pixels } = countPatches(opened, grid.width, grid.height, areaMinPx)
+  const { patches, pixels } = countPatches(flagged, grid.width, grid.height, blockPx, areaMinPx)
   return patches
     ? { ...recorded, state: 'changed', shift, patches, hectares: (pixels * pxM * pxM) / 10_000 }
     : { ...recorded, state: 'nothing', shift }
