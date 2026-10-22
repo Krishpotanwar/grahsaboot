@@ -17,9 +17,9 @@ import {
 const AXE_TAGS = ['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']
 const sharperSwitch = (page: Page) => page.getByRole('checkbox', { name: flow.sharper.label })
 const photos = (page: Page) => page.getByRole('img', { name: /^(Before|After) photo/ })
-/** The CSS filter a canvas is drawn with ("none" when it has none). */
+/** The CSS filter a canvas is drawn with ("none" when it has none). Its text is the engine's own (Chromium and WebKit print `url("#gs-sharper")`), so it is only searched for the id. */
 const filterOf = (canvas: ReturnType<Page['locator']>) => canvas.evaluate((c) => getComputedStyle(c).filter)
-const FILTER = 'url("#gs-sharper")'
+const ID = '#gs-sharper'
 
 test('the switch is off at first and named as a viewing aid; on, both photos are drawn through the filter and a line says so', async ({
   page,
@@ -37,7 +37,7 @@ test('the switch is off at first and named as a viewing aid; on, both photos are
   await expect(page.getByText(flow.sharper.note)).toBeVisible()
   await expect(page.locator('filter#gs-sharper')).toHaveCount(1)
   await expect(photos(page)).toHaveCount(2)
-  for (const i of [0, 1]) expect(await filterOf(photos(page).nth(i))).toBe(FILTER)
+  for (const i of [0, 1]) expect(await filterOf(photos(page).nth(i))).toContain(ID)
   // The picture is the same pixels: the canvas holds exactly what it held, only the drawing differs.
   expect(
     await photos(page)
@@ -69,6 +69,56 @@ test('the canvas keeps its pixels: the same bytes with the aid on and off', asyn
   expect(await bytes()).toBe(off)
 })
 
+test('the filter does not lift the outermost pixels of the picture or the edge of a no-data hole', async ({
+  page,
+}) => {
+  await openFixtureSite(page)
+  await waitForPhotos(page)
+  await sharperSwitch(page).check()
+  // A flat light-grey picture with a transparent hole, drawn outside the viewer, through the same filter, over black. A blur that
+  // counts a transparent neighbour as black lifts the outermost pixels by tens of levels (57 of 255 at pixel ratio 2); filled and
+  // limited, nothing may rise more than 4 above the flat area.
+  await page.evaluate((id) => {
+    const wrap = document.createElement('div')
+    wrap.id = 'edge-probe'
+    wrap.style.cssText =
+      'position:fixed;left:0;top:0;z-index:99999;background:#000;padding:12px;line-height:0'
+    const c = document.createElement('canvas')
+    c.width = 64
+    c.height = 64
+    c.style.cssText = `width:64px;height:64px;filter:url(${id})`
+    const g = c.getContext('2d')!
+    g.fillStyle = 'rgb(191,191,191)'
+    g.fillRect(0, 0, 64, 64)
+    g.clearRect(24, 24, 16, 16)
+    wrap.append(c)
+    document.body.append(wrap)
+  }, ID)
+  const shot = await page.locator('#edge-probe').screenshot()
+  const { w, d } = await page.evaluate(async (b64) => {
+    // Decoded by the page itself: no PNG library in the tests.
+    const bmp = await createImageBitmap(
+      new Blob([Uint8Array.from(atob(b64), (ch) => ch.charCodeAt(0))], { type: 'image/png' }),
+    )
+    const c = document.createElement('canvas')
+    c.width = bmp.width
+    c.height = bmp.height
+    const g = c.getContext('2d')!
+    g.drawImage(bmp, 0, 0)
+    return { w: bmp.width, d: Array.from(g.getImageData(0, 0, bmp.width, bmp.height).data) }
+  }, shot.toString('base64'))
+  const red = (x: number, y: number) => d[(y * w + x) * 4]!
+  const scale = w / (64 + 24)
+  const flat = red(Math.round((12 + 8) * scale), Math.round((12 + 8) * scale)) // inside the picture, far from every edge
+  expect(flat, 'the filter is on the probe: 1.1 x 191 - 0.045 x 255 is about 199').toBeGreaterThan(190)
+  expect(flat).toBeLessThan(207)
+  let highest = 0
+  for (let y = Math.round(12 * scale); y < Math.round((12 + 64) * scale); y++)
+    for (let x = Math.round(12 * scale); x < Math.round((12 + 64) * scale); x++)
+      highest = Math.max(highest, red(x, y))
+  expect(highest - flat, `the highest pixel is ${highest}, the flat area ${flat}`).toBeLessThanOrEqual(4)
+})
+
 test('the difference layer and the timeline previews are drawn as they were; the photo under the difference is not', async ({
   page,
 }) => {
@@ -79,7 +129,7 @@ test('the difference layer and the timeline previews are drawn as they were; the
   const heat = page.getByRole('img', { name: flow.workbench.modes.diff, exact: true })
   await expect(heat).toBeVisible({ timeout: 30_000 }) // the masks arrived and the difference was drawn
   expect(await filterOf(heat)).toBe('none')
-  expect(await filterOf(page.getByRole('img', { name: /^Before photo/ }))).toBe(FILTER)
+  expect(await filterOf(page.getByRole('img', { name: /^Before photo/ }))).toContain(ID)
   // The 52 px previews of the timeline are not the viewer's pictures: they keep the page as it was.
   const previews = page.locator('canvas[aria-label^="Satellite pass photo"]')
   expect(await previews.count()).toBeGreaterThan(0)
