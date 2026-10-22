@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
+import { fixtureItem } from '../../tests/fixtures/scene.ts'
 import type { LonLat } from '../evidence/types.ts'
+import { parseItem } from '../stac/parse.ts'
 import { selectPerDate } from '../stac/select.ts'
-import type { AssetRef, DateCandidate, S2Item } from '../stac/types.ts'
+import type { DateCandidate, S2Item } from '../stac/types.ts'
 import {
   ageDays,
   CLEAR_VIEW_MIN,
@@ -16,28 +18,27 @@ import {
 } from './season.ts'
 
 const DAY = 86_400_000
-const ASSET: AssetRef = {
-  href: 'https://example.test/a.tif',
-  transform: [10, 0, 0, 0, -10, 0],
-  shape: [1, 1],
-}
+// One parsed fixture scene is the template, as in rank.test.ts: a field added to S2Item later needs no change here.
+const TEMPLATE = parseItem(
+  fixtureItem('https://sentinel-cogs.s3.us-west-2.amazonaws.com', {
+    date: '2025-01-10',
+    scl: () => 5,
+    roof: false,
+    cloud: 0,
+  }),
+  'sentinel-2-l2a',
+)!
 
 /** `ymd` moved by `days` calendar days. */
 const add = (ymd: string, days: number) =>
   new Date(Date.parse(`${ymd}T00:00:00Z`) + days * DAY).toISOString().slice(0, 10)
 /** A scene as the catalogue lists it: 05:30 UTC on `date`, with the given cloud cover. */
 const item = (date: string, cloudCover: number | null, over: Partial<S2Item> = {}): S2Item => ({
+  ...TEMPLATE,
   id: `S2B_44QKJ_${date.replaceAll('-', '')}_0_L2A`,
-  collection: 'sentinel-2-l2a',
   datetime: `${date}T05:30:00Z`,
   date,
-  epsg: 32644,
   cloudCover,
-  baseline: '05.11',
-  nodataPct: 0,
-  footprint: [],
-  visual: ASSET,
-  scl: ASSET,
   ...over,
 })
 /** What `selectPerDate` hands over for one date. */
