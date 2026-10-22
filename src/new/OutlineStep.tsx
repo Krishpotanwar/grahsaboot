@@ -8,6 +8,7 @@ import { useMapStage } from '../map/MapStage.tsx'
 import { copy, issueMessage } from '../ui/copy.ts'
 import { flow } from '../ui/copy-flow.ts'
 import { Button, TextField } from '../ui/kit.tsx'
+import { LookCloser } from '../ui/LookCloser.tsx'
 import { Optional } from '../ui/Optional.tsx'
 import { LazyContextToggle } from './contextGate.ts'
 import { draftToAoi, type Draft } from './draft.ts'
@@ -185,6 +186,8 @@ export function OutlineStep({ draft, setDraft, onBack, onNext }: StepProps) {
           </div>
         )}
       </div>
+      {/* Once there is an outline to look at from the ground: outside the live region above, so it is not read out when it appears. */}
+      {result?.ok && <LookCloser bbox={result.summary.bbox} className="border border-line p-3" />}
       <div className="flex justify-between">
         <Button onClick={onBack}>{copy.common.back}</Button>
         <Button variant="primary" disabled={!result?.ok} onClick={onNext}>

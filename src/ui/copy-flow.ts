@@ -86,6 +86,18 @@ export const flow = {
     failed: 'Could not get a satellite photo. The map still works.',
     update: 'Update for this view',
   },
+  // The Look-closer box (src/ui/LookCloser.tsx) and the note that starts from it (src/workbench/NotesPanel.tsx). The two links open
+  // Google's own pages: nothing of them is fetched, stored or checked here. A note that starts with `groundNoteStart` leaves its date
+  // to the person, because the picture's date is shown in Google's own page and never comes from today's date.
+  lookCloser: {
+    title: 'Look closer',
+    streetView: 'Street View',
+    earth: 'Google Earth',
+    newTab: '(opens in a new tab)',
+    note: "Opens Google's own pages. Not checked by GrahSaboot.",
+    groundNote: 'Start a Street View note',
+    groundNoteStart: 'Street View, ',
+  },
   dates: {
     title: 'Which dates?',
     from: 'From',
