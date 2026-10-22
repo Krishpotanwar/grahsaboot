@@ -1,9 +1,17 @@
 import { resolveItemHrefs } from '../stac/pc.ts'
-import type { FrameRequest, FrameResult, QualityRequest, QualityResult } from './imagery-core.ts'
+import type {
+  ChangeRequest,
+  ChangeResult,
+  FrameRequest,
+  FrameResult,
+  QualityRequest,
+  QualityResult,
+} from './imagery-core.ts'
 
 export type WorkerRequest =
   | { id: number; op: 'quality'; req: QualityRequest }
   | { id: number; op: 'frame'; req: FrameRequest }
+  | { id: number; op: 'change'; req: ChangeRequest }
   | { id: number; op: 'cancel'; target: number }
 
 export interface WorkerLike {
@@ -16,6 +24,15 @@ export interface WorkerLike {
 export interface ImageryClient {
   quality(req: QualityRequest, signal?: AbortSignal): Promise<QualityResult>
   frame(req: FrameRequest, signal?: AbortSignal): Promise<FrameResult>
+  /**
+   * The change rule (src/evidence/change.ts) on two display pictures.
+   *
+   * The request is posted by structured clone, a copy, and nothing is transferred (ruling R42, which replaced the transfer of
+   * D14): `req.first.rgba`, `req.last.rgba`, `req.first.invalid`, `req.last.invalid` and `req.inside` are left exactly as they
+   * were. A caller can keep showing a picture, hold its pinned pair, or send the same arrays again, without copying them first.
+   * The copy took about 0.3 ms at 400 by 400 and about 3 ms at 1024 by 1024 (Node, a busy Mac; F15 measures a phone).
+   */
+  change(req: ChangeRequest, signal?: AbortSignal): Promise<ChangeResult>
   dispose(): void
 }
 
@@ -55,8 +72,8 @@ export function createImageryClient(
     pending.clear()
   }
   function call<T>(
-    op: 'quality' | 'frame',
-    req: QualityRequest | FrameRequest,
+    op: 'quality' | 'frame' | 'change',
+    req: QualityRequest | FrameRequest | ChangeRequest,
     signal?: AbortSignal,
   ): Promise<T> {
     if (signal?.aborted) return Promise.reject(abortError())
@@ -88,9 +105,14 @@ export function createImageryClient(
         },
       })
       signal?.addEventListener('abort', onAbort, { once: true })
-      resolveItemHrefs(req.item, signal)
-        .then((item) => {
-          if (pending.has(id)) worker.postMessage({ id, op, req: { ...req, item } })
+      // A scene first needs its picture host resolved (a Planetary Computer token); a change request is pixels only.
+      const ready =
+        'item' in req
+          ? resolveItemHrefs(req.item, signal).then((item) => ({ ...req, item }))
+          : Promise.resolve(req)
+      ready
+        .then((r) => {
+          if (pending.has(id)) worker.postMessage({ id, op, req: r })
         })
         .catch((e) => {
           pending.delete(id)
@@ -102,6 +124,7 @@ export function createImageryClient(
   return {
     quality: (req, signal) => call<QualityResult>('quality', req, signal),
     frame: (req, signal) => call<FrameResult>('frame', req, signal),
+    change: (req, signal) => call<ChangeResult>('change', req, signal),
     dispose: () => {
       dead = abortError() // before terminate(): a terminated worker never answers, so later calls must fail at once
       worker.terminate()

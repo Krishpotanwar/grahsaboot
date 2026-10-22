@@ -16,6 +16,7 @@ import {
   type QualityStats,
   type Window,
 } from '../evidence/index.ts'
+import { measureChange, type ChangeInput, type ChangeResult } from '../evidence/change.ts'
 import type { ByteCache } from '../lib/byte-cache.ts'
 import type { S2Item } from '../stac/types.ts'
 
@@ -49,6 +50,9 @@ export interface FrameResult {
   native: { width: number; height: number; rgb: Uint8Array }
   display: { width: number; height: number; rgba: Uint8ClampedArray }
 }
+/** Two display pictures with their cloud marks, the grid they sit on and an optional outline: see src/evidence/change.ts. */
+export type ChangeRequest = ChangeInput
+export type { ChangeResult }
 
 const SUB = 2
 /** Opening a COG is a few small range requests; past this the network has stalled. */
@@ -203,4 +207,9 @@ export async function runFrame(
     native: { width, height, rgb: bytes },
     display: { width: req.grid.width, height: req.grid.height, rgba },
   }
+}
+
+/** The change rule on two display pictures. Pure and short (tens of milliseconds), so it runs to the end: nothing in it to abort. */
+export function runChange(req: ChangeRequest): ChangeResult {
+  return measureChange(req)
 }
