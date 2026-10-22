@@ -323,5 +323,47 @@ export const flow = {
     unchecked: (n: number) => `${plural(n, 'pinned date', 'pinned dates')} could not be checked.`,
     nativeNote: 'Source pixels exactly as hashed (native 10 m grid, before reprojection).',
     nativeAlt: 'source pixels, native 10 m grid',
+    // The "What we measured" block (src/report/measured.ts): sentences from numbers only, in measurement words. Every number and the
+    // rule's tag are passed in from the result, so a retuned rule prints its own. The report states what the rule did and never
+    // judges the person's claim (`claim.help` above): no line of the block says a verdict, nor the honest line of the time-lapse.
+    measured: {
+      title: 'What we measured',
+      lead: 'Computed from the pixels of the two pinned pictures by a fixed rule, not seen by a person. The rule, the grid and its settings are recorded below, so it can be run again from the hashed source pixels.',
+      // One per picture: "Before, 22 Feb 2018: 92% clear view, sun 41° above the horizon." A figure the catalogue or the check has not
+      // given is left out of the sentence, never printed as zero.
+      picture: (role: string, date: string, clearPct: number | null, sunDeg: number | null) => {
+        const facts = [
+          clearPct === null ? '' : clearView(clearPct),
+          sunDeg === null ? '' : `sun ${sunDeg}° above the horizon`,
+        ].filter(Boolean)
+        return `${role}, ${date}${facts.length ? `: ${facts.join(', ')}` : ''}.`
+      },
+      // What the rule found, one of these five, in the order the rule looks at them.
+      notEnoughGround: 'Not enough clear ground in both pictures to compare.',
+      outlineTooSmall: (rule: string, ha: string, m: string) =>
+        `This outline holds no area of ${ha} ha that is ${m} m across, so the change rule (${rule}) cannot report a changed patch inside it.`,
+      mostDiffers: (rule: string) =>
+        `Most of the clear area differs between these two pictures, so the change rule (${rule}) cannot separate a change from a difference in overall brightness or colour. No changed area is stated. Compare the two pictures by eye.`,
+      noPatch: (rule: string, ha: string, m: string, nativeM: string) =>
+        `The change rule (${rule}) found no changed patch of at least ${ha} ha and ${m} m across between these two pictures. At ${nativeM} m a change this small cannot be told from seasons or noise.`,
+      figure: (f: {
+        from: string
+        to: string
+        rule: string
+        patches: number
+        ha: string
+        m: string
+        area: string
+        pixels: string
+      }) =>
+        `Between ${f.from} and ${f.to}, the change rule (${f.rule}) found ${plural(f.patches, 'changed patch', 'changed patches')} of at least ${f.ha} ha and ${f.m} m across, ${f.area} ha in all. It rests on ${f.pixels} pixels that are clear in both pictures.`,
+      // The one caution string: it ends the figure here, and ends the line under the time-lapse. A patch count never prints without it.
+      caution: 'It cannot tell a building from a crop or a season: compare the pictures by eye.',
+      differentSeasons: 'These dates are in different seasons; seasonal change is included.',
+      // Beside the number: what it takes to run the rule again.
+      gridSize: (width: number, height: number) => `${width} × ${height} pixels`,
+      record: (rule: string, grid: string, settings: string) =>
+        `Rule ${rule}, grid ${grid}. Settings: ${settings}.`,
+    },
   },
 }
