@@ -10,6 +10,15 @@ export async function startAt(page: Page, query = 'tier=0&lat=21.1458&lon=79.088
   await expect(page.getByRole('heading', { name: flow.outline.title })).toBeVisible()
 }
 
+/**
+ * The key that moves focus to the next control. WebKit on macOS, like Safari, tabs only to text fields by default: Tab skips links,
+ * buttons and range inputs, and Option+Tab reaches them. Every other engine and platform tabs to all of them.
+ */
+export const tabKey = (page: Page): 'Alt+Tab' | 'Tab' =>
+  process.platform === 'darwin' && page.context().browser()?.browserType().name() === 'webkit'
+    ? 'Alt+Tab'
+    : 'Tab'
+
 async function openCoordsForm(page: Page) {
   const details = page.locator('details', { hasText: flow.outline.byCoords })
   if (!(await details.evaluate((d: HTMLDetailsElement) => d.open))) await details.locator('summary').click()

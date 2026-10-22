@@ -835,6 +835,58 @@ describe('EvidenceViewer', () => {
     expect(shut).not.toContain('aria-pressed')
     expect(open).not.toContain('aria-pressed')
   })
+
+  describe('the Sharper viewing aid', () => {
+    /** The label that holds the Sharper switch: its checkbox and the words next to it. */
+    const labelOf = (html: string) =>
+      /<label[^>]*>(?:(?!<\/label>)[\s\S])*Sharper(?:(?!<\/label>)[\s\S])*<\/label>/.exec(html)?.[0]
+    /** How many photo canvases carry the filter class. */
+    const filtered = (html: string) => html.match(/<canvas[^>]*\[filter:url\(#gs-sharper\)\]/g)?.length ?? 0
+
+    it('puts the switch in the tool row only where there is a handler: off, a real checkbox, named for what it is', () => {
+      expect(viewer()).not.toContain(flow.sharper.label)
+      const label = labelOf(viewer({ onSharper: noop }))!
+      expect(label).toMatch(/<input[^>]*type="checkbox"/)
+      expect(label).not.toContain('checked=""')
+      expect(label).toContain(`>${flow.sharper.label}`)
+      // The name a screen reader says carries the plan's words; the line itself is on show while the aid is on.
+      expect(label).toContain(`<span class="sr-only">: ${flow.sharper.aid}</span>`)
+    })
+
+    it('is as big a target as the outline switch: the same look, 44 px tall', () => {
+      const html = viewer({ onSharper: noop })
+      const outline = html.match(/<label class="(relative inline-flex h-11 [^"]*)"/)![1]
+      expect(labelOf(html)).toContain(`<label class="${outline}"`)
+    })
+
+    it('on: the switch is checked, both photos carry the filter, it is defined once, and a line says it is a viewing aid', () => {
+      const html = viewer({ onSharper: noop, sharper: true })
+      expect(labelOf(html)).toContain('checked=""')
+      expect(filtered(html)).toBe(2) // before and after of the swipe
+      expect(html.match(/<filter id="gs-sharper"/g)).toHaveLength(1)
+      expect(html).toContain(flow.sharper.note)
+      expect(filtered(viewer({ onSharper: noop, sharper: true }, true))).toBe(2) // one above the other, on a phone
+    })
+
+    it('off: no class, no filter and no line', () => {
+      const html = viewer({ onSharper: noop })
+      expect(html).not.toContain('gs-sharper')
+      expect(html).not.toContain(flow.sharper.note)
+    })
+
+    it("says it in the plan's words", () => {
+      expect(flow.sharper.label).toBe('Sharper')
+      expect(flow.sharper.aid).toBe('viewing aid: the same pixels, shown more clearly')
+      expect(flow.sharper.note).toBe('Sharper is a viewing aid: the same pixels, shown more clearly.')
+    })
+
+    it('waits like the outline switch: disabled, and nothing to say or to filter before there are photos', () => {
+      const html = viewer({ before: null, after: null, onSharper: noop, sharper: true })
+      expect(labelOf(html)).toMatch(/<input[^>]*type="checkbox"[^>]*disabled/)
+      expect(html).not.toContain(flow.sharper.note)
+      expect(filtered(html)).toBe(0)
+    })
+  })
 })
 
 describe('the side sections', () => {

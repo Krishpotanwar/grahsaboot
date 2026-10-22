@@ -14,6 +14,7 @@ import { useMapLayout, useMapStage } from '../map/MapStage.tsx'
 import { copy } from '../ui/copy.ts'
 import { flow } from '../ui/copy-flow.ts'
 import { Button, Skeleton } from '../ui/kit.tsx'
+import { LookCloser } from '../ui/LookCloser.tsx'
 import { Optional } from '../ui/Optional.tsx'
 import { ClaimPanel } from '../workbench/ClaimPanel.tsx'
 import { canPickDefaults, isUsable, pickDefaults } from '../workbench/defaults.ts'
@@ -77,6 +78,9 @@ export default function Workbench({ id }: { id: string }) {
   }, [error, toast])
   const { map, tier, layout, stage, installLayers } = useMapStage()
   const [mapOpen, setMapOpen] = useState(false)
+  // The "Sharper" viewing aid, one switch for the viewer's photos and the map's photo. Off at every visit and kept nowhere, so
+  // nothing but the screen ever sees it: the report builds its pictures from the pixels.
+  const [sharper, setSharper] = useState(false)
   // One identity for the life of the page: the viewer is memoised and must not render again for a slider step.
   const toggleMap = useCallback(() => setMapOpen((o) => !o), [])
   useMapLayout(mapOpen && tier > 0 ? 'mini' : 'hidden')
@@ -198,9 +202,9 @@ export default function Workbench({ id }: { id: string }) {
   useEffect(
     () =>
       map && grid
-        ? installLayers('frame', (m) => setFrameLayer(m, frameImage, grid), removeFrameLayer)
+        ? installLayers('frame', (m) => setFrameLayer(m, frameImage, grid, sharper), removeFrameLayer)
         : undefined,
-    [map, grid, frameImage, installLayers],
+    [map, grid, frameImage, sharper, installLayers],
   )
   // Once the stage has the corner box (a layout later than `mapOpen`), so the fit is to that size and not to the hidden map's.
   useEffect(() => {
@@ -271,7 +275,7 @@ export default function Workbench({ id }: { id: string }) {
   const wait = LazySaveBar ? saveWait(inv, byDate, state.phase === 'ready' && !state.more) : null
   return (
     <div className="min-h-[calc(100dvh-64px)]">
-      <header className="flex flex-col gap-4 border-b border-line px-4 pb-5 pt-5 sm:flex-row sm:items-end sm:justify-between lg:px-8">
+      <header className="grid gap-4 border-b border-line px-4 pb-5 pt-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end lg:px-8">
         <div className="min-w-0">
           <h1 className="break-words text-[1.875rem] font-[650] leading-[1.15] tracking-[-0.025em]">
             {inv.name}
@@ -312,6 +316,9 @@ export default function Workbench({ id }: { id: string }) {
             {flow.workbench.report}
           </Link>
         </div>
+        {/* A row of its own under the title and the buttons. The header is a grid for it: a wrapping flex row would drop the buttons
+            under a long title, where they sit beside it now. */}
+        {summary && <LookCloser bbox={summary.bbox} className="sm:col-span-2" />}
       </header>
       <div className="grid lg:grid-cols-[minmax(0,1fr)_440px]">
         <div className="grid min-w-0 content-start gap-3 px-4 pb-5 pt-3 lg:px-8">
@@ -359,6 +366,8 @@ export default function Workbench({ id }: { id: string }) {
               searching={searching}
               mapOpen={mapOpen}
               onToggleMap={tier > 0 ? toggleMap : undefined}
+              sharper={sharper}
+              onSharper={setSharper}
               onRetry={retry}
             />
           )}

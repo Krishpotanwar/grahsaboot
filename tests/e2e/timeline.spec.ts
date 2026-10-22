@@ -10,6 +10,7 @@ import {
   openFixtureSite,
   openThenEdit,
   readStored,
+  tabKey,
   waitForSettled,
 } from './helpers.ts'
 import { FIXTURE_DATES } from '../fixtures/scene.ts'
@@ -390,10 +391,11 @@ test('the slider is out of sight but is still the keyboard stop, and the barcode
   const barcode = s.locator('xpath=following-sibling::div[1]')
   await expect(barcode).toHaveCSS('outline-style', 'none')
   // Reached with Tab, as a keyboard user does (a focus() from a script is not "focus-visible" in every engine): from the
-  // outline switch, past the swipe slider where there is one (a phone starts in side by side).
+  // outline switch, past the Sharper switch, the map tool and the swipe slider where there are ones (a phone starts in side by
+  // side; a page with a map has all four stops, so up to four presses).
   await page.getByRole('checkbox', { name: flow.workbench.outlineToggle }).focus()
-  for (let i = 0; i < 3 && !(await s.evaluate((el) => el === document.activeElement)); i++)
-    await page.keyboard.press('Tab')
+  for (let i = 0; i < 4 && !(await s.evaluate((el) => el === document.activeElement)); i++)
+    await page.keyboard.press(tabKey(page))
   await expect(s).toBeFocused()
   await page.keyboard.press('ArrowLeft')
   await expect(s).toHaveAttribute('aria-valuetext', '15 Jun 2025, Obscured')
@@ -401,7 +403,7 @@ test('the slider is out of sight but is still the keyboard stop, and the barcode
   await expect(barcode).toHaveCSS('outline-width', '2px')
   // The ticks are out of the reading order and the tab order: Tab goes from the slider to the first row.
   expect(await tick(page, '2025-03-05').evaluate((el) => !!el.closest('[aria-hidden="true"]'))).toBe(true)
-  await page.keyboard.press('Tab')
+  await page.keyboard.press(tabKey(page))
   await expect(page.locator(':focus')).toHaveText(/^10 Jan 2025/)
   await expect(barcode).toHaveCSS('outline-style', 'none')
   // Pressing on the barcode puts the keyboard on the slider, so the arrow keys go on from there.

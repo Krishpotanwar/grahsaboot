@@ -12,6 +12,7 @@ import { LIMITS } from '../geo/limits.ts'
 import { fmtDate } from '../lib/format.ts'
 import { flow } from '../ui/copy-flow.ts'
 import { Button, Section, TEXTAREA } from '../ui/kit.tsx'
+import { withGroundNote } from '../ui/lookCloser.ts'
 
 const KINDS: NoteKind[] = ['change', 'no_clear_change', 'unsure']
 
@@ -56,6 +57,14 @@ export const NotesPanel = memo(function NotesPanel({ inv, parts, current, update
     focusNext.current = null
     document.getElementById(id)?.focus()
   })
+
+  // The ground-note helper: the text with "Street View, " added, or null when that would pass the cap (the button is then off).
+  const withGround = withGroundNote(body)
+  const startGroundNote = () => {
+    if (withGround === null) return
+    setBody(withGround)
+    focusNext.current = 'note-body' // the date is the next thing typed: the effect above focuses the box once the text is in it
+  }
 
   const add = () => {
     // The draft goes only when the note was kept; a refused one leaves the text where it was, and the message says why.
@@ -109,9 +118,14 @@ export const NotesPanel = memo(function NotesPanel({ inv, parts, current, update
             className={TEXTAREA}
             aria-describedby="note-count"
           />
-          <p id="note-count" className="text-right font-mono text-[0.75rem] text-fg-2 num">
-            {flow.notes.count(body.length)}
-          </p>
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+            <Button size="sm" disabled={withGround === null} onClick={startGroundNote}>
+              {flow.lookCloser.groundNote}
+            </Button>
+            <p id="note-count" className="ml-auto font-mono text-[0.75rem] text-fg-2 num">
+              {flow.notes.count(body.length)}
+            </p>
+          </div>
         </div>
         {/* One wrapping row, so Add note takes the right end of the last line however many selects there are. */}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.8125rem] text-fg-2">

@@ -86,6 +86,18 @@ export const flow = {
     failed: 'Could not get a satellite photo. The map still works.',
     update: 'Update for this view',
   },
+  // The Look-closer box (src/ui/LookCloser.tsx) and the note that starts from it (src/workbench/NotesPanel.tsx). The two links open
+  // Google's own pages: nothing of them is fetched, stored or checked here. A note that starts with `groundNoteStart` leaves its date
+  // to the person, because the picture's date is shown in Google's own page and never comes from today's date.
+  lookCloser: {
+    title: 'Look closer',
+    streetView: 'Street View',
+    earth: 'Google Earth',
+    newTab: '(opens in a new tab)',
+    note: "Opens Google's own pages. Not checked by GrahSaboot.",
+    groundNote: 'Start a Street View note',
+    groundNoteStart: 'Street View, ',
+  },
   dates: {
     title: 'Which dates?',
     from: 'From',
@@ -239,6 +251,14 @@ export const flow = {
     criterion: 'What would be visible from above if it were true?',
     save: 'Save claim',
     remove: 'Remove claim',
+  },
+  // The "Sharper" switch of the viewer (src/workbench/EvidenceViewer.tsx): a viewing aid that shows the same pixels with a little
+  // more contrast and a light unsharp mask. `aid` is the plan's wording, which the switch says to a screen reader; `note` is on
+  // show under the photos while it is on. Nothing of it reaches the report.
+  sharper: {
+    label: 'Sharper',
+    aid: 'viewing aid: the same pixels, shown more clearly',
+    note: 'Sharper is a viewing aid: the same pixels, shown more clearly.',
   },
   report: {
     title: 'Evidence report',

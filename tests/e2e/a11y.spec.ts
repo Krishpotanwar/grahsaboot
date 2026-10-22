@@ -1,7 +1,14 @@
 import { expect, test, type Page } from '@playwright/test'
 import { copy } from '../../src/ui/copy.ts'
 import { flow } from '../../src/ui/copy-flow.ts'
-import { openFixtureRoad, openFixtureSite, startAt, waitForPhotos, waitForSettled } from './helpers.ts'
+import {
+  openFixtureRoad,
+  openFixtureSite,
+  startAt,
+  tabKey,
+  waitForPhotos,
+  waitForSettled,
+} from './helpers.ts'
 
 // What axe cannot see (the axe sweeps of every screen live beside the screens' own specs: shell, new-outline, new-create,
 // search, workbench, timeline, workbench-map, report): where the keyboard starts, how a person who asked for less motion is
@@ -12,7 +19,7 @@ const skipLink = (page: Page) => page.getByRole('link', { name: copy.common.skip
 /** On a freshly loaded page the first Tab press lands on the skip link: the way past the header to the content. */
 async function firstTabIsSkipLink(page: Page) {
   await expect(page.locator('main')).toBeVisible()
-  await page.keyboard.press('Tab')
+  await page.keyboard.press(tabKey(page))
   await expect(skipLink(page)).toBeFocused()
 }
 

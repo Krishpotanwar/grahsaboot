@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { searchSentinel2 } from './search.ts'
 
 const item = (id: string, date: string) => ({
@@ -404,5 +404,54 @@ describe('searchSentinel2', () => {
     })
     expect(typeof AbortSignal.any).toBe('function') // restored
     expect(typeof AbortSignal.timeout).toBe('function')
+  })
+})
+
+// WebKit ends a fetch that AbortSignal.timeout cut short with an AbortError (the signal's own reason is a TimeoutError), the name a
+// caller's abort gets too: only the caller's signal tells the two apart.
+describe('searchSentinel2 where a timed-out fetch rejects with an AbortError (WebKit)', () => {
+  const abortError = (init: RequestInit) =>
+    new Promise<Response>((_, reject) =>
+      init.signal!.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), {
+        once: true,
+      }),
+    )
+  beforeEach(() => {
+    const real = AbortSignal.timeout.bind(AbortSignal)
+    vi.spyOn(AbortSignal, 'timeout').mockImplementation(() => real(5)) // 20 s would stall the suite
+  })
+  afterEach(() => vi.restoreAllMocks())
+
+  it('retries the timed-out request, then succeeds on a later attempt', async () => {
+    const caller = new AbortController() // never aborted
+    const fetchImpl = vi
+      .fn()
+      .mockImplementationOnce((_url: string, init: RequestInit) => abortError(init))
+      .mockImplementation(async () => json({ features: [item('A', '2025-01-01')], links: [] }))
+    const r = await searchSentinel2({ ...args, fetchImpl, signal: caller.signal })
+    expect(fetchImpl).toHaveBeenCalledTimes(2)
+    expect(r.source).toBe('sentinel-2-l2a')
+    expect(r.items).toHaveLength(1)
+  })
+  it('falls back to Planetary Computer once every Earth Search attempt has timed out', async () => {
+    const caller = new AbortController()
+    const fetchImpl = vi
+      .fn()
+      .mockImplementation((url: string, init: RequestInit) =>
+        url.includes('planetarycomputer')
+          ? Promise.resolve(json({ features: [pcItem('P', '2025-03-01')], links: [] }))
+          : abortError(init),
+      )
+    const r = await searchSentinel2({ ...args, fetchImpl, signal: caller.signal })
+    expect(fetchImpl).toHaveBeenCalledTimes(4) // 3 timed-out Earth Search attempts, then Planetary Computer
+    expect(r.source).toBe('pc:sentinel-2-l2a')
+  })
+  it('still ends at once on a caller abort: no retry, no fallback', async () => {
+    const caller = new AbortController()
+    const fetchImpl = vi.fn().mockImplementation((_url: string, init: RequestInit) => abortError(init))
+    const p = searchSentinel2({ ...args, fetchImpl, signal: caller.signal })
+    caller.abort()
+    await expect(p).rejects.toMatchObject({ name: 'AbortError' })
+    expect(fetchImpl).toHaveBeenCalledTimes(1)
   })
 })

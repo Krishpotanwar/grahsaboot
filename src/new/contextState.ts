@@ -1,5 +1,6 @@
 import { config } from '../config.ts'
 import type { ContextImage, ContextResult } from '../context/load.ts'
+import { realDate } from '../lib/dates.ts'
 
 // What the satellite switch (ContextToggle.tsx) needs that is not a component: the states it shows, how a finished load becomes
 // one, the guard that keeps a stale load from changing the screen, the remembered choice and the test clock.
@@ -83,8 +84,5 @@ export function writeChoice(c: Choice): void {
 
 /** Test builds only: `?now=YYYY-MM-DD` is the loader's today (the fixture scenes are dated 2025). A real build ignores it. */
 export function nowFromUrl(search: string, testMode = config.testMode): Date | undefined {
-  if (!testMode) return undefined
-  const v = new URLSearchParams(search).get('now')
-  const d = v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? new Date(v) : null
-  return d && !Number.isNaN(+d) && d.toISOString().slice(0, 10) === v ? d : undefined
+  return testMode ? realDate(new URLSearchParams(search).get('now')) : undefined
 }
