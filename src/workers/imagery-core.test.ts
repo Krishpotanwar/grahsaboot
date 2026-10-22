@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { clearCogCache, runFrame, runQuality, type CoreDeps } from './imagery-core.ts'
+import { clearCogCache, runChange, runFrame, runQuality, type CoreDeps } from './imagery-core.ts'
+import { measureChange } from '../evidence/change.ts'
 import { fromUtm, makeDisplayGrid, openCogBuffer, sha256Hex, type Cog } from '../evidence/index.ts'
 import { parseItem } from '../stac/parse.ts'
 import {
@@ -202,5 +203,27 @@ describe('runFrame', () => {
     expect((await frame()).window).toEqual([92, 94, 203, 211])
     expect(signals).toHaveLength(2)
     expect(signals[1]?.aborted).toBe(false)
+  })
+})
+
+describe('runChange', () => {
+  // Two display pictures on GRID: flat grey, and the same with a block of 40 x 40 display pixels much lighter.
+  const n = GRID.width * GRID.height
+  const grey = () => new Uint8ClampedArray(n * 4).fill(100)
+  const withBlock = () => {
+    const rgba = grey()
+    for (let y = 100; y < 140; y++)
+      for (let x = 100; x < 140; x++) rgba.fill(220, (y * GRID.width + x) * 4, (y * GRID.width + x) * 4 + 3)
+    return rgba
+  }
+  it('runs the change rule on the two pictures', () => {
+    const req = { first: { rgba: grey() }, last: { rgba: withBlock() }, grid: GRID }
+    const result = runChange(req)
+    expect(result).toEqual(measureChange(req))
+    expect(result).toMatchObject({ state: 'changed', patches: 1 })
+  })
+  it('throws SIZE_MISMATCH for pictures that do not fit the grid', () => {
+    const req = { first: { rgba: grey() }, last: { rgba: new Uint8ClampedArray(8) }, grid: GRID }
+    expect(() => runChange(req)).toThrow('SIZE_MISMATCH')
   })
 })

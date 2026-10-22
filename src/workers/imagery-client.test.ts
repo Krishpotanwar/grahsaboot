@@ -144,3 +144,134 @@ describe('imagery client', () => {
     }
   })
 })
+
+describe('imagery client: the change request', () => {
+  // A worker that does what the platform does with a transfer list: the buffers listed leave the sender, the rest is copied.
+  class CloningWorker extends FakeWorker {
+    received: any[] = []
+    transfers: Array<Transferable[] | undefined> = []
+    override postMessage(msg: any, transfer?: Transferable[]) {
+      super.postMessage(msg)
+      if (msg.op !== 'change') return
+      this.transfers.push(transfer)
+      this.received.push(structuredClone(msg, { transfer }))
+      queueMicrotask(() =>
+        this.onmessage?.({ data: { id: msg.id, ok: true, result: { state: 'nothing' } } } as MessageEvent),
+      )
+    }
+  }
+  const changeReq = () => ({
+    first: { rgba: Uint8ClampedArray.from({ length: 16 }, (_, i) => i), invalid: new Uint8Array(4) },
+    last: { rgba: Uint8ClampedArray.from({ length: 16 }, (_, i) => 100 + i), invalid: new Uint8Array(4) },
+    grid: { width: 2, height: 2 } as any, // the client never reads it
+    inside: Uint8Array.from([1, 1, 1, 0]),
+  })
+  const held = (s: AbortSignal) => getEventListeners(s, 'abort').length
+
+  it('sends the pictures and masks to the worker with no item to resolve, and answers with its result', async () => {
+    vi.stubGlobal('fetch', () => Promise.reject(new Error('the change request must not fetch anything')))
+    try {
+      const w = new CloningWorker()
+      const r = changeReq()
+      expect(await createImageryClient(() => w).change(r)).toEqual({ state: 'nothing' })
+      expect(w.received[0].op).toBe('change')
+      expect([...w.received[0].req.last.rgba]).toEqual(Array.from({ length: 16 }, (_, i) => 100 + i))
+      expect([...w.received[0].req.inside]).toEqual([1, 1, 1, 0])
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+  it('transfers the buffers it is given: the worker gets them and the caller no longer has them', async () => {
+    const w = new CloningWorker()
+    const r = changeReq()
+    const buffers = [r.first.rgba, r.last.rgba, r.first.invalid, r.last.invalid, r.inside].map(
+      (a) => a.buffer,
+    )
+    await createImageryClient(() => w).change(r)
+    expect(w.transfers[0]).toEqual(buffers)
+    for (const b of buffers) expect(b.byteLength).toBe(0)
+  })
+  it('lists a buffer once, and copies a view of part of a larger buffer instead of detaching it', async () => {
+    const w = new CloningWorker()
+    const r = changeReq()
+    const shared = new Uint8ClampedArray(16)
+    const big = new ArrayBuffer(32)
+    const part = new Uint8Array(big, 8, 4).fill(1)
+    await createImageryClient(() => w).change({
+      first: { rgba: shared },
+      last: { rgba: shared },
+      grid: r.grid,
+      inside: part,
+    })
+    expect(w.transfers[0]).toEqual([shared.buffer])
+    expect(big.byteLength).toBe(32)
+    expect([...w.received[0].req.inside]).toEqual([1, 1, 1, 1])
+  })
+  it('rejects, rather than throws, for a request it cannot hand over, and leaves no timer or listener behind', async () => {
+    vi.useFakeTimers()
+    try {
+      const ac = new AbortController()
+      const bad = { first: undefined, last: undefined, grid: {} } as any
+      const p = createImageryClient(() => new FakeWorker()).change(bad, ac.signal)
+      await expect(p).rejects.toBeInstanceOf(TypeError)
+      expect(vi.getTimerCount()).toBe(0)
+      expect(held(ac.signal)).toBe(0)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+  it('rejects with the worker error', async () => {
+    const w = new FakeWorker()
+    w.postMessage = (m: any) =>
+      queueMicrotask(() =>
+        w.onmessage?.({
+          data: { id: m.id, ok: false, error: { name: 'Error', message: 'SIZE_MISMATCH' } },
+        } as MessageEvent),
+      )
+    await expect(createImageryClient(() => w).change(changeReq())).rejects.toThrow('SIZE_MISMATCH')
+  })
+  it('rejects with AbortError when aborted while waiting, posts only a cancel, and drops its listener', async () => {
+    const w = new FakeWorker()
+    const ac = new AbortController()
+    const p = createImageryClient(() => w).change(changeReq(), ac.signal)
+    ac.abort()
+    await expect(p).rejects.toMatchObject({ name: 'AbortError' })
+    await Promise.resolve()
+    expect(w.sent.map((m) => m.op)).toEqual(['cancel'])
+    expect(held(ac.signal)).toBe(0)
+  })
+  it('rejects at once, posting nothing, for a signal that is already aborted', async () => {
+    const w = new FakeWorker()
+    await expect(createImageryClient(() => w).change(changeReq(), AbortSignal.abort())).rejects.toMatchObject(
+      { name: 'AbortError' },
+    )
+    expect(w.sent).toEqual([])
+  })
+  it('rejects with TimeoutError when the worker never answers, and tells it to stop', async () => {
+    vi.useFakeTimers()
+    try {
+      const w = new FakeWorker()
+      const done = expect(createImageryClient(() => w).change(changeReq())).rejects.toMatchObject({
+        name: 'TimeoutError',
+        message: 'IMAGERY_TIMEOUT',
+      })
+      await vi.advanceTimersByTimeAsync(120_000)
+      await done
+      expect(w.sent.some((m) => m.op === 'cancel')).toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+  it('fails when the worker dies, and after dispose without posting', async () => {
+    const w = new FakeWorker()
+    const c = createImageryClient(() => w)
+    const p = c.change(changeReq())
+    ;(w as WorkerLike).onerror?.(new Event('error'))
+    await expect(p).rejects.toThrow('IMAGERY_WORKER_FAILED')
+    const d = new FakeWorker()
+    const gone = createImageryClient(() => d)
+    gone.dispose()
+    await expect(gone.change(changeReq())).rejects.toMatchObject({ name: 'AbortError' })
+    expect(d.sent).toEqual([])
+  })
+})
