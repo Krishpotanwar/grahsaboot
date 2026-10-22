@@ -1,10 +1,13 @@
 import type { ImageSource, ImageSourceSpecification, Map as MlMap } from 'maplibre-gl'
 import type { DisplayGrid } from '../evidence/types.ts'
 
-// The "Sharper" viewing aid on the map is the layer's own contrast, the stretch of the viewer's filter (FrameCanvas.tsx), and no
-// resampling key of either spelling. Not `nearest`: the display grid is 3 to 4 times the 10 m pixels, so it would draw 2 to 3 m
-// stair-steps that look like pixels and are not (and MapLibre 6.12 refuses a raster layer that sets both `resampling` and
-// `raster-resampling`). The map has no sharpen; the pixels themselves are the same.
+// The "Sharper" viewing aid on the map is the layer's own contrast, and no resampling key of either spelling. Not `nearest`: the
+// display grid is 3 to 4 times the 10 m pixels, so it would draw 2 to 3 m stair-steps that look like pixels and are not (and
+// MapLibre 6.12 refuses a raster layer that sets both `resampling` and `raster-resampling`).
+// It is not the viewer's curve (FrameCanvas.tsx). MapLibre pivots at mid-grey, `rgb = (rgb - 0.5) * factor + 0.5` with factor
+// 1 / (1 - contrast), so 0.12 is a factor of 1.14; the viewer's line, 1.1 x - 0.045, pivots at 0.45. On the worked example both leave
+// the average tone within 2 levels, so the two surfaces do not drift apart in brightness. The map has no sharpen; the pixels
+// themselves are the same.
 const SHARPER_CONTRAST = 0.12
 
 // The photo goes to the map as decoded pixels (`updateImage({ image })`, no network request): no PNG is encoded for it, no
