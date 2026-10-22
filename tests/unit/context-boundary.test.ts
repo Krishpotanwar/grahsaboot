@@ -4,7 +4,8 @@ import { describe, expect, it } from 'vitest'
 
 // The satellite view is a picture to find a place by, never evidence (src/context/load.ts). This is the source side of that
 // rule: who may reach the context code and its map layer, and that nothing in them digests pixels. Tests are not scanned.
-// The time-lapse (src/explore) is held to the same line on the evidence side: display only, never in a report or a record.
+// The time-lapse (src/explore and its screen) is held to the same line: the evidence side never imports it, and nothing in
+// it hashes a picture, because its frames are display only.
 const root = new URL('../../src/', import.meta.url)
 const files = (readdirSync(root, { recursive: true }) as string[])
   .map((f) => f.replaceAll('\\', '/'))
@@ -14,13 +15,16 @@ const files = (readdirSync(root, { recursive: true }) as string[])
 const IMPORT = /\b(?:from|import)\s*\(?\s*['"]([^'"]+)['"]/g
 const CONTEXT = /^context(?:\/|$)/
 const LAYER = /^map\/contextLayer(?:\.[cm]?[jt]sx?)?$/
-const EXPLORE = /^explore(?:\/|$)/
+/** The time-lapse: src/explore and the screen that shows it. */
+const EXPLORE = /^(?:explore(?:\/|$)|screens\/ExploreScreen(?:\.[cm]?[jt]sx?)?$)/
 /** The files that may use src/context (it may use itself): the switch, its state types and the map layer, nothing else. */
 const MAY = /^(?:context\/|map\/contextLayer\.ts$|new\/(?:ContextToggle\.tsx|contextState\.ts)$)/
 /** Where the evidence, the report and the accounts live: none of it may see the picture or the time-lapse. */
 const EVIDENCE_SIDE = /^(?:report\/|workbench\/|screens\/Report\.tsx$|data\/|accounts\/)/
 /** Built in pieces so that this file passes its own scan. */
 const NEEDLE = ['s', 'ha'].join('')
+/** Hashing in source: an algorithm name with its size, WebCrypto, a digest call. The bare word of NEEDLE is inside "share". */
+const HASHING = /sha-?\d{1,3}|crypto\.subtle|\.digest\(/i
 
 /** What `file` (relative to src/) imports from src/, relative to src/. Only a relative specifier can reach another file of src/. */
 const targets = (file: string, src: string) =>
@@ -95,6 +99,12 @@ describe('context imagery module boundary', () => {
     ])
       expect(leaks(f, season)).toEqual(['explore/season.ts'])
     expect(leaks('report/html.ts', `const m = import('../explore')`)).toEqual(['explore']) // the folder itself
+    // the screen that shows the time-lapse counts as the time-lapse, with or without its extension
+    const screen = `import { ExploreScreen } from './ExploreScreen.tsx'`
+    expect(leaks('screens/Report.tsx', screen)).toEqual(['screens/ExploreScreen.tsx'])
+    expect(leaks('report/html.ts', `const m = import('../screens/ExploreScreen')`)).toEqual([
+      'screens/ExploreScreen',
+    ])
   })
 
   it('does not flag the places that may, or names that only look alike', () => {
@@ -116,6 +126,7 @@ describe('context imagery module boundary', () => {
       '../data/contexts.ts',
       '../map/contextLayers.ts',
       '../explorer/season.ts',
+      '../screens/ExploreScreens.tsx',
       '../ui/explore.ts',
       '../data/exploreStats.ts',
       'zod',
@@ -139,5 +150,18 @@ describe('context imagery module boundary', () => {
     expect(scanned).toEqual(expect.arrayContaining(['context/load.ts', 'map/contextLayer.ts']))
     expect(scanned.filter((f) => digestName(text(f)))).toEqual([])
     expect(digestName(`const ${NEEDLE.toUpperCase()}OfPixels = 1`)).toBe(true) // the scan sees the word where it would be written
+  })
+
+  it('has no hashing call in the time-lapse code: its frames are display only, never hashed', () => {
+    const scanned = files.filter((f) => EXPLORE.test(f))
+    expect(scanned).toEqual(expect.arrayContaining(['explore/season.ts']))
+    expect(scanned.filter((f) => HASHING.test(text(f)))).toEqual([])
+    // the scan sees the API where it is written, in the evidence code that hashes frames, and not the plain words
+    expect(HASHING.test(text('evidence/frame.ts'))).toBe(true) // sha256Hex and crypto.subtle.digest
+    expect(HASHING.test(text('explore/season.ts'))).toBe(false) // "share of the square" is not a hash
+    expect(['await sha256Hex(b)', "digest('SHA-256', b)", 'h.digest(b)'].every((s) => HASHING.test(s))).toBe(
+      true,
+    )
+    expect(['a share of it', 'its shape', 'a shadow'].some((s) => HASHING.test(s))).toBe(false)
   })
 })
