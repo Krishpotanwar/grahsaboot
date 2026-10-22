@@ -181,15 +181,35 @@ describe('imagery client: the change request', () => {
       vi.unstubAllGlobals()
     }
   })
-  it('transfers the buffers it is given: the worker gets them and the caller no longer has them', async () => {
+  // The contract of `change` (ruling R36, plan D14): the arrays the caller passes are DETACHED by the call, so callers pass copies.
+  it('detaches the arrays it is given: the worker has the data and the caller has empty arrays', async () => {
     const w = new CloningWorker()
     const r = changeReq()
-    const buffers = [r.first.rgba, r.last.rgba, r.first.invalid, r.last.invalid, r.inside].map(
-      (a) => a.buffer,
-    )
+    const arrays = [r.first.rgba, r.last.rgba, r.first.invalid, r.last.invalid, r.inside]
+    const buffers = arrays.map((a) => a.buffer)
     await createImageryClient(() => w).change(r)
     expect(w.transfers[0]).toEqual(buffers)
-    for (const b of buffers) expect(b.byteLength).toBe(0)
+    for (const a of arrays) {
+      expect(a).toHaveLength(0)
+      expect(a.byteLength).toBe(0)
+      expect(a.buffer.byteLength).toBe(0)
+    }
+    expect([...w.received[0].req.first.rgba]).toEqual(Array.from({ length: 16 }, (_, i) => i))
+    expect([...w.received[0].req.inside]).toEqual([1, 1, 1, 0])
+  })
+  it('fails loudly, rather than compare empty pictures, when it is given arrays it already took', async () => {
+    const c = createImageryClient(() => new CloningWorker())
+    const r = changeReq()
+    await c.change(r)
+    await expect(c.change(r)).rejects.toMatchObject({ name: 'DataCloneError' })
+  })
+  it('detaches nothing of a request it refuses before posting', async () => {
+    const r = changeReq()
+    await expect(
+      createImageryClient(() => new CloningWorker()).change(r, AbortSignal.abort()),
+    ).rejects.toThrow()
+    expect(r.first.rgba).toHaveLength(16)
+    expect(r.inside).toHaveLength(4)
   })
   it('lists a buffer once, and copies a view of part of a larger buffer instead of detaching it', async () => {
     const w = new CloningWorker()

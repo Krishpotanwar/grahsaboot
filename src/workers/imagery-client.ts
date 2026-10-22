@@ -25,9 +25,14 @@ export interface ImageryClient {
   quality(req: QualityRequest, signal?: AbortSignal): Promise<QualityResult>
   frame(req: FrameRequest, signal?: AbortSignal): Promise<FrameResult>
   /**
-   * The change rule (src/evidence/change.ts) on two display pictures. The buffers in `req` are handed over to the worker, not
-   * copied: the caller's arrays are empty afterwards, so pass copies of any picture that is shown again. A view of part of a
-   * larger buffer is copied instead, and so detaches nothing.
+   * The change rule (src/evidence/change.ts) on two display pictures.
+   *
+   * This call DETACHES the buffers it is given (plan D14, ruling R36): `req.first.rgba`, `req.last.rgba`, `req.first.invalid`,
+   * `req.last.invalid` and `req.inside` are transferred to the worker, not copied, so once the request is posted they are empty
+   * (length 0) in the caller, and passing the same arrays again rejects with a DataCloneError. Callers MUST pass copies of
+   * every array they still need afterwards, for example `rgba.slice()` of a picture the player shows again. A typed array that
+   * is only a view of part of a larger buffer is copied instead and detaches nothing; so does a call refused before it is
+   * posted (an aborted signal, a disposed client).
    */
   change(req: ChangeRequest, signal?: AbortSignal): Promise<ChangeResult>
   dispose(): void
