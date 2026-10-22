@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { realDate } from '../lib/dates.ts'
 import { SCENE_ID } from '../stac/search.ts'
-import { decodeShare, encodeShare, type Share, type ShareNotice, type ShareRead } from './share.ts'
+import {
+  decodeShare,
+  encodeShare,
+  MAX_FRAMES,
+  SIDE,
+  type Share,
+  type ShareNotice,
+  type ShareRead,
+} from './share.ts'
 
 // An address is text anyone can edit, so most of this file is bad text. `today` is fixed: no test depends on the day it runs.
 const TODAY = new Date('2026-10-22T09:00:00Z')
@@ -41,6 +49,27 @@ const deepFreeze = <T>(x: T): T => {
   }
   return x
 }
+
+describe('the limits it exports', () => {
+  it("are the brief's: a size from 500 to 2900 and at most 8 frames", () => {
+    expect(SIDE).toEqual({ min: 500, max: 2900 })
+    expect(MAX_FRAMES).toBe(8)
+  })
+
+  it('are the ones decodeShare and encodeShare hold to', () => {
+    for (const side of [SIDE.min, SIDE.max])
+      expect(decodeShare(link({ side: String(side) }), TODAY).share?.sideM).toBe(side)
+    for (const side of [SIDE.min - 1, SIDE.max + 1])
+      expect(decodeShare(link({ side: String(side) }), TODAY)).toEqual(unreadable)
+    const many = link({ d: days(MAX_FRAMES + 1).join(','), s: null })
+    expect(decodeShare(many, TODAY).share?.frames).toHaveLength(MAX_FRAMES)
+    const q = (sideM: number) => new URLSearchParams(encodeShare({ ...SHARE, sideM }, TODAY)!).get('side')
+    expect([q(SIDE.min - 100), q(SIDE.max + 100)]).toEqual([String(SIDE.min), String(SIDE.max)])
+    const all = days(MAX_FRAMES + 3).map((date) => ({ date, id: sceneId(date) }))
+    const d = new URLSearchParams(encodeShare({ ...NAGPUR, frames: all }, TODAY)!).get('d')!
+    expect(d.split(',')).toHaveLength(MAX_FRAMES)
+  })
+})
 
 describe('encodeShare', () => {
   it('writes the version, the centre, the size, the dates and the scene ids, in that order', () => {
@@ -196,7 +225,7 @@ describe('decodeShare', () => {
       const text = encodeShare(share, TODAY)!
       const { share: back, notices } = decodeShare(text, TODAY)
       expect(back, text).toEqual(share)
-      expect(notices, text).toEqual(share.frames.some((f) => f.id === null) ? ['date-fallback'] : [])
+      expect(notices, text).toEqual([]) // a frame with no scene id is for the lookups to judge, not for the reader
     }
   })
 
@@ -394,17 +423,17 @@ describe('decodeShare', () => {
       ['an empty entry', ''],
       ['words', 'junk'],
     ])(
-      'keeps the date of a frame whose scene id is %s (%j) and says it fell back to the date',
+      'keeps the date of a frame whose scene id is %s (%j), with no scene to ask for, and says nothing yet',
       (_why, bad) => {
         const read = decodeShare(link({ s: `${bad},${F2.id},${F3.id}` }), TODAY)
         expect(read).toEqual({
           share: { ...NAGPUR, frames: [{ date: F1.date, id: null }, F2, F3] },
-          notices: ['date-fallback'],
+          notices: [], // whether a frame falls back to its day is for rebuildFrames to say, once the lookups have answered
         })
       },
     )
 
-    it('opens an old link that names dates only: every frame falls back to its date, and says so', () => {
+    it('opens an old link that names dates only: every frame keeps its date, with no scene to ask for', () => {
       const old = 'v=1&lat=21.1458&lon=79.0882&side=2000&d=2019-02-20,2021-02-15'
       expect(decodeShare(old, TODAY)).toEqual({
         share: {
@@ -414,7 +443,7 @@ describe('decodeShare', () => {
             { date: '2021-02-15', id: null },
           ],
         },
-        notices: ['date-fallback'],
+        notices: [],
       })
     })
 
@@ -427,7 +456,7 @@ describe('decodeShare', () => {
       ])
       expect(decodeShare(link({ d: dates, s: `${F1.id},,${F3.id}` }), TODAY)).toEqual({
         share: { ...NAGPUR, frames: [F1, { date: F2.date, id: null }, F3] },
-        notices: ['date-fallback'],
+        notices: [],
       })
       expect(decodeShare(link({ d: dates, s: '' }), TODAY).share?.frames.map((f) => f.id)).toEqual([
         null,
@@ -436,11 +465,11 @@ describe('decodeShare', () => {
       ])
     })
 
-    it('says both things when a frame is dropped and another has no scene', () => {
+    it('says only that a day was dropped when another frame has no scene: whether that one falls back is for the lookups', () => {
       const read = decodeShare(link({ d: `${F1.date},zzzz,${F3.date}`, s: `${F1.id},${F2.id},` }), TODAY)
       expect(read).toEqual({
         share: { ...NAGPUR, frames: [F1, { date: F3.date, id: null }] },
-        notices: ['missing-frame', 'date-fallback'],
+        notices: ['missing-frame'],
       })
     })
   })
@@ -479,7 +508,7 @@ describe('decodeShare', () => {
     expect(got.latitude).toEqual(unreadable)
     expect(got.commas).toEqual({ share: { ...NAGPUR, frames: [F1] }, notices: ['missing-frame'] })
     expect(got.manyDates!.share?.frames).toHaveLength(8)
-    expect(got.longId!.notices).toEqual(['date-fallback'])
+    expect(got.longId!.notices).toEqual([])
     expect(elapsed).toBeLessThan(5000)
   })
 })
@@ -554,7 +583,7 @@ describe('decodeShare on random text', () => {
   ]
   const KEYS = ['name', 'notes', 'claim', 'token', '__proto__', 'constructor', 'x', 'v', 'lat', 'd', 's', '']
 
-  const codes: ShareNotice[] = ['unknown-version', 'unreadable', 'missing-frame', 'date-fallback']
+  const codes: ShareNotice[] = ['unknown-version', 'unreadable', 'missing-frame'] // never date-fallback: only rebuildFrames says it
   /** What a read must always satisfy, whatever the text was. */
   function check(read: ShareRead, text: string): void {
     for (const n of read.notices) expect(codes, text).toContain(n)

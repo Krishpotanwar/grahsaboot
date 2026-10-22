@@ -14,8 +14,10 @@ import { SCENE_ID } from '../stac/search.ts'
 // nothing free-form: each field is a number, a real day or a strict scene id, so no text of an address reaches the page.
 
 const VERSION = '1'
-const MAX_FRAMES = 8
-const SIDE = { min: 500, max: 2900 } as const // 3000 fails the outline check at 59% of 20,235 sampled places
+/** The most frames a link holds. */
+export const MAX_FRAMES = 8
+/** The sides of the square, in metres, a link may name (3000 fails the outline check at 59% of 20,235 sampled places). */
+export const SIDE = { min: 500, max: 2900 } as const
 
 /** One frame: its day and, when it has one, the Earth Search scene that made it (null: the day alone). */
 export interface ShareFrame {
@@ -33,8 +35,10 @@ export interface Share {
  * What a read tells the page, as codes (the words are the page's):
  * - `unknown-version`: the address names a version of the link that this code does not read;
  * - `unreadable`: no place, size or frame could be taken from it;
- * - `missing-frame`: a day of the link was left out (not a real day in range, not later than the one before it, or past the 8th);
- * - `date-fallback`: a frame has no scene to ask for, so its day is searched instead.
+ * - `missing-frame`: a day of the link was left out (not a real day in range, not later than the one before it, or past the 8th); it
+ *   is also what `rebuildFrames` says of a frame it could not find;
+ * - `date-fallback`: a frame shows the day's scene, not the scene the link named. Only `rebuildFrames` says it: no reader can know
+ *   before the lookups have answered, so a frame with no scene id is not a notice here.
  */
 export type ShareNotice = 'unknown-version' | 'unreadable' | 'missing-frame' | 'date-fallback'
 /** `share` is null for a link that cannot be opened; with no notice either, the address held no share link at all (no `v`). */
@@ -119,8 +123,8 @@ export function decodeShare(search: string | URLSearchParams, today: Date = new 
     frames.length === 0
   )
     return { share: null, notices: ['unreadable'] }
-  const notices: ShareNotice[] = []
-  if (frames.length < dates.length) notices.push('missing-frame')
-  if (frames.some((f) => f.id === null)) notices.push('date-fallback')
-  return { share: { lat: round4(lat), lon: round4(lon), sideM, frames }, notices }
+  return {
+    share: { lat: round4(lat), lon: round4(lon), sideM, frames },
+    notices: frames.length < dates.length ? ['missing-frame'] : [],
+  }
 }
