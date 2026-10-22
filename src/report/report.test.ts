@@ -3,7 +3,9 @@ import { escapeHtml } from './escape.ts'
 import { buildProvenance } from './provenance.ts'
 import { buildReportHtml, type ReportImage } from './html.ts'
 import { addNote, newInvestigation, setBeforeAfter, setClaim, togglePin } from '../data/investigation.ts'
+import { CHANGE_RECIPE } from '../evidence/change.ts'
 import { makeDisplayGrid } from '../evidence/display.ts'
+import { RECIPES } from '../evidence/types.ts'
 import type { AoiSummary } from '../geo/aoi.ts'
 import { copy } from '../ui/copy.ts'
 import { flow } from '../ui/copy-flow.ts'
@@ -239,6 +241,21 @@ describe('buildProvenance', () => {
       '2025-12-20:visual:0',
     ])
     expect(p.frames[3]).toMatchObject({ sha256: 'c'.repeat(64), transform: [20, 0, 300000, 0, -20, 2341000] })
+  })
+
+  it('lists every recipe a report can use, the change rule among them, in every new report', () => {
+    expect(buildProvenance(inv, summary, entries, '0.1.0', T).recipes).toEqual({
+      frame: 'frame-v1',
+      scl: 'scl-v2',
+      display: 'display-v1',
+      diff: 'diff-v1',
+      change: 'change-v1',
+    })
+  })
+
+  // types.ts cannot import the rule (change.ts imports types.ts), so the tag lives in both places and this ties them (ruling D32).
+  it('names the change rule by the tag the rule writes into every result', () => {
+    expect(RECIPES.change).toBe(CHANGE_RECIPE)
   })
 
   it('credits Sentinel data once, for the years of the pinned dates, oldest first', () => {
