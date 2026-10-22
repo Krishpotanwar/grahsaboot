@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { version } from '../../package.json'
 import { useInvestigation } from '../data/useInvestigation.ts'
-import type { QualityStats } from '../evidence/types.ts'
+import type { ChangeResult } from '../evidence/change.ts'
+import { rasterizeOnGrid } from '../evidence/mask.ts'
+import type { DisplayGrid, QualityStats } from '../evidence/types.ts'
+import { toAoiGeometry, type AoiInput } from '../geo/aoi.ts'
 import { rgbaToPngDataUrl, rgbToRgba } from '../lib/canvas.ts'
 import { Link } from '../lib/router.tsx'
 import { useMapLayout } from '../map/MapStage.tsx'
@@ -13,6 +16,7 @@ import { Button, Skeleton, TextField } from '../ui/kit.tsx'
 import { useTheme } from '../ui/theme.ts'
 import { isUsable } from '../workbench/defaults.ts'
 import { useEvidence } from '../workbench/useEvidence.ts'
+import { createImageryClient, type ImageryClient } from '../workers/imagery-client.ts'
 import type { FrameResult } from '../workers/imagery-core.ts'
 import NotFound from './NotFound.tsx'
 
@@ -21,6 +25,59 @@ function download(name: string, type: string, body: string) {
   const a = Object.assign(document.createElement('a'), { href: url, download: name })
   a.click()
   setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
+/**
+ * How long the report waits for the change rule. The rule runs in tens of milliseconds in the worker (58 ms on a 1024 by 1024 grid in
+ * Node), so a wait this long means a worker that is stuck or dead: the report is built without its "What we measured" block rather
+ * than keep the person waiting for the imagery client's own limit, 120 s (src/workers/imagery-client.ts).
+ */
+export const MEASURE_DEADLINE_MS = 10_000
+
+export interface MeasureInput {
+  makeClient: () => ImageryClient
+  aoi: AoiInput
+  grid: DisplayGrid
+  /** The pinned pictures on `grid` and their "not clear" marks, as the report holds them. A null mark is a mark that was never made. */
+  before: { rgba: Uint8ClampedArray; invalid: Uint8Array | null }
+  after: { rgba: Uint8ClampedArray; invalid: Uint8Array | null }
+  /** Fires when the report is left. */
+  signal: AbortSignal
+}
+
+/**
+ * The change rule (src/evidence/change.ts) on the pinned pair, run in a worker of its own on the display grid with the outline as its
+ * `inside` mask (`rasterizeOnGrid`); the pictures and marks are passed as they are, the client clones them (R42). It gives the result,
+ * or undefined, which is the report without its "What we measured" block, and nothing else: a missing mark (never read as "all
+ * clear"), a worker that cannot be made, fails, dies, outlasts `MEASURE_DEADLINE_MS` or is cut off by leaving the report all end
+ * the same way, and nothing is thrown or logged (ruling R46). The worker it made is ended however the run ends.
+ */
+export async function measurePair(a: MeasureInput): Promise<ChangeResult | undefined> {
+  const { before, after, signal } = a
+  if (signal.aborted || !before.invalid || !after.invalid) return undefined
+  const stop = new AbortController()
+  const leave = () => stop.abort()
+  signal.addEventListener('abort', leave, { once: true })
+  const deadline = setTimeout(leave, MEASURE_DEADLINE_MS)
+  let client: ImageryClient | undefined
+  try {
+    client = a.makeClient()
+    return await client.change(
+      {
+        first: { rgba: before.rgba, invalid: before.invalid },
+        last: { rgba: after.rgba, invalid: after.invalid },
+        grid: a.grid,
+        inside: rasterizeOnGrid(toAoiGeometry(a.aoi), a.grid),
+      },
+      stop.signal,
+    )
+  } catch {
+    return undefined // by ruling R46 a failed run is the report without the block, not an error of the report
+  } finally {
+    clearTimeout(deadline)
+    signal.removeEventListener('abort', leave)
+    client?.dispose()
+  }
 }
 
 const linkClass = 'inline-flex h-11 items-center rounded-[6px] border border-control px-4'
@@ -81,9 +138,34 @@ export default function Report({ id }: { id: string }) {
   const beforeStats = beforeEntry?.quality?.stats ?? null
   const afterStats = afterEntry?.quality?.stats ?? null
 
+  // The change rule on the pinned pair, once the pair's pictures and marks are in (ruling R46). The report is built from its answer,
+  // or from the lack of one (`measurePair`), so the first sight of the page is the finished report. An answer belongs to the two
+  // pictures it was made from: a new pair of frames (a retry) starts a new run, and a stale answer is never shown.
+  const [measured, setMeasured] = useState<{
+    before: FrameResult
+    after: FrameResult
+    change: ChangeResult | undefined
+  } | null>(null)
+  useEffect(() => {
+    if (!ready || !pair || !grid || !beforeFull || !afterFull) return
+    const left = new AbortController()
+    void measurePair({
+      makeClient: () => createImageryClient(),
+      aoi: pair.aoi,
+      grid,
+      before: { rgba: beforeFull.display.rgba, invalid: beforeEntry?.invalid ?? null },
+      after: { rgba: afterFull.display.rgba, invalid: afterEntry?.invalid ?? null },
+      signal: left.signal,
+    }).then((change) => {
+      if (!left.signal.aborted) setMeasured({ before: beforeFull, after: afterFull, change })
+    })
+    return () => left.abort()
+  }, [ready, pair?.aoi, grid, beforeFull, afterFull, beforeEntry?.invalid, afterEntry?.invalid]) // eslint-disable-line react-hooks/exhaustive-deps
+  const settled = ready && measured?.before === beforeFull && measured?.after === afterFull
+
   const provenance = useMemo(
-    () => (ready && pair && summary ? buildProvenance(pair, summary, state.entries, version) : null),
-    [ready, pair, summary, state.entries],
+    () => (settled && pair && summary ? buildProvenance(pair, summary, state.entries, version) : null),
+    [settled, pair, summary, state.entries],
   )
   // Apart from the HTML: typing in "Prepared by" builds the page again, never the four PNGs.
   const images = useMemo<ReportImage[]>(() => {
@@ -116,13 +198,14 @@ export default function Report({ id }: { id: string }) {
             grid: grid ?? undefined,
             images,
             entries: state.entries,
+            change: measured?.change,
             provenance,
             theme,
             preparedBy,
             generatedAt: new Date(provenance.generatedAt),
           })
         : null,
-    [provenance, pair, summary, grid, images, state.entries, theme, preparedBy],
+    [provenance, pair, summary, grid, images, state.entries, measured, theme, preparedBy],
   )
 
   if (inv === undefined) return <Skeleton className="m-6 h-64" />
