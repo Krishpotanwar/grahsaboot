@@ -64,7 +64,10 @@ type Json = {
   links?: Array<{ rel?: string; href?: string; method?: string; body?: unknown; merge?: boolean }>
 }
 
-async function fetchJson(req: Req, a: SearchArgs): Promise<Json> {
+/** What the fetch below reads of its caller: a search brings more, a lookup by id only this. */
+type FetchArgs = Pick<SearchArgs, 'signal' | 'fetchImpl' | 'sleep'>
+
+async function fetchJson(req: Req, a: FetchArgs): Promise<Json> {
   const f = a.fetchImpl ?? fetch
   const sleep = a.sleep ?? ((ms: number) => new Promise((r) => setTimeout(r, ms)))
   let last: unknown
@@ -172,5 +175,28 @@ export async function searchSentinel2(a: SearchArgs): Promise<SearchResult> {
   } catch (e) {
     if (isAbort(a.signal) || fatal(e)) throw e
     return await searchEndpoint(config.pcStacUrl, 'pc:sentinel-2-l2a', a, false)
+  }
+}
+
+/** An Earth Search scene id. The other catalogue builds its ids differently (S2B_MSIL2A_20250307T053649_R005_T43QBB_20250307T082113). */
+export const SCENE_ID = /^S2[ABC]_[0-9]{2}[A-Z]{3}_[0-9]{8}_[0-9]_L2A$/
+
+/**
+ * One Earth Search scene by its id, with a search's retries and timeout; null when there is no such scene (a 404, or an id of the
+ * other catalogue, which is not asked for). Any other failure throws, as a search's does, so a caller can tell "gone" from "no
+ * answer". The id is checked before it reaches the path and the answer must be that scene: never a stand-in.
+ */
+export async function getItemById(id: string, a: FetchArgs = {}): Promise<S2Item | null> {
+  if (!SCENE_ID.test(id)) return null
+  try {
+    const raw = await fetchJson(
+      { url: `${config.stacUrl}/collections/sentinel-2-l2a/items/${id}`, method: 'GET' },
+      a,
+    )
+    const item = parseItem(raw, 'sentinel-2-l2a')
+    return item?.id === id ? item : null
+  } catch (e) {
+    if (e instanceof StacError && e.status === 404) return null
+    throw e
   }
 }

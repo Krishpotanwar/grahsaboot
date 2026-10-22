@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { searchSentinel2 } from './search.ts'
+import { getItemById, SCENE_ID, searchSentinel2 } from './search.ts'
 
 const item = (id: string, date: string) => ({
   id,
@@ -453,5 +453,199 @@ describe('searchSentinel2 where a timed-out fetch rejects with an AbortError (We
     caller.abort()
     await expect(p).rejects.toMatchObject({ name: 'AbortError' })
     expect(fetchImpl).toHaveBeenCalledTimes(1)
+  })
+})
+
+// One scene by its id (the share link names the scene of each frame). Earth Search only: the two catalogues build their ids
+// differently, so an id of one is never a question for the other.
+const SCENE = 'S2B_44QLJ_20260512_0_L2A'
+const PC_SCENE = 'S2B_MSIL2A_20250307T053649_R005_T43QBB_20250307T082113' // as the plan gives a Planetary Computer id
+const ES_ITEMS = 'https://earth-search.aws.element84.com/v1/collections/sentinel-2-l2a/items/'
+
+describe('SCENE_ID', () => {
+  it('is the strict pattern of the share link, verbatim', () => {
+    expect(SCENE_ID.source).toBe('^S2[ABC]_[0-9]{2}[A-Z]{3}_[0-9]{8}_[0-9]_L2A$')
+    expect(SCENE_ID.flags).toBe('') // no g or y flag: `test` keeps no state between calls
+  })
+  it.each([
+    SCENE,
+    'S2A_43QBB_20180222_0_L2A',
+    'S2C_44QKJ_20250220_3_L2A',
+    'S2B_01AAA_20170101_9_L2A', // the pattern is a shape, not a calendar
+  ])('accepts %s', (id) => {
+    expect(SCENE_ID.test(id)).toBe(true)
+  })
+  it.each([
+    ['a Planetary Computer id', PC_SCENE],
+    ['nothing', ''],
+    ['a satellite letter that is not A, B or C', 'S2D_44QLJ_20260512_0_L2A'],
+    ['lower case', 'S2b_44qlj_20260512_0_l2a'],
+    ['a one-digit tile number', 'S2B_4QLJ_20260512_0_L2A'],
+    ['a three-digit tile number', 'S2B_444QLJ_20260512_0_L2A'],
+    ['a tile with two letters', 'S2B_44QL_20260512_0_L2A'],
+    ['a tile with four letters', 'S2B_44QLJK_20260512_0_L2A'],
+    ['a date of seven digits', 'S2B_44QLJ_2026051_0_L2A'],
+    ['a date of nine digits', 'S2B_44QLJ_202605120_0_L2A'],
+    ['a two-digit processing number', 'S2B_44QLJ_20260512_10_L2A'],
+    ['no processing number', 'S2B_44QLJ_20260512__L2A'],
+    ['level 1C', 'S2B_44QLJ_20260512_0_L1C'],
+    ['a text before it', ' S2B_44QLJ_20260512_0_L2A'],
+    ['a text after it', 'S2B_44QLJ_20260512_0_L2A '],
+    ['a new line after it', 'S2B_44QLJ_20260512_0_L2A\n'],
+    ['a second id after it', 'S2B_44QLJ_20260512_0_L2AS2B_44QLJ_20260512_0_L2A'],
+    ['a query after it', 'S2B_44QLJ_20260512_0_L2A?x=1'],
+    ['a path after it', 'S2B_44QLJ_20260512_0_L2A/..'],
+    ['full-width digits', 'S2B_４４QLJ_20260512_0_L2A'],
+  ])('refuses %s (%j)', (_why, id) => {
+    expect(SCENE_ID.test(id)).toBe(false)
+  })
+})
+
+describe('getItemById', () => {
+  it('asks Earth Search for the one scene and reads it as a search reads a result', async () => {
+    const feature = item(SCENE, '2026-05-12')
+    const byId = vi.fn().mockImplementation(async () => json(feature))
+    const got = await getItemById(SCENE, { fetchImpl: byId })
+    expect(byId).toHaveBeenCalledTimes(1)
+    const [url, init] = byId.mock.calls[0]!
+    expect(url).toBe(`${ES_ITEMS}${SCENE}`)
+    expect(init.method).toBe('GET')
+    expect(init.body).toBeUndefined()
+    expect(init.headers).toBeUndefined() // a plain GET: no preflight
+    const search = vi.fn().mockImplementation(async () => json({ features: [feature], links: [] }))
+    const listed = (await searchSentinel2({ ...args, fetchImpl: search })).items[0]
+    expect(got).toEqual(listed)
+    expect(got).toMatchObject({ id: SCENE, collection: 'sentinel-2-l2a', date: '2026-05-12', epsg: 32644 })
+  })
+
+  it('answers null, not an error, for a scene the catalogue does not have (404): one request, no retry', async () => {
+    const fetchImpl = vi.fn().mockImplementation(async () => json({ code: 'NotFound' }, 404))
+    expect(await getItemById(SCENE, { fetchImpl, sleep: async () => {} })).toBeNull()
+    expect(fetchImpl).toHaveBeenCalledTimes(1)
+  })
+
+  it.each([
+    ['a Planetary Computer id', PC_SCENE],
+    ['nothing', ''],
+    ['a path out of the collection', '../x'],
+    ['the collection itself', '..'],
+    ['an id with a path after it', `${SCENE}/..`],
+    ['an id with a query after it', `${SCENE}?fields=id`],
+    ['an id with a new line after it', `${SCENE}\n`],
+    ['lower case', SCENE.toLowerCase()],
+    ['a satellite that does not exist', 'S2D_44QLJ_20260512_0_L2A'],
+  ])('does not ask at all for %s (%j): null', async (_why, id) => {
+    const fetchImpl = vi.fn().mockImplementation(async () => json(item(SCENE, '2026-05-12')))
+    expect(await getItemById(id, { fetchImpl })).toBeNull()
+    expect(fetchImpl).not.toHaveBeenCalled()
+  })
+
+  it('never answers with another scene than the one asked for', async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockImplementation(async () => json(item('S2B_44QLJ_20260513_0_L2A', '2026-05-13')))
+    expect(await getItemById(SCENE, { fetchImpl })).toBeNull()
+  })
+
+  it.each([
+    ['an empty object', {}],
+    ['null', null],
+    ['an array', []],
+    [
+      'a scene without its pictures',
+      { id: SCENE, properties: { datetime: '2026-05-12T05:30:00Z' }, assets: {} },
+    ],
+  ])('answers null for a 200 that is %s', async (_why, body) => {
+    const fetchImpl = vi.fn().mockImplementation(async () => json(body))
+    expect(await getItemById(SCENE, { fetchImpl })).toBeNull()
+  })
+
+  it('retries a 503 as a search does, backing off, then answers', async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockImplementationOnce(async () => json({}, 503))
+      .mockImplementationOnce(async () => json({}, 429))
+      .mockImplementation(async () => json(item(SCENE, '2026-05-12')))
+    const sleep = vi.fn(async () => {})
+    expect((await getItemById(SCENE, { fetchImpl, sleep }))?.id).toBe(SCENE)
+    expect(fetchImpl).toHaveBeenCalledTimes(3)
+    expect(sleep.mock.calls).toEqual([[500], [1500]])
+  })
+
+  it('gives up after three attempts with the status, and never asks the other catalogue', async () => {
+    const fetchImpl = vi.fn().mockImplementation(async () => json({}, 502))
+    await expect(getItemById(SCENE, { fetchImpl, sleep: async () => {} })).rejects.toMatchObject({
+      status: 502,
+    })
+    expect(fetchImpl).toHaveBeenCalledTimes(3)
+    for (const [url] of fetchImpl.mock.calls) expect(url).toBe(`${ES_ITEMS}${SCENE}`) // its ids are another shape: the caller falls back to the date
+  })
+
+  it('rethrows a 4xx other than 404 at once', async () => {
+    const fetchImpl = vi.fn().mockImplementation(async () => json({}, 400))
+    await expect(getItemById(SCENE, { fetchImpl })).rejects.toMatchObject({ status: 400 })
+    expect(fetchImpl).toHaveBeenCalledTimes(1)
+  })
+
+  it('never swallows an abort: no retry, no null', async () => {
+    const ac = new AbortController()
+    ac.abort()
+    const fetchImpl = vi.fn().mockRejectedValue(new DOMException('Aborted', 'AbortError'))
+    await expect(getItemById(SCENE, { fetchImpl, signal: ac.signal })).rejects.toMatchObject({
+      name: 'AbortError',
+    })
+    expect(fetchImpl).toHaveBeenCalledTimes(1)
+  })
+
+  it('times a stalled request out after 20 s and retries it', async () => {
+    const real = AbortSignal.timeout.bind(AbortSignal)
+    const timeout = vi.spyOn(AbortSignal, 'timeout').mockImplementation(() => real(5)) // 20 s would stall the suite
+    try {
+      const fetchImpl = vi
+        .fn()
+        .mockImplementationOnce((_url: string, init: RequestInit) => stall(init))
+        .mockImplementation(async () => json(item(SCENE, '2026-05-12')))
+      const got = await getItemById(SCENE, { fetchImpl, sleep: async () => {} })
+      expect(timeout).toHaveBeenCalledWith(20_000)
+      expect(fetchImpl).toHaveBeenCalledTimes(2)
+      expect(got?.id).toBe(SCENE)
+    } finally {
+      timeout.mockRestore()
+    }
+  })
+
+  // WebKit rejects a fetch that AbortSignal.timeout cut short with an AbortError, the name a caller's abort gets too: only the
+  // caller's own signal tells them apart, so a timed-out lookup is retried and a caller abort is not.
+  it('retries a timed-out request that rejects with an AbortError (WebKit), but ends at once on a caller abort', async () => {
+    const abortError = (init: RequestInit) =>
+      new Promise<Response>((_, reject) =>
+        init.signal!.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), {
+          once: true,
+        }),
+      )
+    const real = AbortSignal.timeout.bind(AbortSignal)
+    const timeout = vi.spyOn(AbortSignal, 'timeout').mockImplementation(() => real(5))
+    try {
+      const caller = new AbortController()
+      const retried = vi
+        .fn()
+        .mockImplementationOnce((_url: string, init: RequestInit) => abortError(init))
+        .mockImplementation(async () => json(item(SCENE, '2026-05-12')))
+      const got = await getItemById(SCENE, {
+        fetchImpl: retried,
+        signal: caller.signal,
+        sleep: async () => {},
+      })
+      expect(retried).toHaveBeenCalledTimes(2)
+      expect(got?.id).toBe(SCENE)
+
+      const ended = vi.fn().mockImplementation((_url: string, init: RequestInit) => abortError(init))
+      const p = getItemById(SCENE, { fetchImpl: ended, signal: caller.signal })
+      caller.abort()
+      await expect(p).rejects.toMatchObject({ name: 'AbortError' })
+      expect(ended).toHaveBeenCalledTimes(1)
+    } finally {
+      timeout.mockRestore()
+    }
   })
 })
