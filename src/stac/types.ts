@@ -15,6 +15,11 @@ export interface S2Item {
   cloudCover: number | null
   baseline: string | null
   nodataPct: number | null
+  /**
+   * Sun height above the horizon, degrees: `view:sun_elevation`, else 90 minus `s2:mean_solar_zenith` (the fallback catalogue); null
+   * when the catalogue gives neither. Optional so that an item built by hand, without it, stays valid: read it as null.
+   */
+  sunElevation?: number | null
   footprint: LonLat[][]
   visual: AssetRef
   scl: AssetRef

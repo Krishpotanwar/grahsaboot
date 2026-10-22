@@ -38,6 +38,13 @@ function rings(geom: unknown): LonLat[][] | null {
   return ok.length ? ok : null
 }
 
+/** Degrees above the horizon, -90 to 90: the catalogue's own `view:sun_elevation`, else 90 minus the zenith angle (0 to 180). */
+function sunElevation(p: Obj): number | null {
+  const inRange = (e: number | null) => (e !== null && e >= -90 && e <= 90 ? e : null)
+  const zenith = num(p['s2:mean_solar_zenith'])
+  return inRange(num(p['view:sun_elevation'])) ?? inRange(zenith === null ? null : 90 - zenith)
+}
+
 export function parseItem(raw: unknown, collection: Collection): S2Item | null {
   if (!isObj(raw) || !isObj(raw.properties) || !isObj(raw.assets)) return null
   const id = str(raw.id)
@@ -59,6 +66,7 @@ export function parseItem(raw: unknown, collection: Collection): S2Item | null {
     cloudCover: num(p['eo:cloud_cover']),
     baseline: str(p['s2:processing_baseline']),
     nodataPct: num(p['s2:nodata_pixel_percentage']),
+    sunElevation: sunElevation(p),
     footprint,
     visual,
     scl,
