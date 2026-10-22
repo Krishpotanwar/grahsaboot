@@ -1,34 +1,55 @@
 import { describe, expect, it } from 'vitest'
 import { LIMITS } from '../geo/limits.ts'
+import {
+  GOOGLE_PHRASINGS,
+  LOOK_CLOSER_LINE,
+  SIGN_IN,
+  withoutLookCloserLine,
+} from '../../tests/fixtures/sign-in-words.ts'
 import { account } from './copy-account.ts'
 import { flow } from './copy-flow.ts'
 import { copy } from './copy.ts'
 
-// The words of signing in are only for a build with accounts (copy-account.ts). The live pages say nothing about them. Google is
-// one of them as the way in, or as the owner of the person's name, email and profile; the Look closer line names it only as the
-// place a link opens.
-const SIGN_IN =
-  /sign.?in|signed.?in|Google (name|account|email|profile|identity|log.?in)|(with|via|using|through) Google|your (whole )?account/i
+// The words of signing in are only for a build with accounts (copy-account.ts). The live pages say nothing about them, Google
+// included: only the Look closer line of the privacy page names it (tests/fixtures/sign-in-words.ts, shared with dormant.spec.ts).
+
+/** What the guard scans of a live page: the privacy page without its one permitted line, the limits page as it is. `extra` are
+ * lines added to the page, to prove what the guard refuses. */
+const scanned = (name: 'privacy' | 'limits', extra: readonly string[] = []): string => {
+  const page = copy.pages[name]
+  const items = [...page.items, ...extra]
+  return [page.title, page.intro, ...(name === 'privacy' ? withoutLookCloserLine(items) : items)].join('\n')
+}
 
 describe('account copy', () => {
-  it('leaves every sign-in word out of the live privacy and limits pages', () => {
-    for (const page of [copy.pages.privacy, copy.pages.limits])
-      expect([page.title, page.intro, ...page.items].join('\n')).not.toMatch(SIGN_IN)
+  it('leaves every sign-in word out of the live privacy and limits pages, and Google out of every line but one', () => {
+    for (const name of ['privacy', 'limits'] as const) expect(scanned(name)).not.toMatch(SIGN_IN)
     // counter-case: the pattern does match the words moved to copy-account, and "without an account" stays allowed
     expect(account.privacyItems.join('\n')).toMatch(SIGN_IN)
     expect(copy.pages.privacy.items.join(' ')).toContain('without an account')
-    // Google as the way in is banned however it is put, and Google as the place a link opens is not
-    for (const t of [
-      'Sign in with Google',
-      'Log in via Google',
-      'Continue using Google',
-      'Authenticate through Google',
-      'Google login',
-      'your Google email',
-      'your Google profile',
-    ])
+    // the one permitted line is on the privacy page, whole and once, and it needs its exemption: it names Google
+    expect(copy.pages.privacy.items.filter((t) => t === LOOK_CLOSER_LINE)).toHaveLength(1)
+    expect(LOOK_CLOSER_LINE).toMatch(SIGN_IN)
+  })
+
+  it('fails on any other mention of Google, and on each way of signing in with it, on either page', () => {
+    for (const t of GOOGLE_PHRASINGS) {
       expect(t, t).toMatch(SIGN_IN)
-    expect('Nothing is sent to Google until you click one.').not.toMatch(SIGN_IN)
+      for (const name of ['privacy', 'limits'] as const)
+        expect(scanned(name, [t]), `${t}, added to the ${name} page`).toMatch(SIGN_IN)
+    }
+  })
+
+  it('exempts the Look closer line only whole, and only on the privacy page', () => {
+    // longer, shorter, edited or with something before it: a different line, scanned like any other
+    for (const t of [
+      `${LOOK_CLOSER_LINE} Sign in with Google.`,
+      `Note: ${LOOK_CLOSER_LINE}`,
+      LOOK_CLOSER_LINE.slice(0, -1),
+      LOOK_CLOSER_LINE.replace('Nothing', 'Everything'),
+    ])
+      expect(scanned('privacy', [t]), t).toMatch(SIGN_IN)
+    expect(scanned('limits', [LOOK_CLOSER_LINE])).toMatch(SIGN_IN)
   })
 
   it('moves both sign-in privacy items to account.privacyItems, with how long each record is kept', () => {

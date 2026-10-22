@@ -1,5 +1,11 @@
 import { expect, test, type Page } from '@playwright/test'
 import { flow } from '../../src/ui/copy-flow.ts'
+import {
+  GOOGLE_PHRASINGS,
+  LOOK_CLOSER_LINE,
+  SIGN_IN,
+  withoutLookCloserLine,
+} from '../fixtures/sign-in-words.ts'
 import { openFixtureSite, waitForPhotos } from './helpers.ts'
 
 // Accounts are dormant: a build without the flag does nothing of them. This runs in the main suite, on the build that
@@ -16,8 +22,10 @@ const ACCOUNT_WORDS = [
 // src/lib/byte-cache.ts. A new key means a new thing the app stores, which an accounts build must not add to this one.
 const LOCAL_KEYS = ['gs-theme', 'gs-tier-override']
 const DATABASES = ['gs-investigations', 'gs-bytes']
-const SIGN_IN_TALK =
-  /sign.?in|signed.?in|Google (name|account|email|profile|identity|log.?in)|(with|via|using|through) Google|your (whole )?account/i
+
+/** What the guard scans of a text page: the privacy page without its one permitted line (matched whole), the limits page as it is. */
+const scanned = (path: string, text: string) =>
+  path === '/privacy' ? withoutLookCloserLine(text.split('\n')).join('\n') : text
 
 /** Every URL the page and its workers request from now on. */
 function requests(page: Page) {
@@ -59,8 +67,36 @@ for (const path of ['/?tier=0', '/new?tier=0', '/privacy', '/limits']) {
     await page.goto(path)
     await expect(page.locator('h1').first()).toBeVisible()
     const text = await expectDormant(page, path, urls)
-    // The two text pages say nothing about signing in: there is no sign-in. "Without an account" stays.
-    if (path === '/privacy' || path === '/limits') expect(text).not.toMatch(SIGN_IN_TALK)
+    // The two text pages say nothing about signing in: there is no sign-in. "Without an account" stays. Google is named in one
+    // line only, the privacy page's Look closer line (tests/fixtures/sign-in-words.ts, shared with copy-account.test.ts).
+    if (path === '/privacy' || path === '/limits') expect(scanned(path, text)).not.toMatch(SIGN_IN)
+    if (path === '/privacy') expect(text.split('\n').map((l) => l.trim())).toContain(LOOK_CLOSER_LINE)
+  })
+}
+
+// The guard lets that one line name Google. A counter-case: any other line that does, or that signs in with it, is found on the
+// page as the browser reads it, and the permitted line is no exception on the limits page or when something is added to it.
+for (const path of ['/privacy', '/limits']) {
+  test(`${path}: any other mention of Google, or way of signing in with it, fails the guard`, async ({
+    page,
+  }) => {
+    await page.goto(path)
+    await expect(page.locator('h1').first()).toBeVisible()
+    const others = [
+      ...GOOGLE_PHRASINGS,
+      `${LOOK_CLOSER_LINE} Sign in with Google.`,
+      ...(path === '/limits' ? [LOOK_CLOSER_LINE] : []),
+    ]
+    for (const line of others) {
+      await page.evaluate((t) => {
+        const item = document.createElement('li')
+        item.textContent = t
+        item.dataset.added = ''
+        document.querySelector('article ul')!.append(item)
+      }, line)
+      expect(scanned(path, await page.locator('body').innerText()), line).toMatch(SIGN_IN)
+      await page.evaluate(() => document.querySelector('[data-added]')!.remove())
+    }
   })
 }
 
