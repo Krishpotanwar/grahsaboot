@@ -18,19 +18,22 @@ import { fromMercator, toMercator } from './utm.ts'
 /** Ground metres per Mercator metre on the equator, from the two Earth radii the code measures with. */
 const GROUND_PER_MERC = haversineM([0, 0], [1, 0]) / toMercator([1, 0])[0]
 
-/** A size x size grid at `lat` whose display pixels are exactly C.nativeM / k metres on the ground: k display pixels span one native pixel. */
-function gridOf(size: number, k: number, lat = 21): DisplayGrid {
+/**
+ * A `size` wide and `height` high grid (square when `height` is left out) at `lat` whose display pixels are exactly
+ * C.nativeM / k metres on the ground: k display pixels span one native pixel.
+ */
+function gridOf(size: number, k: number, lat = 21, height = size): DisplayGrid {
   const [cx, cy] = toMercator([79, lat])
   const px = C.nativeM / k / (Math.cos((lat * Math.PI) / 180) * GROUND_PER_MERC)
-  const half = (size * px) / 2
-  const [minX, maxX, minY, maxY] = [cx - half, cx + half, cy - half, cy + half]
+  const [halfX, halfY] = [(size * px) / 2, (height * px) / 2]
+  const [minX, maxX, minY, maxY] = [cx - halfX, cx + halfX, cy - halfY, cy + halfY]
   return {
     minX,
     minY,
     maxX,
     maxY,
     width: size,
-    height: size,
+    height,
     cornersLonLat: [
       fromMercator([minX, maxY]),
       fromMercator([maxX, maxY]),
@@ -40,11 +43,22 @@ function gridOf(size: number, k: number, lat = 21): DisplayGrid {
   }
 }
 
+/**
+ * Ground metres on a side of a display pixel by the Mercator scale: its Mercator size shrunk by the cosine of the latitude of
+ * the grid's middle. The rule measures it another way (the grid's edges, with haversineM), so this is a check on it.
+ */
+function groundPx(g: DisplayGrid): number {
+  const latMid = fromMercator([(g.minX + g.maxX) / 2, (g.minY + g.maxY) / 2])[1]
+  return ((g.maxX - g.minX) / g.width) * Math.cos((latMid * Math.PI) / 180) * GROUND_PER_MERC
+}
+
 const K = 2 // the grid of the F10 example: about 2 display pixels per 10 m pixel
 const SIZE = 140
 const G = gridOf(SIZE, K)
 const BLOCK = C.blockNative * K // display pixels across a block 30 m wide on G
 const AREA_MIN = C.areaMinNative * K * K // display pixels in 0.3 ha on G
+/** Native pixels on a side of the smallest square block that makes the area minimum: it counts, with room in width too. */
+const SQUARE = Math.ceil(Math.sqrt(C.areaMinNative))
 const AT = 32 // where the new site sits: a square of 40 display pixels (1600 of them, 4 ha on G) that most fixtures change
 
 type Rgb = readonly [number, number, number]
@@ -62,7 +76,8 @@ const OVER = C.bandThreshold + 1
 const SOFT = Math.floor(C.shiftLimit / 2)
 
 const BASE = 100
-const texture = (x: number, y: number) => (x * 7 + y * 13) % 23
+const TEXTURE = 23 // the texture runs from 0 to TEXTURE - 1
+const texture = (x: number, y: number) => (x * 7 + y * 13) % TEXTURE
 
 const rect =
   (x0: number, y0: number, w: number, h: number): Where =>
@@ -308,6 +323,47 @@ describe('change-v1', () => {
     })
   })
 
+  describe('the last estimate of the normal shift stands', () => {
+    // The shift by the rule's own description, on differences that are equal in all three bands: the lower median of the ones
+    // not flagged by the estimate before (the first is over all of them), a difference being flagged when it is farther than
+    // the band threshold from that estimate.
+    const estimates = (diffs: number[], n: number) => {
+      const out: number[] = []
+      let use = diffs
+      for (let i = 0; i < n; i++) {
+        const sorted = [...use].sort((a, b) => a - b)
+        const s = sorted[(sorted.length - 1) >> 1]!
+        out.push(s)
+        use = diffs.filter((d) => Math.abs(d - s) <= C.bandThreshold)
+      }
+      return out
+    }
+    it('is the last of its estimates: the third still moves it, and a fourth would move it again', () => {
+      // 21 pixels in five groups, spread so that each estimate lands on a different group than the one before it
+      const groups: Array<[number, number]> = [
+        [0.26, 9], // [the difference as a share of the band threshold, pixels]
+        [1.37, 2],
+        [2.21, 3],
+        [2.47, 1],
+        [2.84, 6],
+      ]
+      const diffs = groups.flatMap(([share, n]) => Array<number>(n).fill(Math.round(share * C.bandThreshold)))
+      expect(diffs).toHaveLength(21)
+      expect(Math.max(...diffs) + BASE + TEXTURE - 1).toBeLessThanOrEqual(255) // no pixel clamps
+      const est = estimates(diffs, C.passes + 1)
+      for (let i = 1; i < est.length; i++) expect(est[i]).not.toBe(est[i - 1]) // the premise: every estimate moves the shift
+      const g = gridOf(7, K, 21, 3) // 21 pixels
+      const r = withShift(
+        run(
+          pair(g, (x, y) => same(diffs[y * 7 + x]!)),
+          g,
+        ),
+      )
+      const last = est[C.passes - 1]!
+      expect(r.shift).toEqual([last, last, last])
+    })
+  })
+
   describe('a pixel is changed only when red, green and blue all differ', () => {
     const block = SITE
     it('flags a block whose three bands all differ by more than the band threshold', () => {
@@ -341,11 +397,14 @@ describe('change-v1', () => {
       expect(r).not.toHaveProperty('hectares')
       expect(r).not.toHaveProperty('patches')
     })
+    // The shift can go either way: the later picture lighter (haze) or darker (shadow, a drier season).
     it.each([0, 1, 2])(
-      'is said when the final shift reaches the limit in band %i alone, and not one below',
+      'is said when the final shift reaches the limit in band %i alone, in either direction, and not one below',
       (b) => {
-        expect(run(pair(G, () => inBand(b, C.shiftLimit))).state).toBe('most-differs')
-        expect(run(pair(G, () => inBand(b, C.shiftLimit - 1))).state).toBe('nothing')
+        for (const sign of [1, -1]) {
+          expect(run(pair(G, () => inBand(b, sign * C.shiftLimit))).state).toBe('most-differs')
+          expect(run(pair(G, () => inBand(b, sign * (C.shiftLimit - 1)))).state).toBe('nothing')
+        }
       },
     )
     it('is said when half or more of the clear pixels are flagged, though the shift is small and few differ before it', () => {
@@ -361,6 +420,26 @@ describe('change-v1', () => {
         g,
       )
       expect(r.state).toBe('most-differs')
+    })
+    it('is said at exactly half flagged: half +x and half -x, with x under the band threshold and under the shift limit', () => {
+      // x is over half the band threshold, so the two halves are more than the threshold apart; it is under the threshold
+      // itself and under the shift limit, so neither the raw differences nor the shift can trip the other two branches.
+      const x = Math.floor(C.bandThreshold / 2) + 1
+      expect(2 * x).toBeGreaterThan(C.bandThreshold)
+      expect(x).toBeLessThan(C.bandThreshold)
+      expect(x).toBeLessThan(C.shiftLimit)
+      const g = gridOf(10, K)
+      const half = 100 * C.flaggedShare // exactly the share
+      // `up` pixels at +x and the rest at -x: the lower median is -x until `up` passes half, and the pixels on the other side
+      // of it are the flagged ones
+      const split = (up: number) =>
+        run(
+          pair(g, (cx, cy) => same(cy * 10 + cx < up ? x : -x)),
+          g,
+        )
+      expect(split(half).state).toBe('most-differs') // the 50 at +x are flagged: exactly the share
+      expect(split(half - 1).state).toBe('nothing') // 49 flagged
+      expect(split(half + 1).state).toBe('nothing') // the median turns to +x, and the 49 at -x are the flagged ones
     })
     it('is said when half or more of the clear pixels differ by the band threshold before any shift, and not at one fewer', () => {
       const g = gridOf(10, K)
@@ -379,15 +458,17 @@ describe('change-v1', () => {
     it('does not count a line one native pixel wide, however long', () => {
       expect(run(pair(G, only(rect(10, 10, 1 * K, 60 * K), same(FAR)))).state).toBe('nothing')
     })
-    it('counts a road three native pixels wide', () => {
-      const r = changed(run(pair(G, only(rect(10, 10, 3 * K, 40 * K), same(FAR)))))
+    it('counts a road exactly as wide as the block', () => {
+      expect(C.blockNative * 40).toBeGreaterThanOrEqual(C.areaMinNative) // long enough for the area
+      const r = changed(run(pair(G, only(rect(10, 10, C.blockNative * K, 40 * K), same(FAR)))))
       expect(r.patches).toBe(1)
-      expect(r.hectares).toBeCloseTo(ha(3 * K * 40 * K), 6)
+      expect(r.hectares).toBeCloseTo(ha(C.blockNative * K * 40 * K), 6)
     })
-    it('counts a block six native pixels across', () => {
-      const r = changed(run(pair(G, only(rect(10, 10, 6 * K, 6 * K), same(FAR)))))
+    it('counts a square block that makes the area minimum', () => {
+      expect(SQUARE).toBeGreaterThanOrEqual(C.blockNative) // wide enough as well
+      const r = changed(run(pair(G, only(rect(10, 10, SQUARE * K, SQUARE * K), same(FAR)))))
       expect(r.patches).toBe(1)
-      expect(r.hectares).toBeCloseTo(ha(6 * K * 6 * K), 6)
+      expect(r.hectares).toBeCloseTo(ha(SQUARE * K * SQUARE * K), 6)
     })
     it('does not count a block wide enough but under the area minimum, and counts a strip of exactly the minimum', () => {
       const side = Math.ceil(Math.sqrt(C.areaMinNative)) - 1 // 5 native pixels: 25 < 30
@@ -402,13 +483,14 @@ describe('change-v1', () => {
       )
     })
     it('joins pixels that touch at a corner (8-connected): two blocks, each too small alone, count once', () => {
-      const a = rect(10, 10, BLOCK, 2 * BLOCK)
-      const b = rect(10 + BLOCK, 10 + 2 * BLOCK, BLOCK, 2 * BLOCK)
-      expect(2 * BLOCK * BLOCK).toBeLessThan(AREA_MIN) // each alone is under the minimum
-      expect(4 * BLOCK * BLOCK).toBeGreaterThanOrEqual(AREA_MIN) // together they are not
+      const rows = Math.ceil(AREA_MIN / (2 * BLOCK)) // two blocks BLOCK wide and `rows` high make the minimum, one does not
+      const a = rect(10, 10, BLOCK, rows)
+      const b = rect(10 + BLOCK, 10 + rows, BLOCK, rows) // starts where a ends, one column over: they meet at a corner only
+      expect(BLOCK * rows).toBeLessThan(AREA_MIN) // each alone is under the minimum
+      expect(2 * BLOCK * rows).toBeGreaterThanOrEqual(AREA_MIN) // together they are not
       const r = changed(run(pair(G, only(either(a, b), same(FAR)))))
       expect(r.patches).toBe(1)
-      expect(r.hectares).toBeCloseTo(ha(4 * BLOCK * BLOCK), 6)
+      expect(r.hectares).toBeCloseTo(ha(2 * BLOCK * rows), 6)
     })
     it('counts two separate patches, and the hectares of both', () => {
       const a = rect(10, 10, 12 * K, 12 * K)
@@ -432,10 +514,11 @@ describe('change-v1', () => {
       expect(r.hectares).toBeCloseTo(ha(BLOCK * 40 + (40 - BLOCK) * BLOCK), 6)
     })
     it('counts a block that touches the edge of the grid in full', () => {
-      const edge = rect(SIZE - 12, SIZE - 12, 12, 12)
-      const r = changed(run(pair(G, only(either(edge, rect(0, 0, 12, 12)), same(FAR)))))
+      const side = SQUARE * K // a square block that makes the area minimum
+      const edge = rect(SIZE - side, SIZE - side, side, side)
+      const r = changed(run(pair(G, only(either(edge, rect(0, 0, side, side)), same(FAR)))))
       expect(r.patches).toBe(2)
-      expect(r.hectares).toBeCloseTo(ha(2 * 12 * 12), 6)
+      expect(r.hectares).toBeCloseTo(ha(2 * side * side), 6)
     })
     it('does not count scattered noise', () => {
       let s = 123456789 // xorshift32: the same noise on every run
@@ -473,14 +556,14 @@ describe('change-v1', () => {
       const nativeHa = (w: number, h: number) => (w * h * C.nativeM ** 2) / 10_000
       expect(at(1, 40).state).toBe('nothing') // a line one native pixel wide
       expect(changed(at(C.blockNative, 40)).hectares).toBeCloseTo(nativeHa(C.blockNative, 40), 6)
-      expect(changed(at(6, 6)).hectares).toBeCloseTo(nativeHa(6, 6), 6)
+      expect(changed(at(SQUARE, SQUARE)).hectares).toBeCloseTo(nativeHa(SQUARE, SQUARE), 6)
       expect(at(side, side).state).toBe('nothing') // under the area minimum
       expect(changed(at(C.blockNative, len)).hectares).toBeCloseTo(nativeHa(C.blockNative, len), 6) // exactly the minimum
       expect(at(C.blockNative, len - 1).state).toBe('nothing')
     })
 
     // On the real 2 km grid (about 400 by 400) a display pixel is about 5.5 m, not 5 m (makeDisplayGrid pads every side by
-    // 100 m): the minimums are rounded up, so a counted patch is never under 30 m across or 0.3 ha.
+    // 100 m): the minimums are rounded up, so a counted patch is never under the block width or the area minimum.
     const DLAT = 2 / (haversineM([0, 0], [1, 0]) / 1000)
     const DLON = DLAT / Math.cos((21.1458 * Math.PI) / 180)
     const REAL = makeDisplayGrid(
@@ -489,11 +572,23 @@ describe('change-v1', () => {
       0,
     )
     it('rounds the width and the area up on the real grid', () => {
+      const px = groundPx(REAL)
+      const blockM = C.blockNative * C.nativeM // metres across
+      const areaM2 = C.areaMinNative * C.nativeM ** 2 // square metres
+      const blockPx = Math.ceil(blockM / px) // the narrowest strip that is at least blockM across
+      const areaPx = Math.ceil(areaM2 / px ** 2) // the fewest pixels that make at least areaM2
+      const rowsUnder = Math.floor((areaPx - 1) / blockPx) // a strip a block wide that falls just short of the area ...
+      const rowsOver = Math.ceil(areaPx / blockPx) // ... and one that just makes it
+      // the premises: the pixel does not divide the minimums evenly (so rounding matters), and the strips are on either side
+      expect(blockPx * px).toBeGreaterThan(blockM)
+      expect((blockPx - 1) * px).toBeLessThan(blockM)
+      expect(blockPx * rowsUnder * px ** 2).toBeLessThan(areaM2)
+      expect(blockPx * rowsOver * px ** 2).toBeGreaterThanOrEqual(areaM2)
       const at = (w: number, h: number) => run(pair(REAL, only(rect(50, 50, w, h), same(FAR))), REAL)
-      expect(at(5, 60).state).toBe('nothing') // 5 pixels are about 27 m
-      expect(at(6, 60).state).toBe('changed') // 6 pixels are about 33 m
-      expect(at(6, 16).state).toBe('nothing') // 96 pixels are about 0.29 ha
-      expect(at(6, 17).state).toBe('changed') // 102 pixels are about 0.30 ha
+      expect(at(blockPx - 1, 60).state).toBe('nothing') // too narrow, though long
+      expect(at(blockPx, 60).state).toBe('changed')
+      expect(at(blockPx, rowsUnder).state).toBe('nothing') // wide enough, but a little short of the area
+      expect(at(blockPx, rowsOver).state).toBe('changed')
     })
   })
 
@@ -569,7 +664,8 @@ describe('change-v1', () => {
       expect(r.hectares).toBeCloseTo(ha(AREA_MIN), 6)
     })
     it('is never said when there is no outline, not even on a grid smaller than the area minimum', () => {
-      const g = gridOf(10, K) // 100 pixels, under the minimum of 120
+      const side = Math.floor(Math.sqrt(AREA_MIN - 1))
+      const g = gridOf(side, K) // a grid of fewer pixels than the area minimum
       expect(g.width * g.height).toBeLessThan(AREA_MIN)
       expect(run(pair(g), g).state).toBe('nothing')
       expect(run(site).state).toBe('changed')
@@ -594,6 +690,30 @@ describe('change-v1', () => {
       const cloudy = { first: shifted.first, last: clouded(shifted.last, G, allOf(G)) }
       expect(run(cloudy, G, { inside: tiny }).state).toBe('not-enough-ground')
     })
+  })
+
+  describe('a grid that is not square', () => {
+    // Width and height are each used for their own axis: the pixel size comes from the width, the rows from the height.
+    it.each([
+      { w: 100, h: 160 },
+      { w: 160, h: 100 },
+    ])(
+      'reads a $w by $h grid: a site, its outline, a road along each axis, a line along neither',
+      ({ w, h }) => {
+        const g = gridOf(w, K, 21, h)
+        const on = (where: Where, extra: Partial<ChangeInput> = {}) =>
+          run(pair(g, only(where, same(FAR))), g, extra)
+        const site = rect(10, 20, 40, 60)
+        expect(changed(on(site)).hectares).toBeCloseTo(ha(40 * 60), 6)
+        expect(changed(on(site, { inside: mask(g, site) })).hectares).toBeCloseTo(ha(40 * 60), 6) // through the outline too
+        const tall = rect(w - 20, 10, BLOCK, h - 20) // a block wide, the whole height but the margins
+        const wide = rect(10, h - 20, w - 20, BLOCK) // a block high, the whole width but the margins
+        expect(changed(on(tall)).hectares).toBeCloseTo(ha(BLOCK * (h - 20)), 6)
+        expect(changed(on(wide)).hectares).toBeCloseTo(ha((w - 20) * BLOCK), 6)
+        expect(on(rect(w - 20, 10, K, h - 20)).state).toBe('nothing') // a line one native pixel wide, upright
+        expect(on(rect(10, h - 20, w - 20, K)).state).toBe('nothing') // and lying
+      },
+    )
   })
 
   describe('hectares come from the ground size of the grid', () => {
