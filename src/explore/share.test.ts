@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { realDate } from '../lib/dates.ts'
 import { SCENE_ID } from '../stac/search.ts'
 import {
@@ -71,6 +71,27 @@ describe('the limits it exports', () => {
   })
 })
 
+describe('the default today', () => {
+  afterEach(() => vi.useRealTimers())
+
+  it('is the day of the call, for encodeShare and decodeShare: that day is taken and the next is not, until the clock moves', () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-22T23:59:59Z'))
+    const one = (date: string) => ({ ...NAGPUR, frames: [{ date, id: null }] })
+    expect(encodeShare(one('2026-10-22'))).toContain('&d=2026-10-22')
+    expect(encodeShare(one('2026-10-23'))).toBeNull()
+    expect(decodeShare(link({ d: '2026-10-22', s: null })).share?.frames).toEqual([
+      { date: '2026-10-22', id: null },
+    ])
+    expect(decodeShare(link({ d: '2026-10-23', s: null }))).toEqual(unreadable)
+    vi.setSystemTime(new Date('2026-10-23T00:00:00Z')) // the next day, read when asked, not when the module was loaded
+    expect(encodeShare(one('2026-10-23'))).toContain('&d=2026-10-23')
+    expect(decodeShare(link({ d: '2026-10-23', s: null })).share?.frames).toEqual([
+      { date: '2026-10-23', id: null },
+    ])
+  })
+})
+
 describe('encodeShare', () => {
   it('writes the version, the centre, the size, the dates and the scene ids, in that order', () => {
     expect(encodeShare(SHARE, TODAY)).toBe(LINK)
@@ -90,7 +111,9 @@ describe('encodeShare', () => {
   it.each([
     ['below the least', 499, 500],
     ['the least', 500, 500],
-    ['a fraction', 1999.6, 2000],
+    ['a fraction above half', 1999.6, 2000],
+    ['a fraction below half', 2000.4, 2000],
+    ['a fraction above half, up', 2000.6, 2001],
     ['the most', 2900, 2900],
     ['above the most', 3000, 2900],
     ['far above', 99999, 2900],
