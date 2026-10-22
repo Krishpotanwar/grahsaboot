@@ -20,6 +20,20 @@ function pageLoads(page: Page) {
 const flag = (page: Page) => page.evaluate((k) => sessionStorage.getItem(k), FLAG)
 const home = (page: Page) => page.getByRole('link', { name: copy.nav.home })
 
+/** The home page's file is asked for and not answered until `release()`. A page that left meanwhile has dropped the request. */
+async function holdHomeChunk(page: Page) {
+  let release!: () => void
+  const gate = new Promise<void>((r) => (release = r))
+  let ask!: () => void
+  const asked = new Promise<void>((r) => (ask = r))
+  await page.route(HOME_CHUNK, async (route) => {
+    ask()
+    await gate
+    await route.continue().catch(() => {})
+  })
+  return { asked, release }
+}
+
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('gs-tier-override', '0'))
 })
@@ -51,4 +65,22 @@ test('reloads only once: a file that is still gone after the reload is left to f
   await page.waitForTimeout(1_000) // a third load, if one were coming, starts well within this
   expect(loads.count).toBe(2)
   expect(await flag(page)).toBe('1')
+})
+
+// WebKit ends the files a page has asked for the moment a navigation away from it starts, and keeps running the page until the next one
+// arrives, so Vite reports an ended file like one that will not load. The tab then reloaded the page being left, and that reload took
+// the place of the navigation (a person's, or page.goto in a test: "interrupted by another navigation").
+test('leaving while a page file is still loading is not turned into a reload', async ({ page }) => {
+  const held = await holdHomeChunk(page)
+  try {
+    await page.goto('/limits')
+    await expect(page.getByRole('heading', { level: 1, name: copy.pages.limits.title })).toBeVisible()
+    await home(page).click()
+    await held.asked // the home page's file is wanted and not answered
+    await page.goto('/privacy')
+    await expect(page.getByRole('heading', { level: 1, name: copy.pages.privacy.title })).toBeVisible()
+    expect(await flag(page)).toBeNull() // the one reload is still there for a deploy
+  } finally {
+    held.release()
+  }
 })

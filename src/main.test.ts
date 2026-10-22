@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 // main.tsx starts the app as soon as it is loaded. The app, its styles and the page are stood in for, so that only the
-// `vite:preloadError` listener it registers is under test.
+// listeners it registers (`vite:preloadError`, and `beforeunload` for the page being left) are under test.
 vi.mock('react-dom/client', () => ({ createRoot: () => ({ render: () => undefined }) }))
 vi.mock('./app.tsx', () => ({ App: () => null }))
 vi.mock('./styles.css', () => ({}))
@@ -20,18 +20,23 @@ const blocked = () => {
   throw new Error('blocked')
 }
 
+type Listener = (event: Event) => void
+
 /**
  * A browser tab in which main.tsx has just run. `fail()` is what Vite does when a lazy page's file will not load: it fires the
  * event, and the page file's import error is thrown unless the listener took it over. It says whether the listener did. The
  * listeners are called straight, so one that throws fails the test (Node's own EventTarget would report it later, elsewhere).
+ * `leave()` is the browser starting a navigation away from the page, and `later(ms)` is the clock moving on.
  * `online` is left out for a browser that does not report it.
  */
 async function openTab({ online, storage }: { online?: boolean; storage: unknown }) {
-  const listeners: Array<(event: Event) => void> = []
+  const listeners = new Map<string, Listener[]>()
   const reload = vi.fn()
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(1_000_000)
   vi.stubGlobal('window', {
-    addEventListener: (type: string, listener: (event: Event) => void) => {
-      if (type === 'vite:preloadError') listeners.push(listener)
+    addEventListener: (type: string, listener: Listener) => {
+      listeners.set(type, [...(listeners.get(type) ?? []), listener])
     },
   })
   vi.stubGlobal('document', { getElementById: () => ({}) })
@@ -40,18 +45,24 @@ async function openTab({ online, storage }: { online?: boolean; storage: unknown
   vi.stubGlobal('sessionStorage', storage)
   vi.resetModules()
   await import('./main.tsx')
+  const fire = (type: string) => {
+    const event = new Event(type, { cancelable: true })
+    for (const listener of listeners.get(type) ?? []) listener(event)
+    return event.defaultPrevented
+  }
   return {
     reload,
-    fail: () => {
-      const event = new Event('vite:preloadError', { cancelable: true })
-      for (const listener of listeners) listener(event)
-      return event.defaultPrevented
-    },
+    fail: () => fire('vite:preloadError'),
+    leave: () => void fire('beforeunload'),
+    later: (ms: number) => vi.setSystemTime(Date.now() + ms),
   }
 }
 
 describe('a page file that will not load (a tab opened before a deploy)', () => {
-  afterEach(() => vi.unstubAllGlobals())
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.useRealTimers()
+  })
 
   it('takes the error over, reloads the tab once and notes that it did', async () => {
     const storage = memory()
@@ -86,6 +97,21 @@ describe('a page file that will not load (a tab opened before a deploy)', () => 
   it('reloads when the browser does not say whether it is online', async () => {
     const tab = await openTab({ storage: memory() })
     expect(tab.fail()).toBe(true)
+    expect(tab.reload).toHaveBeenCalledTimes(1)
+  })
+
+  // WebKit ends a page's lazy files the moment a navigation away from it starts, and keeps running the page until the next one
+  // arrives: Vite reports an ended file like a missing one, and a reload of the page being left would take the navigation's place.
+  it('does not reload a page that is being left, and keeps the one reload for a deploy', async () => {
+    const storage = memory()
+    const tab = await openTab({ storage })
+    tab.leave()
+    tab.later(5)
+    expect(tab.fail()).toBe(false)
+    expect(tab.reload).not.toHaveBeenCalled()
+    expect(storage.data).toEqual({})
+    tab.later(1_500)
+    expect(tab.fail()).toBe(true) // the page stayed, so the failure is a deploy's after all
     expect(tab.reload).toHaveBeenCalledTimes(1)
   })
 
