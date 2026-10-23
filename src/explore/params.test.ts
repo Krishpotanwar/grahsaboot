@@ -27,6 +27,14 @@ describe('the place of an /explore address', () => {
     expect(read(`lat=1&lon=2&name=${'a'.repeat(300)}`)?.name).toHaveLength(120)
   })
 
+  it('cuts a name by characters, so an emoji at the cut is whole or gone and the hand-over link can still be made', () => {
+    for (const name of ['a'.repeat(119) + '😀', 'a'.repeat(117) + '😀😀', 'a'.repeat(120) + '😀']) {
+      const place = read(`lat=1&lon=2&name=${encodeURIComponent(name)}`)!
+      expect(Array.from(place.name).length).toBeLessThanOrEqual(120)
+      expect(() => placeToQuery(place)).not.toThrow()
+    }
+  })
+
   it('keeps a name as plain text: nothing in it is read as anything else', () => {
     expect(read('lat=1&lon=2&name=%3Cimg%20src%3Dx%3E')?.name).toBe('<img src=x>')
   })

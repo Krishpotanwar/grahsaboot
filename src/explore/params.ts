@@ -24,6 +24,8 @@ export function placeFromParams(p: URLSearchParams): Place | null {
   if (plainNumber(lat) === undefined || plainNumber(lon) === undefined) return null
   const c = parseCoordinates(`${lat}, ${lon}`)
   if (!c) return null
-  const name = (p.get('name') ?? '').trim().slice(0, 120)
+  const name = Array.from((p.get('name') ?? '').trim())
+    .slice(0, 120)
+    .join('') // by characters: a cut inside an emoji would make encodeURIComponent throw
   return { name: name || copy.search.coordsResult(c.lat, c.lon), lat: c.lat, lon: c.lon, bbox: null }
 }
