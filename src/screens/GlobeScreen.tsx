@@ -1,3 +1,4 @@
+import { Eye, EyeSlash } from '@phosphor-icons/react'
 import type { Marker } from 'maplibre-gl'
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { loadAccounts } from '../accounts/enabled.ts'
@@ -17,10 +18,11 @@ import {
   updateSatLayers,
 } from '../map/satLayers.ts'
 import type { Place } from '../search/nominatim.ts'
+import { readSatsHidden, writeSatsHidden } from '../sats/hidden.ts'
 import { useSatellites } from '../sats/useSatellites.ts'
 import { copy } from '../ui/copy.ts'
 import { explore } from '../ui/copy-explore.ts'
-import { Button } from '../ui/kit.tsx'
+import { Button, IconButton } from '../ui/kit.tsx'
 import { Optional } from '../ui/Optional.tsx'
 import { SatellitesPanel } from '../ui/SatellitesPanel.tsx'
 import { SearchBox } from '../ui/SearchBox.tsx'
@@ -41,6 +43,8 @@ export default function GlobeScreen() {
   const desktop = useMediaQuery('(min-width: 1024px)')
   const [place, setPlace] = useState<Place | null>(lastPlace)
   const [hot, setHot] = useState<number | null>(null)
+  // Hiding takes the panel, markers, tracks and swaths away; the positions keep running, so showing them again needs no request.
+  const [satsHidden, setSatsHidden] = useState(readSatsHidden)
   // Positions run at every tier (T0 and T1 show the text list); only the map layers need T2+.
   const { sats, status, stale, tracks, swaths, passes } = useSatellites(true)
   const markers = useRef(new Map<number, Marker>())
@@ -80,10 +84,10 @@ export default function GlobeScreen() {
     }
   }, [map, tier])
 
-  // Satellite layers (T2+). The installer re-applies the latest data after a style reload (theme switch).
+  // Satellite layers (T2+). The installer re-applies the latest data after a style reload (theme switch); hidden, it is not registered, so a reload does not bring the layers back.
   useEffect(
     () =>
-      map && tier >= 2
+      map && tier >= 2 && !satsHidden
         ? installLayers(
             'sats',
             (m) => {
@@ -93,21 +97,25 @@ export default function GlobeScreen() {
             uninstallSatLayers,
           )
         : undefined,
-    [map, tier, installLayers],
+    [map, tier, installLayers, satsHidden],
   )
   useEffect(() => {
     if (map && tier >= 2) updateSatLayers(map, tracks, swaths, hot)
   }, [map, tier, tracks, swaths, hot])
   useEffect(() => {
-    if (map && tier >= 2) void syncSatMarkers(map, markers.current, sats)
-  }, [map, tier, sats])
+    if (!map || tier < 2 || satsHidden) return
+    const ctl = new AbortController()
+    void syncSatMarkers(map, markers.current, sats, ctl.signal)
+    return () => ctl.abort()
+  }, [map, tier, sats, satsHidden])
+  // Also runs when the satellites are hidden: the markers come off the map then, not only when the map goes.
   useEffect(() => {
     const all = markers.current
     return () => {
       for (const m of all.values()) m.remove()
       all.clear()
     }
-  }, [map])
+  }, [map, satsHidden])
   // Pin on the picked place, at every tier that has a map.
   useEffect(() => {
     if (!map || !place) return
@@ -122,7 +130,11 @@ export default function GlobeScreen() {
     setPlace(p)
     if (map) flyToPlace(map, p, reducedMotion())
   }
-  const panel = (
+  const toggleSats = () => {
+    writeSatsHidden(!satsHidden)
+    setSatsHidden(!satsHidden)
+  }
+  const panel = satsHidden ? null : (
     <SatellitesPanel
       sats={sats}
       status={status}
@@ -151,6 +163,15 @@ export default function GlobeScreen() {
           >
             {place ? copy.nav.startHere : copy.nav.newInvestigation}
           </Link>
+          {/* Beside the start button at every tier, icon only and ahead of the links, so it stays on the first line of the row. */}
+          <IconButton
+            label={satsHidden ? copy.sats.show : copy.sats.hide}
+            role="switch"
+            aria-checked={!satsHidden}
+            onClick={toggleSats}
+          >
+            {satsHidden ? <EyeSlash size={20} weight="bold" /> : <Eye size={20} weight="bold" />}
+          </IconButton>
           {place && (
             // Our own button says what it costs and starts at once; a link to the same page waits for a tap (src/explore/startFlag.ts).
             <Link
@@ -202,7 +223,7 @@ export default function GlobeScreen() {
           {/* The panel is held to the screen, not to this column, which grows with the text beside it: it must stay clear of MapLibre's controls whatever is added there. */}
           <div className="sticky top-16 h-[calc(100dvh-4rem)]">
             {/* right-14 / bottom-14 keep the panel off MapLibre's zoom buttons and attribution (bottom right of the map); a touch screen has 44 px controls, so it clears them by more. */}
-            {desktop && (
+            {desktop && panel && (
               <div className="pointer-events-auto absolute bottom-14 right-14 z-20 pointer-coarse:bottom-24 pointer-coarse:right-18">
                 {panel}
               </div>

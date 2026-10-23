@@ -60,6 +60,8 @@ export const copy = {
   },
   sats: {
     title: 'Live satellites',
+    hide: 'Hide satellites',
+    show: 'Show satellites',
     live: 'Live',
     orbitsFrom: (date: string) => `Orbits from ${date}`,
     unavailable: 'Satellite positions are unavailable right now. Everything else works.',
