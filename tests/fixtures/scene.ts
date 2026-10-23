@@ -20,6 +20,24 @@ export const FIXTURE_DATES: FixtureDate[] = [
   { date: '2025-12-20', scl: () => 4, roof: true, cloud: 0.4 },
 ]
 
+/**
+ * The time-lapse fixture (tests/e2e/explore.spec.ts): the same square in the same season of six years, three scenes a year around
+ * 11 February, the roof from 2030 on. The years are 2027 to 2032 on purpose: no search window of any other fixture reaches them,
+ * and the page takes `?now=2032-03-10` as its day (a test build only). Every scene is clear; a test makes one cloudy by serving the
+ * cloudy day's file in its place.
+ */
+export const EXPLORE_DATES: FixtureDate[] = [2027, 2028, 2029, 2030, 2031, 2032].flatMap((y) =>
+  (
+    [
+      ['02-01', 4],
+      ['02-11', 2],
+      ['02-21', 6],
+    ] as const
+  ).map(([md, cloud]) => ({ date: `${y}-${md}`, scl: () => 5, roof: y >= 2030, cloud })),
+)
+/** The middle of the fixture's picture, where a 2 km square (and the margin of its display grid) lies inside the picture. */
+export const EXPLORE_PLACE = { lat: 21.148, lon: 79.0863 }
+
 /** The Nagpur ±0.005° square used across tests (fully inside the fixture extent). */
 export const NAGPUR_SQUARE: LonLat[] = [
   [79.0832, 21.1408],
