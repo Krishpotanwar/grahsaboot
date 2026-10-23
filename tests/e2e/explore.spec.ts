@@ -5,6 +5,7 @@ import { PACE_MS } from '../../src/explore/playback.ts'
 import { copy } from '../../src/ui/copy.ts'
 import { explore } from '../../src/ui/copy-explore.ts'
 import { EXPLORE_PLACE } from '../fixtures/scene.ts'
+import { tabKey } from './helpers.ts'
 
 // The time-lapse page ("Watch it change") on the fixture server: six Februaries of one square, 2027 to 2032 (tests/fixtures/scene.ts).
 // `?now=2032-03-10` (test builds only) is the day the loader counts back from, so the last frame is the scene of 21 Feb 2032 and
@@ -421,8 +422,8 @@ test('the picture shows a ring when it has the keyboard, and the page passes axe
   await loaded(page)
   await pause(page).click()
   await axeInBothThemes(page) // the player with its six years
-  for (let i = 0; i < 12 && !(await stage(page).evaluate((e) => e === document.activeElement)); i++)
-    await page.keyboard.press('Tab')
+  for (let i = 0; i < 20 && !(await stage(page).evaluate((e) => e === document.activeElement)); i++)
+    await page.keyboard.press(tabKey(page)) // WebKit on macOS reaches links and buttons with Option+Tab
   await expect(stage(page)).toBeFocused()
   const ring = await stage(page).evaluate((e) => {
     const s = getComputedStyle(e)
