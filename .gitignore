@@ -15,3 +15,10 @@ test-results/
 playwright-report/
 coverage/
 .DS_Store
+
+# Tool and scratch folders that sit beside the code
+.claude/
+.agents/
+output/
+.tmp.drivedownload/
+.tmp.driveupload/
