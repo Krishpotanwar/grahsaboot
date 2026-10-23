@@ -16,7 +16,7 @@ export function YearStrip({
   current: number | null
 }) {
   return (
-    <ol aria-label={explore.stripLabel} className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+    <ol aria-label={explore.stripLabel} className="grid grid-cols-2 gap-2 sm:grid-cols-3">
       {years.map((year) => {
         const r = results.get(year)
         const here = r !== undefined && 'frame' in r && current === year
