@@ -1,7 +1,6 @@
 import { readFileSync } from 'node:fs'
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Download, type Page } from '@playwright/test'
-import { RECIPES } from '../../src/evidence/types.ts'
 import { copy } from '../../src/ui/copy.ts'
 import { flow } from '../../src/ui/copy-flow.ts'
 import {
@@ -427,13 +426,13 @@ const setMode = (page: Page, mode: Mode) =>
   page.evaluate((m) => ((window as unknown as { __watch: Watch }).__watch.mode = m), mode)
 const measured = (page: Page) => reportFrame(page).locator('.measured')
 const SITE_SECTIONS = ['01', '02', '03', '04', '05', '06', '07', '08']
-/** The recipes every report listed before the change rule existed: a report that printed no block lists these and no more (ruling R55). */
-const BEFORE_THE_RULE = {
-  frame: RECIPES.frame,
-  scl: RECIPES.scl,
-  display: RECIPES.display,
-  diff: RECIPES.diff,
-}
+/**
+ * The recipes of a report, by their tags (unit tests tie them to src/evidence/types.ts): a report that printed no block lists the four
+ * it listed before the change rule existed and no more, one that printed it lists the rule too (ruling R55). Written out here, not
+ * imported, so that the lines of the tests above stay where they were.
+ */
+const BEFORE_THE_RULE = { frame: 'frame-v1', scl: 'scl-v2', display: 'display-v1', diff: 'diff-v1' }
+const WITH_THE_RULE = { ...BEFORE_THE_RULE, change: 'change-v1' }
 /** The `recipes` of the provenance the report page itself embeds (a JSON script in the preview). */
 const embeddedRecipes = async (page: Page) =>
   JSON.parse((await reportFrame(page).locator('script#provenance').textContent())!).recipes as unknown
@@ -543,9 +542,9 @@ test('the report prints what the change rule measured on the pair, in the first 
   expect(words).not.toMatch(/nothing you can claim/i)
   expect(words).not.toMatch(/\bno change\b/i)
   // The report printed the block, so the provenance, the page's own and the file, names the rule among its recipes.
-  expect(await embeddedRecipes(page)).toStrictEqual(RECIPES)
+  expect(await embeddedRecipes(page)).toStrictEqual(WITH_THE_RULE)
   const prov = JSON.parse(await fileOf(await download(page, flow.report.provenance)))
-  expect(prov.recipes).toStrictEqual(RECIPES)
+  expect(prov.recipes).toStrictEqual(WITH_THE_RULE)
   // The first sight was the finished page: the preview was given one document, with the block in it, and it was never rebuilt.
   await expect.poll(async () => (await watched(page)).ended).toBe(1)
   const w = await watched(page)
@@ -572,7 +571,7 @@ test('a worker that fails the change request leaves the report finished, with no
   expect(html).not.toContain(flow.report.measured.title)
   expect(html).not.toContain('class="measured"')
   // Nothing was printed from the rule, so the rule is named nowhere: not in the block, not in the provenance (ruling R55).
-  expect(html).not.toContain(RECIPES.change)
+  expect(html).not.toContain(WITH_THE_RULE.change)
   expect(await embeddedRecipes(page)).toStrictEqual(BEFORE_THE_RULE)
   const prov = JSON.parse(await fileOf(await download(page, flow.report.provenance)))
   expect(prov.recipes).toStrictEqual(BEFORE_THE_RULE)
@@ -599,7 +598,7 @@ test('a worker that never answers is waited for 10 s at most, then the report is
   await expect(reportFrame(page).locator('p', { hasText: CREDIT })).toBeVisible()
   await expect(measured(page)).toHaveCount(0)
   // The same as a failed run: the rule is named nowhere (ruling R55).
-  expect(await fileOf(await download(page, flow.report.download))).not.toContain(RECIPES.change)
+  expect(await fileOf(await download(page, flow.report.download))).not.toContain(WITH_THE_RULE.change)
   expect(await embeddedRecipes(page)).toStrictEqual(BEFORE_THE_RULE)
   const prov = JSON.parse(await fileOf(await download(page, flow.report.provenance)))
   expect(prov.recipes).toStrictEqual(BEFORE_THE_RULE)
@@ -625,7 +624,7 @@ test('leaving the report while the rule runs ends its worker at once and is quie
   await setMode(page, 'pass')
   await openReport(page)
   await expect(measured(page)).toHaveCount(1)
-  expect(await embeddedRecipes(page)).toStrictEqual(RECIPES)
+  expect(await embeddedRecipes(page)).toStrictEqual(WITH_THE_RULE)
   const w = await watched(page)
   expect([w.asked, w.docs]).toEqual([2, [true]])
   await expect.poll(async () => (await watched(page)).ended).toBe(2)
