@@ -7,7 +7,7 @@ _Grah_ (ग्रह) means planet. _Saboot_ (सबूत) means proof.
 
 **Try it now:** <https://grahsaboot.grahsaboot.workers.dev> (free, no sign-in)
 
-> **Status:** a live, working prototype (version 0.1.0). Phases A to E are built and live. Accounts are built but switched off. Phase F is part built, and its first stage has been live since 23 October 2026: the Look closer box, a Sharper viewing aid, a faster photo reader and a "What we measured" block in the report. The time-lapse is not built. See the [Roadmap](#roadmap).
+> **Status:** a live, working prototype (version 0.1.0). Phases A to E are built and live. Accounts are built but switched off. Phase F is part built. Its first stage has been live since 23 October 2026: the Look closer box, a Sharper viewing aid, a faster photo reader and a "What we measured" block in the report. Its time-lapse, "Watch it change", and a switch that hides the satellites have been live since 24 October 2026. See the [Roadmap](#roadmap).
 
 ## Contents
 
@@ -65,7 +65,9 @@ The report lists exactly which photos were used. Each photo gets a **digital fin
 - **Check a road in sections.** A road is cut into sections. A grid shows how clearly each section is seen on each pinned date.
 - **Write notes and a claim.** Say what you see, and what claim you are testing.
 - **Save a report.** One self-contained web page file with the photos, the table of dates, your notes and claim, the limits, and a "provenance" block (a list of every file, window and fingerprint used) so someone else can check your work.
-- **Phase F so far (live since 23 October 2026).**
+- **Phase F so far (live since 23 and 24 October 2026).**
+  - **Watch it change (live since 24 October 2026).** Pick a place on the globe, or open a link to one, and press "Watch it change": six satellite pictures of the same place, one a year and all from the same time of year, played one after another, with Play, Previous, Next, a slider and the keyboard. It loads about 14 MB or more, which the button says before you press it (a link from outside waits for a tap on "Load the pictures"). The pictures are for looking: they are not saved, not fingerprinted and never put in a report. A link at the bottom opens the same place as a new investigation.
+  - **A switch that hides the satellites (live since 24 October 2026).** An eye button next to "Start an investigation" hides the live satellites panel, their markers and their tracks on the globe, and shows them again. Your choice is remembered in your browser.
   - **Look closer.** Once your outline is valid, a box offers two links, Street View and Google Earth. It sits in the outline step and at the top of the workbench. Each link opens Google's own page for the middle of your outline in a new tab. GrahSaboot does not check those pages, and they are never put in a report. In the notes panel, a button starts a note with "Street View, " and leaves the date for you to type from what Google shows.
   - **Sharper.** A switch in the workbench's tool row shows the photos with a little more contrast and a light sharpening. It is "a viewing aid: the same pixels, shown more clearly". It starts off at every visit, and it never changes a fingerprint or the report.
   - **What we measured.** The report gets a short block with a changed area in hectares, or a plain statement of why it has none. See [What the report measures](#what-the-report-measures).
@@ -393,7 +395,7 @@ src/
   data/               the investigation model and the on-device store
   lib/                small helpers (router, caching of photo pieces, formatting)
   accounts/           sign-in, save and verify (built, switched off, reached through one flag)
-  explore/            the same-season picker and the share link: Phase F building blocks, not on a screen yet
+  explore/            the time-lapse (Watch it change): its loader, player and address; the share-link codec is a building block with no screen yet
 worker/               the Cloudflare Worker: /api/tle with cache, back-off and saved-copy fallback
 supabase/             database migrations and the verify and delete-account functions (not live)
 scripts/              the checks run by npm run check, the headers builder, probes, the orbit snapshot tool
@@ -473,7 +475,7 @@ Accounts have their own settings (`VITE_ACCOUNTS`, `VITE_SUPABASE_URL`, `VITE_SU
 
 CI (`.github/workflows/ci.yml`) uses Node 22. It holds **no secrets** and **never deploys**. It runs `npm run check`, a check that the server's evidence copy is committed, the Deno checks and tests, and the browser tests in Chromium (the desktop, phone-sized and accounts projects). It does not run the live checks, Firefox or WebKit: those are run by hand.
 
-**What the checks held at this release.** All 1,554 unit tests (95 files, the database tests among them) and all 62 server-function tests in Deno pass. In the browser tests, run by hand on a laptop, 629 pass in Chromium, a phone-sized Chromium and the accounts build, 287 in WebKit and 287 in Firefox, and none fail; 24 more skip themselves by design (a touch test on a desktop browser, for example). The live checks pass in all three browsers. The first page's JavaScript is 99.8 KB compressed, inside the 150 KB limit.
+**What the checks held at this release.** All 1,697 unit tests (103 files, the database tests among them) and all 62 server-function tests in Deno pass. In the browser tests, run by hand on a laptop, 715 pass in Chromium, a phone-sized Chromium and the accounts build, 330 in WebKit and 330 in Firefox, and none fail; 24 more skip themselves by design (a touch test on a desktop browser, for example). The live checks pass in all three browsers. The first page's JavaScript is 100.2 KB compressed, inside the 150 KB limit.
 
 ## Putting it online (deploy)
 
@@ -540,6 +542,7 @@ flowchart TB
 - **Satellite photos** are read straight from public Sentinel-2 files on Amazon Web Services (with Microsoft's Planetary Computer and Azure as backup). Those requests reveal an approximate area, never your name or email.
 - **The satellite view** is off until you switch it on. A choice you made earlier is remembered and starts it again by itself. It asks the Earth Search catalogue about a coarse version of your map area and reads one recent photo.
 - **The Look closer links** (live since 23 October 2026) open Google Street View and Google Earth in a new tab. Nothing is sent to Google until you click one. A click sends the middle of your outline, as latitude and longitude, to Google; what Google does with it is set by its own privacy policy.
+- **Watch it change** (live since 24 October 2026) starts when you press its button or tap "Load the pictures". It asks the Earth Search catalogue (Planetary Computer is the fallback) about the 2 km square around your place, once for each year, and reads one picture a year. Nothing is saved.
 - **Satellite positions** come through our Worker from CelesTrak. Nothing about you is sent to CelesTrak.
 - **Our host.** Cloudflare, which hosts the site, can see ordinary web request information, and the Worker's logs are switched on.
 
@@ -611,11 +614,11 @@ Sign-in with Google, saving, and a server re-check of every photo are written an
 | E: Clear imagery   | Done, live                | A readable outline map in both themes, drawing aids, a size note, an optional recent satellite photo behind the map                              |
 | F: Look closer     | **Part built, part live** | See below                                                                                                                                        |
 
-**Phase F, in plain words.** The aim is to type a place and watch a time-lapse of the same time of year across the last six years, one photo per year. The first stage has been live since 23 October 2026. The time-lapse itself is not built.
+**Phase F, in plain words.** The aim is to type a place and watch a time-lapse of the same time of year across the last six years, one photo per year. The first stage has been live since 23 October 2026, and the time-lapse page since 24 October 2026.
 
-- **Live:** the Look closer box (Street View and Google Earth links, and a button that starts a Street View note), the Sharper viewing aid, a faster photo reader, two small fixes (dates, and a tab left open across an update), and the "What we measured" block in the report.
-- **Building blocks:** the change rule, the same-season picker and the share-link codec are built and tested as building blocks, but only the change rule has a place on a screen so far (the "What we measured" block), and the other two have none.
-- **Not built:** the time-lapse itself (its loader, player and page, and the plain line it will show when 10 m photos cannot support a claim), the gallery of real big changes, a share link you can use, and the hand-over of two photos from the time-lapse into a full investigation. What is not built is a plan that may change, not a promise.
+- **Live:** the Look closer box (Street View and Google Earth links, and a button that starts a Street View note), the Sharper viewing aid, a faster photo reader, two small fixes (dates, and a tab left open across an update), the "What we measured" block in the report, the time-lapse page "Watch it change" (with its two entry links on the home screen), and a switch that hides the satellites.
+- **Building blocks:** the change rule is on a screen (the "What we measured" block) and the same-season picker is used by the time-lapse; the share-link codec is built and tested but has no screen yet.
+- **Not built:** the plain line the time-lapse could show when 10 m photos cannot support a claim, the gallery of real big changes, a share link you can use, and the hand-over of two photos from the time-lapse into a full investigation (today its link opens the same place as a new investigation). What is not built is a plan that may change, not a promise.
 
 ## Documents
 
