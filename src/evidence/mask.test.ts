@@ -58,7 +58,7 @@ describe('rasterizeAoi', () => {
 // part of how the figure is made, so these tests pin the rule of `rasterizeOnGrid`: pixel centres, even-odd with holes, a corridor
 // widened by 1/cos(latitude).
 const cellOf = (g: DisplayGrid) => (g.maxX - g.minX) / g.width
-/** Ground metres on a side of one display pixel: a Mercator pixel is 1/cos(latitude) larger on the ground than it is drawn. */
+/** Ground metres on a side of one display pixel: a Mercator pixel is cos(latitude) as long on the ground as it is on the grid. */
 const groundPx = (g: DisplayGrid, lat: number) => cellOf(g) * Math.cos((lat * Math.PI) / 180)
 const LAT = 21.1458
 const SQUARE_BOX: [number, number, number, number] = [79.0832, 21.1408, 79.0932, 21.1508]

@@ -128,8 +128,8 @@ function fillCorridor(
  *   - The grid is Web Mercator (EPSG:3857). The outline's vertices are projected into it, and a pixel is taken when its CENTRE is
  *     inside the outline: a pixel that the outline only touches is not.
  *   - A site: even-odd scanline fill, so a ring inside another one is a hole.
- *   - A road: the pixels whose centre is within half the road's width of its centre line, with flat ends. A Mercator metre is
- *     1/cos(latitude) larger on the ground than a metre of the road, so the half width is widened by that.
+ *   - A road: the pixels whose centre is within half the road's width of its centre line, with flat ends. A metre on the ground is
+ *     1/cos(latitude) Mercator metres (the grid is stretched by that), so the half width is widened by that.
  * shortcut: one such scale for the whole line, taken at its mean latitude; for the longest road allowed (10 km) it is off by under
  * 0.3 % even at 60 degrees north, under a tenth of a metre of a 30 m road. Upgrade it if roads ever get longer.
  */
