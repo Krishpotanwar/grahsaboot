@@ -406,3 +406,227 @@ for (const [name, open] of [
     }
   })
 }
+
+// "What we measured": the change rule is run on the pinned pair in a worker of its own before the report is built (ruling R46). The
+// page is watched in two ways: through its Worker, whose one `change` request is let through, failed or never answered, and through
+// the documents its report preview is given.
+type Mode = 'pass' | 'fail' | 'silent'
+interface Watch {
+  /** What the worker does with the change request: `pass` lets it through, `fail` answers it with an error, `silent` never answers. */
+  mode: Mode
+  /** Requests to the change rule, the round trip of its answer in ms, and the workers asked for it that were ended. */
+  asked: number
+  ms: number | null
+  ended: number
+  /** Every document the report preview was given, in order: whether it holds the block. */
+  docs: boolean[]
+}
+const watched = (page: Page) => page.evaluate(() => (window as unknown as { __watch: Watch }).__watch)
+const setMode = (page: Page, mode: Mode) =>
+  page.evaluate((m) => ((window as unknown as { __watch: Watch }).__watch.mode = m), mode)
+const measured = (page: Page) => reportFrame(page).locator('.measured')
+const SITE_SECTIONS = ['01', '02', '03', '04', '05', '06', '07', '08']
+/**
+ * The recipes of a report, by their tags (unit tests tie them to src/evidence/types.ts): a report that printed no block lists the four
+ * it listed before the change rule existed and no more, one that printed it lists the rule too (ruling R55). Written out here, not
+ * imported, so that the lines of the tests above stay where they were.
+ */
+const BEFORE_THE_RULE = { frame: 'frame-v1', scl: 'scl-v2', display: 'display-v1', diff: 'diff-v1' }
+const WITH_THE_RULE = { ...BEFORE_THE_RULE, change: 'change-v1' }
+/** The `recipes` of the provenance the report page itself embeds (a JSON script in the preview). */
+const embeddedRecipes = async (page: Page) =>
+  JSON.parse((await reportFrame(page).locator('script#provenance').textContent())!).recipes as unknown
+
+async function watchReport(page: Page, how: Mode) {
+  await page.addInitScript(
+    ({ mode, title }) => {
+      const w: Watch = { mode, asked: 0, ms: null, ended: 0, docs: [] }
+      ;(window as unknown as { __watch: Watch }).__watch = w
+      const note = (el: Node) => {
+        if (el instanceof HTMLIFrameElement && el.title === title)
+          w.docs.push((el.getAttribute('srcdoc') ?? '').includes('<div class="measured">'))
+      }
+      new MutationObserver((records) => {
+        for (const r of records) {
+          if (r.type === 'attributes') note(r.target)
+          else r.addedNodes.forEach(note)
+        }
+      }).observe(document, { subtree: true, childList: true, attributes: true, attributeFilter: ['srcdoc'] })
+      const Real = window.Worker
+      window.Worker = class extends Real {
+        askedAt = -1
+        constructor(...a: ConstructorParameters<typeof Worker>) {
+          super(...a)
+          this.addEventListener('message', (e) => {
+            if (this.askedAt >= 0 && (e.data as { ok?: boolean }).ok === true)
+              w.ms = performance.now() - this.askedAt
+          })
+        }
+        override postMessage(message: unknown, ...rest: unknown[]): void {
+          if ((message as { op?: string } | null)?.op !== 'change')
+            return super.postMessage(message, ...(rest as []))
+          w.asked++
+          this.askedAt = performance.now()
+          if (w.mode === 'pass') return super.postMessage(message, ...(rest as []))
+          const { id } = message as { id: number }
+          if (w.mode === 'fail')
+            queueMicrotask(() =>
+              this.onmessage?.(
+                new MessageEvent('message', {
+                  data: { id, ok: false, error: { name: 'Error', message: 'SIZE_MISMATCH' } },
+                }),
+              ),
+            )
+        }
+        override terminate(): void {
+          if (this.askedAt >= 0) w.ended++
+          super.terminate()
+        }
+      }
+    },
+    { mode: how, title: flow.report.title },
+  )
+}
+
+/** What the page logged or threw, bar the notice a browser prints for the JSON script of the sandboxed preview (it is there in every report). */
+function loud(page: Page) {
+  const seen: string[] = []
+  page.on('console', (m) => {
+    if (!m.text().includes("'about:srcdoc'")) seen.push(`${m.type()}: ${m.text()}`)
+  })
+  page.on('pageerror', (e) => seen.push(`pageerror: ${e.message}`))
+  return seen
+}
+
+/** From the workbench to the preparing page: the rule has been asked for the pair, and nothing has answered yet. */
+async function openReportAsked(page: Page) {
+  await waitForPhotos(page)
+  await page.getByRole('link', { name: flow.workbench.report }).click()
+  await page.waitForFunction(() => (window as unknown as { __watch: Watch }).__watch.asked === 1, null, {
+    timeout: 30_000,
+  })
+}
+
+test('the report prints what the change rule measured on the pair, in the first page its preview shows', async ({
+  page,
+}) => {
+  const seen = loud(page)
+  await watchReport(page, 'pass')
+  await openFixtureSite(page)
+  await openReport(page)
+  const iframe = reportFrame(page)
+  await expect(measured(page).locator('h3')).toHaveText(flow.report.measured.title)
+  // At the end of the Evidence section, which keeps its number: the block takes none of its own.
+  await expect(iframe.locator('section', { has: measured(page) }).locator('h2')).toHaveText(
+    flow.report.sections.evidence,
+  )
+  await expect(iframe.locator('section .n')).toHaveText(SITE_SECTIONS)
+  const [lead, before, after, figure, seasons, record] = await measured(page).locator('p').allInnerTexts()
+  expect(lead).toBe(flow.report.measured.lead)
+  expect(before).toBe('Before, 10 Jan 2025: 100% clear view.')
+  expect(after).toBe('After, 20 Dec 2025: 100% clear view.')
+  // The fixture's one difference between the two days is the roof: 30 by 30 pixels of 10 m, which is 9 ha (tests/fixtures/scene.ts).
+  const found = new RegExp(
+    '^Between 10 Jan 2025 and 20 Dec 2025, the change rule \\(change-v1\\) found 1 changed patch of at least 0\\.3 ha and 30 m across, ' +
+      '(\\d+\\.\\d) ha in all\\. It rests on ([\\d,]+) pixels that are clear in both pictures\\. ' +
+      'It cannot tell a building from a crop or a season: compare the pictures by eye\\.$',
+  ).exec(figure!)
+  expect(found, figure).not.toBeNull()
+  expect(Number(found![1])).toBeGreaterThan(8.5)
+  expect(Number(found![1])).toBeLessThan(10)
+  expect(Number(found![2]!.replaceAll(',', ''))).toBeGreaterThan(500_000) // most of the 1024 by 1024 grid is clear in both
+  expect(seasons).toBe(flow.report.measured.differentSeasons)
+  expect(record).toMatch(/^Rule change-v1, grid display-v1, 1024 × 1024 pixels\. Settings: bandThreshold 38,/)
+  // It states what the rule did and never judges the claim.
+  const words = await measured(page).innerText()
+  expect(words).not.toMatch(/nothing you can claim/i)
+  expect(words).not.toMatch(/\bno change\b/i)
+  // The report printed the block, so the provenance, the page's own and the file, names the rule among its recipes.
+  expect(await embeddedRecipes(page)).toStrictEqual(WITH_THE_RULE)
+  const prov = JSON.parse(await fileOf(await download(page, flow.report.provenance)))
+  expect(prov.recipes).toStrictEqual(WITH_THE_RULE)
+  // The first sight was the finished page: the preview was given one document, with the block in it, and it was never rebuilt.
+  await expect.poll(async () => (await watched(page)).ended).toBe(1)
+  const w = await watched(page)
+  expect(w.docs).toEqual([true])
+  // The rule was asked once, in a worker that was ended, and answered far inside its deadline of 10 s.
+  expect(w.asked).toBe(1)
+  expect(w.ms).toBeGreaterThan(0)
+  expect(w.ms).toBeLessThan(5_000)
+  expect(seen).toEqual([])
+})
+
+test('a worker that fails the change request leaves the report finished, with no block and no word about it', async ({
+  page,
+}) => {
+  const seen = loud(page)
+  await watchReport(page, 'fail')
+  await openFixtureSite(page)
+  await openReport(page)
+  const iframe = reportFrame(page)
+  await expect(measured(page)).toHaveCount(0)
+  await expect(iframe.locator('section .n')).toHaveText(SITE_SECTIONS) // the same sections, the same table
+  await expect(iframe.locator('table.dates tbody tr')).toHaveCount(2)
+  const html = await fileOf(await download(page, flow.report.download))
+  expect(html).not.toContain(flow.report.measured.title)
+  expect(html).not.toContain('class="measured"')
+  // Nothing was printed from the rule, so the rule is named nowhere: not in the block, not in the provenance (ruling R55).
+  expect(html).not.toContain(WITH_THE_RULE.change)
+  expect(await embeddedRecipes(page)).toStrictEqual(BEFORE_THE_RULE)
+  const prov = JSON.parse(await fileOf(await download(page, flow.report.provenance)))
+  expect(prov.recipes).toStrictEqual(BEFORE_THE_RULE)
+  const w = await watched(page)
+  expect([w.asked, w.ended, w.docs]).toEqual([1, 1, [false]]) // asked once, its worker ended, one document and never another
+  expect(seen).toEqual([])
+})
+
+test('a worker that never answers is waited for 10 s at most, then the report is built without the block', async ({
+  page,
+}) => {
+  const seen = loud(page)
+  await watchReport(page, 'silent')
+  await openFixtureSite(page)
+  await openReportAsked(page)
+  const asked = Date.now()
+  // Until the deadline it is the preparing page, never a half-built report.
+  await expect(page.getByText(flow.report.preparing)).toBeVisible()
+  await expect(page.locator('iframe')).toHaveCount(0)
+  await page.locator('iframe').waitFor({ timeout: 25_000 })
+  const waited = Date.now() - asked
+  expect(waited, 'it waited for the deadline').toBeGreaterThan(9_000)
+  expect(waited, 'and not for the 120 s of the imagery client').toBeLessThan(20_000)
+  await expect(reportFrame(page).locator('p', { hasText: CREDIT })).toBeVisible()
+  await expect(measured(page)).toHaveCount(0)
+  // The same as a failed run: the rule is named nowhere (ruling R55).
+  expect(await fileOf(await download(page, flow.report.download))).not.toContain(WITH_THE_RULE.change)
+  expect(await embeddedRecipes(page)).toStrictEqual(BEFORE_THE_RULE)
+  const prov = JSON.parse(await fileOf(await download(page, flow.report.provenance)))
+  expect(prov.recipes).toStrictEqual(BEFORE_THE_RULE)
+  const w = await watched(page)
+  expect([w.asked, w.ended, w.docs]).toEqual([1, 1, [false]])
+  expect(seen).toEqual([])
+})
+
+test('leaving the report while the rule runs ends its worker at once and is quiet, and leaves nothing for the next report', async ({
+  page,
+}) => {
+  const seen = loud(page)
+  await watchReport(page, 'silent')
+  await openFixtureSite(page)
+  await openReportAsked(page)
+  await page.getByRole('link', { name: flow.report.back }).click()
+  await expect(page).toHaveURL(/\/i\/local-[0-9a-f-]{36}$/)
+  // Not at the deadline, 10 s later: now.
+  await expect.poll(async () => (await watched(page)).ended, { timeout: 3_000 }).toBe(1)
+  // The abandoned run built nothing, so there is no provenance of it to name the rule in: no report was ever shown.
+  expect((await watched(page)).docs).toEqual([])
+  // The next report is a run of its own: with the worker answering, it prints the block and its provenance names the rule.
+  await setMode(page, 'pass')
+  await openReport(page)
+  await expect(measured(page)).toHaveCount(1)
+  expect(await embeddedRecipes(page)).toStrictEqual(WITH_THE_RULE)
+  const w = await watched(page)
+  expect([w.asked, w.docs]).toEqual([2, [true]])
+  await expect.poll(async () => (await watched(page)).ended).toBe(2)
+  expect(seen).toEqual([])
+})

@@ -407,6 +407,49 @@ describe('searchSentinel2', () => {
   })
 })
 
+describe('searchSentinel2: the sun height', () => {
+  const withProps = (it: ReturnType<typeof item>, extra: Record<string, unknown>) => ({
+    ...it,
+    properties: { ...it.properties, ...extra },
+  })
+  it('asks Earth Search for view:sun_elevation, next to the fields it already asks for', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(empty())
+    await searchSentinel2({ ...args, fetchImpl })
+    const include = JSON.parse(fetchImpl.mock.calls[0]![1].body).fields.include as string[]
+    expect(include).toContain('properties.view:sun_elevation')
+    expect(include).toEqual(expect.arrayContaining(['properties.datetime', 'properties.eo:cloud_cover']))
+  })
+  it('carries the sun height of an Earth Search item, and null for one that has none', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(
+      json({
+        features: [
+          withProps(item('A', '2025-01-01'), { 'view:sun_elevation': 47.5 }),
+          item('B', '2025-01-06'),
+        ],
+        links: [],
+      }),
+    )
+    const r = await searchSentinel2({ ...args, fetchImpl })
+    expect(r.items.map((i) => [i.id, i.sunElevation])).toEqual([
+      ['A', 47.5],
+      ['B', null],
+    ])
+  })
+  it('carries 90 minus the zenith on the Planetary Computer fallback, which is searched without a field list', async () => {
+    const fetchImpl = vi.fn().mockImplementation(async (url: string) =>
+      url.includes('planetarycomputer')
+        ? json({
+            features: [withProps(pcItem('P', '2025-03-01'), { 's2:mean_solar_zenith': 31.5 })],
+            links: [],
+          })
+        : json({}, 502),
+    )
+    const r = await searchSentinel2({ ...args, fetchImpl })
+    expect(r.source).toBe('pc:sentinel-2-l2a')
+    expect(r.items.map((i) => i.sunElevation)).toEqual([58.5])
+  })
+})
+
 // WebKit ends a fetch that AbortSignal.timeout cut short with an AbortError (the signal's own reason is a TimeoutError), the name a
 // caller's abort gets too: only the caller's signal tells the two apart.
 describe('searchSentinel2 where a timed-out fetch rejects with an AbortError (WebKit)', () => {

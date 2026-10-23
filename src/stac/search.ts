@@ -32,6 +32,7 @@ const FIELDS = [
   'properties.eo:cloud_cover',
   'properties.s2:processing_baseline',
   'properties.s2:nodata_pixel_percentage',
+  'properties.view:sun_elevation',
   'properties.proj:epsg',
   'properties.proj:code',
   'assets.visual',

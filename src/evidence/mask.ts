@@ -1,5 +1,5 @@
-import { toUtm } from './utm.ts'
-import type { AoiGeometry, LevelInfo, Window, XY } from './types.ts'
+import { toMercator, toUtm } from './utm.ts'
+import type { AoiGeometry, DisplayGrid, LevelInfo, Window, XY } from './types.ts'
 
 /**
  * Rasterise an AOI onto `sub`×`sub` cells per pixel of `win` (pixel-centre rule).
@@ -120,4 +120,49 @@ function fillCorridor(
       }
     }
   }
+}
+
+/**
+ * The outline on a display grid: one byte a pixel, 1 where a pixel is inside it. It is the `inside` mask the change rule is run
+ * with, so this raster is part of how the report's figure is made; it has no recipe tag of its own, and its rule is this one.
+ *   - The grid is Web Mercator (EPSG:3857). The outline's vertices are projected into it, and a pixel is taken when its CENTRE is
+ *     inside the outline: a pixel that the outline only touches is not.
+ *   - A site: even-odd scanline fill, so a ring inside another one is a hole.
+ *   - A road: the pixels whose centre is within half the road's width of its centre line, with flat ends. A metre on the ground is
+ *     1/cos(latitude) Mercator metres (the grid is stretched by that), so the half width is widened by that.
+ * shortcut: one such scale for the whole line, taken at its mean latitude; for the longest road allowed (10 km) it is off by under
+ * 0.3 % even at 60 degrees north, under a tenth of a metre of a 30 m road. Upgrade it if roads ever get longer.
+ */
+export function rasterizeOnGrid(aoi: AoiGeometry, grid: DisplayGrid): Uint8Array {
+  const { width: w, height: h } = grid
+  const mask = new Uint8Array(w * h)
+  const cellX = (grid.maxX - grid.minX) / w
+  const cellY = (grid.maxY - grid.minY) / h
+  if (aoi.kind === 'site') {
+    fillEvenOdd(
+      mask,
+      w,
+      h,
+      grid.minX,
+      grid.maxY,
+      cellX,
+      cellY,
+      aoi.rings.map((ring) => ring.map((p) => toMercator(p))),
+    )
+  } else {
+    const meanLat = aoi.line.length ? aoi.line.reduce((sum, p) => sum + p[1], 0) / aoi.line.length : 0
+    const halfWidth = aoi.widthM / 2 / Math.cos((meanLat * Math.PI) / 180)
+    fillCorridor(
+      mask,
+      w,
+      h,
+      grid.minX,
+      grid.maxY,
+      cellX,
+      cellY,
+      aoi.line.map((p) => toMercator(p)),
+      halfWidth,
+    )
+  }
+  return mask
 }

@@ -53,4 +53,11 @@ export interface DisplayGrid {
   cornersLonLat: [LonLat, LonLat, LonLat, LonLat]
 }
 
-export const RECIPES = { frame: 'frame-v1', scl: 'scl-v2', display: 'display-v1', diff: 'diff-v1' } as const
+/** `change` is `CHANGE_RECIPE` of src/evidence/change.ts, which cannot be imported here (it imports this file): a test ties the two. */
+export const RECIPES = {
+  frame: 'frame-v1',
+  scl: 'scl-v2',
+  display: 'display-v1',
+  diff: 'diff-v1',
+  change: 'change-v1',
+} as const

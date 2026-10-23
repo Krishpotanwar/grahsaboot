@@ -1,4 +1,5 @@
 import { verificationFor, type Investigation } from '../data/investigation.ts'
+import type { ChangeResult } from '../evidence/change.ts'
 import { RECIPES } from '../evidence/types.ts'
 import type { AoiSummary } from '../geo/aoi.ts'
 import { copy } from '../ui/copy.ts'
@@ -27,7 +28,8 @@ export interface Provenance {
   app: { name: string; version: string }
   investigation: Record<string, unknown>
   parts: Array<{ idx: number; fromM: number; toM: number }>
-  recipes: typeof RECIPES
+  /** What the report used: the change rule is named only by a report that printed its "What we measured" block (rulings D32, R55). */
+  recipes: Omit<typeof RECIPES, 'change'> & { change?: typeof RECIPES.change }
   frames: ProvenanceFrame[]
   notes: Investigation['notes']
   attribution: string[]
@@ -42,12 +44,17 @@ const scaled = (t: number[], level: number) => [
   t[5]!,
 ]
 
+/** The recipes of every report. A new recipe is added here, or to the test of what a report lists, on purpose: the type asks for it. */
+const ALWAYS_USED = { frame: RECIPES.frame, scl: RECIPES.scl, display: RECIPES.display, diff: RECIPES.diff }
+
 export function buildProvenance(
   inv: Investigation,
   summary: AoiSummary,
   entries: DateEntry[],
   appVersion: string,
   generatedAt = new Date(),
+  /** What the report prints as its "What we measured" block, the `change` of `buildReportHtml`: only a report that prints it names the change rule. */
+  change?: ChangeResult,
 ): Provenance {
   const pinned = entries.filter((e) => inv.pinned.includes(e.date))
   const frames: ProvenanceFrame[] = pinned.flatMap((e) => {
@@ -122,7 +129,8 @@ export function buildProvenance(
       claim: inv.claim,
     },
     parts: summary.parts.map((p) => ({ idx: p.idx, fromM: p.fromM, toM: p.toM })),
-    recipes: RECIPES,
+    // The same condition as the block's (src/report/html.ts): a recipe is listed because a figure of it is on the page.
+    recipes: change && inv.before && inv.after ? RECIPES : ALWAYS_USED,
     frames,
     notes: inv.notes,
     attribution: [...(years.length ? [copy.attribution.sentinelYears(years)] : []), copy.attribution.osm],

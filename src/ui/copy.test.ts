@@ -1,5 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import { CHANGE_CONSTANTS, CHANGE_RECIPE, type ChangeResult } from '../evidence/change.ts'
+import { measuredText } from '../report/measured.ts'
 import { copy, issueMessage } from './copy.ts'
 import { flow } from './copy-flow.ts'
 
@@ -114,6 +116,49 @@ describe('copy', () => {
     ] as const) {
       expect(issueMessage({ code, value: 1, limit: 2 }).length).toBeGreaterThan(10)
     }
+  })
+})
+
+describe('the words of the report\'s "What we measured" block', () => {
+  const rest = { recipe: CHANGE_RECIPE, constants: CHANGE_CONSTANTS, clearPixels: 143_491 }
+  const shift = [0, 0, 0] as const
+  const results: ChangeResult[] = [
+    { ...rest, state: 'not-enough-ground' },
+    { ...rest, state: 'outline-too-small' },
+    { ...rest, state: 'most-differs', shift },
+    { ...rest, state: 'nothing', shift },
+    { ...rest, state: 'changed', shift, patches: 1, hectares: 0.4 },
+    { ...rest, state: 'changed', shift, patches: 3, hectares: 12.3 },
+  ]
+  // Dates far apart in the year, so the different-seasons sentence is in the text too; no sun height, as for an old item.
+  const lines = results.flatMap((change) => {
+    const m = measuredText({
+      change,
+      before: { date: '2018-02-22', clearPct: 92, sunElevation: 41 },
+      after: { date: '2025-12-20', clearPct: 88, sunElevation: null },
+      grid: { width: 1024, height: 803 },
+    })
+    return [m.lead, ...m.pictures, ...m.findings, m.record]
+  })
+  it('has lines to check: five states, one patch and several, and the seasons sentence', () => {
+    expect(lines.some((l) => l.includes('found 1 changed patch of'))).toBe(true)
+    expect(lines.some((l) => l.includes('found 3 changed patches of'))).toBe(true)
+    expect(lines.some((l) => l.includes('different seasons'))).toBe(true)
+    expect(lines.length).toBeGreaterThan(30)
+  })
+  it('never uses a verdict word (spec §2.2), in any state', () => {
+    for (const line of lines) for (const re of BANNED) expect(re.test(line), `${re} in: ${line}`).toBe(false)
+  })
+  it('never says "Nothing you can claim here." or the whole words "no change": it states what the rule did', () => {
+    for (const line of lines) {
+      expect(line).not.toContain('Nothing you can claim')
+      expect(line).not.toMatch(/\bno change\b/i)
+    }
+  })
+  it('has the title the report prints, and one caution for every figure', () => {
+    expect(flow.report.measured.title).toBe('What we measured')
+    for (const line of lines.filter((l) => /changed patch(es)? of at least/.test(l) && /ha in all/.test(l)))
+      expect(line.endsWith(flow.report.measured.caution)).toBe(true)
   })
 })
 

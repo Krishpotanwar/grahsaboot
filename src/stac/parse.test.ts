@@ -125,3 +125,54 @@ describe('parseItem', () => {
     expect(geo({ type: 'MultiPolygon', coordinates: [[], [ring]] })?.footprint).toEqual([ring])
   })
 })
+
+describe('parseItem: the sun height', () => {
+  const sun = (extra: Record<string, unknown>) =>
+    parseItem({ ...REAL, properties: { ...REAL.properties, ...extra } }, 'sentinel-2-l2a')
+
+  it('reads view:sun_elevation, degrees above the horizon (Earth Search)', () => {
+    expect(sun({ 'view:sun_elevation': 47.5 })?.sunElevation).toBe(47.5)
+  })
+  it('reads 90 minus s2:mean_solar_zenith when there is no view:sun_elevation (Planetary Computer)', () => {
+    expect(sun({ 's2:mean_solar_zenith': 31.5 })?.sunElevation).toBe(58.5)
+  })
+  it('prefers view:sun_elevation when the item has both', () => {
+    expect(sun({ 'view:sun_elevation': 47.5, 's2:mean_solar_zenith': 31.5 })?.sunElevation).toBe(47.5)
+  })
+  it('is null for an item with neither: the trimmed real one above, an old item', () => {
+    expect(parseItem(REAL, 'sentinel-2-l2a')?.sunElevation).toBeNull()
+  })
+  it('keeps a sun at the horizon, zero degrees, from either field (zero is a height, not a missing one)', () => {
+    expect(sun({ 'view:sun_elevation': 0 })?.sunElevation).toBe(0)
+    expect(sun({ 's2:mean_solar_zenith': 90 })?.sunElevation).toBe(0)
+  })
+  it('ignores a value that is not a number or that no sun can have, and then tries the other field', () => {
+    // An elevation runs from -90 to 90 degrees, a zenith angle from 0 to 180.
+    const NOT_A_HEIGHT = ['47.5', NaN, Infinity, null, true, [47.5], {}]
+    for (const bad of [...NOT_A_HEIGHT, 90.5, -90.5, 500]) {
+      expect(sun({ 'view:sun_elevation': bad })?.sunElevation, String(bad)).toBeNull()
+      expect(
+        sun({ 'view:sun_elevation': bad, 's2:mean_solar_zenith': 31.5 })?.sunElevation,
+        String(bad),
+      ).toBe(58.5)
+    }
+    for (const bad of [...NOT_A_HEIGHT, 180.5, -0.5, 500]) {
+      expect(sun({ 's2:mean_solar_zenith': bad })?.sunElevation, String(bad)).toBeNull()
+      expect(
+        sun({ 'view:sun_elevation': 47.5, 's2:mean_solar_zenith': bad })?.sunElevation,
+        String(bad),
+      ).toBe(47.5)
+    }
+    // the ends of both ranges are real values
+    expect(sun({ 'view:sun_elevation': 90 })?.sunElevation).toBe(90)
+    expect(sun({ 'view:sun_elevation': -90 })?.sunElevation).toBe(-90)
+    expect(sun({ 's2:mean_solar_zenith': 0 })?.sunElevation).toBe(90)
+    expect(sun({ 's2:mean_solar_zenith': 180 })?.sunElevation).toBe(-90)
+  })
+  it('never rejects an item over its sun fields', () => {
+    expect(sun({ 'view:sun_elevation': 'dark', 's2:mean_solar_zenith': {} })).toMatchObject({
+      id: REAL.id,
+      sunElevation: null,
+    })
+  })
+})
