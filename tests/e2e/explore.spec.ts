@@ -268,6 +268,19 @@ test('Space, the arrows, Home and End work on the picture, each step is spoken, 
   expect(await page.evaluate(() => scrollY)).toBe(top) // not one of the keys scrolled the page
 })
 
+test('a hidden tab pauses the loop and keeps it paused', async ({ page }) => {
+  await loadAll(page)
+  await expect(pause(page)).toBeVisible()
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => true })
+    document.dispatchEvent(new Event('visibilitychange'))
+  })
+  await expect(play(page)).toBeVisible()
+  const was = await shownYear(page)
+  await page.waitForTimeout(PACE_MS + 400)
+  expect(await shownYear(page)).toBe(was)
+})
+
 test('a key typed anywhere but on the picture is the page’s, and a shortcut with a modifier is the browser’s', async ({
   page,
 }) => {
