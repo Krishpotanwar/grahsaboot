@@ -60,8 +60,8 @@ export const copy = {
   },
   sats: {
     title: 'Live satellites',
-    hide: 'Hide satellites',
-    show: 'Show satellites',
+    // One name for both states: a switch's label stays put and aria-checked says whether they show.
+    toggle: 'Show satellites',
     live: 'Live',
     orbitsFrom: (date: string) => `Orbits from ${date}`,
     unavailable: 'Satellite positions are unavailable right now. Everything else works.',

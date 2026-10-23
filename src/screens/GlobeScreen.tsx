@@ -164,12 +164,7 @@ export default function GlobeScreen() {
             {place ? copy.nav.startHere : copy.nav.newInvestigation}
           </Link>
           {/* Beside the start button at every tier, icon only and ahead of the links, so it stays on the first line of the row. */}
-          <IconButton
-            label={satsHidden ? copy.sats.show : copy.sats.hide}
-            role="switch"
-            aria-checked={!satsHidden}
-            onClick={toggleSats}
-          >
+          <IconButton label={copy.sats.toggle} role="switch" aria-checked={!satsHidden} onClick={toggleSats}>
             {satsHidden ? <EyeSlash size={20} weight="bold" /> : <Eye size={20} weight="bold" />}
           </IconButton>
           {place && (

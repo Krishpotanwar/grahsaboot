@@ -13,8 +13,9 @@ const SIZE = { desktop: { width: 1440, height: 900 }, phone: { width: 390, heigh
 const NOW = new Date('2026-10-05T05:40:00Z')
 
 const hasWebgl2 = (page: Page) => page.evaluate(() => !!document.createElement('canvas').getContext('webgl2'))
-const hideSwitch = (page: Page) => page.getByRole('switch', { name: copy.sats.hide })
-const showSwitch = (page: Page) => page.getByRole('switch', { name: copy.sats.show })
+// One name, two states: checked when the satellites show, not checked when they are hidden. hideSwitch is the switch while they show.
+const hideSwitch = (page: Page) => page.getByRole('switch', { name: copy.sats.toggle, checked: true })
+const showSwitch = (page: Page) => page.getByRole('switch', { name: copy.sats.toggle, checked: false })
 const panel = (page: Page) => page.getByRole('region', { name: copy.sats.title })
 // The row header: after a place is picked the panel's next look names the satellite again, so its name alone matches twice.
 const firstSat = (page: Page) => panel(page).getByRole('rowheader', { name: 'Sentinel-2A' })
@@ -70,7 +71,7 @@ async function pickNagpur(page: Page) {
   await page.getByRole('button', { name: copy.search.submit }).click()
 }
 
-test('the switch is one real button, named for what a press does, 44 px, and the satellites show by default', async ({
+test('the switch is one real button with one name, 44 px, and the satellites show by default', async ({
   page,
 }) => {
   await page.setViewportSize(SIZE.desktop)
