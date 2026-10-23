@@ -7,7 +7,7 @@ _Grah_ (ग्रह) means planet. _Saboot_ (सबूत) means proof.
 
 **Try it now:** <https://grahsaboot.grahsaboot.workers.dev> (free, no sign-in)
 
-> **Status:** a live, working prototype (version 0.1.0). Phases A to E are built and live. Accounts are built but switched off. Phase F is only a plan. See the [Roadmap](#roadmap).
+> **Status:** a live, working prototype (version 0.1.0). Phases A to E are built and live. Accounts are built but switched off. Phase F is part built: the Look closer box, a Sharper viewing aid, a faster photo reader and a "What we measured" block in the report are built and merged, and wait for the owner to deploy them. The time-lapse is not built. See the [Roadmap](#roadmap).
 
 ## Contents
 
@@ -65,8 +65,13 @@ The report lists exactly which photos were used. Each photo gets a **digital fin
 - **Check a road in sections.** A road is cut into sections. A grid shows how clearly each section is seen on each pinned date.
 - **Write notes and a claim.** Say what you see, and what claim you are testing.
 - **Save a report.** One self-contained web page file with the photos, the table of dates, your notes and claim, the limits, and a "provenance" block (a list of every file, window and fingerprint used) so someone else can check your work.
+- **Phase F so far (built and merged, waiting to be deployed).**
+  - **Look closer.** Once your outline is valid, a box offers two links, Street View and Google Earth. It sits in the outline step and at the top of the workbench. Each link opens Google's own page for the middle of your outline in a new tab. GrahSaboot does not check those pages, and they are never put in a report. In the notes panel, a button starts a note with "Street View, " and leaves the date for you to type from what Google shows.
+  - **Sharper.** A switch in the workbench's tool row shows the photos with a little more contrast and a light sharpening. It is "a viewing aid: the same pixels, shown more clearly". It starts off at every visit, and it never changes a fingerprint or the report.
+  - **What we measured.** The report gets a short block with a changed area in hectares, or a plain statement of why it has none. See [What the report measures](#what-the-report-measures).
+  - **Smaller changes.** Photo files are read in 16 KB blocks. For a 1 km square, with nothing cached, a cloud check or a photo now takes 2 requests on Earth Search where it took 12 to 14, and the pixels and fingerprints are the same (measured in [`docs/ops/probes.md`](docs/ops/probes.md), P18, which also gives the times and their limits). A date that is not a real day, such as 30 February, is shown as written instead of as another day. If a tab was left open across an update and a page will not load, the tab reloads itself once to get the new files.
 
-Everything stays in your browser. Your investigations are kept on your device. There are no accounts on the live site.
+Your investigations stay in your browser, on your device. There are no accounts on the live site.
 
 ![Next pass over a searched place](docs/screenshots/next-pass.png)
 
@@ -106,6 +111,20 @@ The story in five steps:
 3. **You choose dates.** The site looks for every satellite photo that covers your outline in that time.
 4. **The site checks each photo.** It reads only the small piece of each photo file that covers your outline. It scores how clear the view is, and it makes a fingerprint of those exact dots.
 5. **You compare and write the report.** You pin the dates that matter, add notes and a claim, and save the report.
+
+### What the report measures
+
+This part is built and merged, and waits for the owner to deploy it.
+
+The Evidence part of the report ends with a short block called **What we measured**. A fixed rule, `change-v1`, compares your two pinned photos (the "before" and the "after"). It looks for patches of changed ground that are at least 0.3 ha (a hectare is 100 m by 100 m) and 30 m across. Those settings are provisional. The block says what the rule found, in one of five ways:
+
+- **A changed area** in hectares, always with the caution "It cannot tell a building from a crop or a season: compare the pictures by eye."
+- **No changed patch** of that size.
+- **Most of the picture differs**, so the rule "cannot separate a change from a difference in overall brightness or colour". It states no area.
+- **Not enough ground:** "Not enough clear ground in both pictures to compare."
+- **An outline that is too small** to hold a patch of that size.
+
+The numbers are computed from the pixels, not seen by a person, and the block never says whether your claim is true. If it compared the photos and the two dates are more than 20 days apart in the year, it adds "These dates are in different seasons; seasonal change is included." It records the rule, the grid and the settings, so it can be run again from the hashed source pixels. It appears only when the rule could run. If it could not (a photo has no cloud check, or no answer comes within 10 seconds, for example), the report is made without it. The report's provenance names `change-v1` only when the block is there.
 
 ## Architecture
 
@@ -392,7 +411,7 @@ Accounts have their own settings (`VITE_ACCOUNTS`, `VITE_SUPABASE_URL`, `VITE_SU
 
 ## Checks that keep it safe
 
-`npm run check` is the full gate. The same checks run on GitHub for every push to `main` and every pull request.
+`npm run check` is the full gate. GitHub runs it for every push to `main` and every pull request, with the extra steps described under the table.
 
 | Check                 | What it protects                                                                                  | How to run it                             |
 | --------------------- | ------------------------------------------------------------------------------------------------- | ----------------------------------------- |
@@ -409,7 +428,9 @@ Accounts have their own settings (`VITE_ACCOUNTS`, `VITE_SUPABASE_URL`, `VITE_SU
 | Accessibility tests   | Every screen passes axe (WCAG 2.2 AA) in both themes                                              | part of `npm run e2e`                     |
 | Live checks           | The same flows against the real services, including photo fingerprints                            | `npm run e2e:live`                        |
 
-CI (`.github/workflows/ci.yml`) uses Node 22. It holds **no secrets** and **never deploys**. It runs `npm run check`, a check that the server's evidence copy is committed, the Deno checks and tests, and the browser tests in Chromium.
+CI (`.github/workflows/ci.yml`) uses Node 22. It holds **no secrets** and **never deploys**. It runs `npm run check`, a check that the server's evidence copy is committed, the Deno checks and tests, and the browser tests in Chromium (the desktop, phone-sized and accounts projects). It does not run the live checks, Firefox or WebKit: those are run by hand.
+
+**What the checks held at this release.** All 1,542 unit tests (95 files, the database tests among them) and all 62 server-function tests in Deno pass. More than 600 browser tests pass in Chromium, a phone-sized Chromium and the accounts build, and more than 270 pass in WebKit; a few more skip themselves by design (a touch test on a desktop browser, for example). The first page's JavaScript is just under 100 KB compressed, inside the 150 KB limit.
 
 ## Putting it online (deploy)
 
@@ -467,6 +488,7 @@ flowchart TB
 - **Map and globe pictures** come from OpenFreeMap, NASA GIBS and AWS. Those requests reveal your IP address and the area you are looking at.
 - **Satellite photos** are read straight from public Sentinel-2 files on Amazon Web Services (with Microsoft's Planetary Computer and Azure as backup). Those requests reveal an approximate area, never your name or email.
 - **The satellite view** is off until you switch it on. A choice you made earlier is remembered and starts it again by itself. It asks the Earth Search catalogue about a coarse version of your map area and reads one recent photo.
+- **The Look closer links** (built and merged, not yet deployed) open Google Street View and Google Earth in a new tab. Nothing is sent to Google until you click one. A click sends the middle of your outline, as latitude and longitude, to Google; what Google does with it is set by its own privacy policy.
 - **Satellite positions** come through our Worker from CelesTrak. Nothing about you is sent to CelesTrak.
 - **Our host.** Cloudflare, which hosts the site, can see ordinary web request information, and the Worker's logs are switched on.
 
@@ -528,9 +550,13 @@ Sign-in with Google, saving, and a server re-check of every photo are written an
 | C: Workbench       | Done, live             | New investigation, the workbench (swipe, side by side, difference), timeline, road sections, notes, report export                                |
 | D: Accounts        | Built, switched off    | Google sign-in, saving, a server re-check of every photo, privacy controls                                                                       |
 | E: Clear imagery   | Done, live             | A readable outline map in both themes, drawing aids, a size note, an optional recent satellite photo behind the map                              |
-| F: Look closer     | **Planned, not built** | See below                                                                                                                                        |
+| F: Look closer     | **Part built, merged** | See below                                                                                                                                        |
 
-**Phase F, in plain words (a plan that may change).** Type a place and watch a time-lapse of the same time of year across the last six years, one photo per year. Show an honest line, "Nothing you can claim here.", when 10 m photos cannot support a claim. A gallery of real big changes. Links to look closer on Street View and Google Earth (opened in a new tab, nothing stored). A share link. A "sharper" way to view the same pixels. A measured section in the report. Nothing in this list is promised or built yet.
+**Phase F, in plain words.** The aim is to type a place and watch a time-lapse of the same time of year across the last six years, one photo per year. Part of it is built and merged, and waits for the owner to deploy it. The time-lapse itself is not built.
+
+- **Built and merged:** the Look closer box (Street View and Google Earth links, and a button that starts a Street View note), the Sharper viewing aid, a faster photo reader, two small fixes (dates, and a tab left open across an update), and the "What we measured" block in the report.
+- **Building blocks:** the change rule, the same-season picker and the share-link codec are built and tested as building blocks, but only the change rule has a place on a screen so far (the "What we measured" block), and the other two have none.
+- **Not built:** the time-lapse itself (its loader, player and page, and the plain line it will show when 10 m photos cannot support a claim), the gallery of real big changes, a share link you can use, and the hand-over of two photos from the time-lapse into a full investigation. What is not built is a plan that may change, not a promise.
 
 ## Documents
 
@@ -564,7 +590,7 @@ Sign-in with Google, saving, and a server re-check of every photo are written an
 
 **What is the fingerprint for?** It lets anyone read the same piece of the same public file later and check that it gives the same fingerprint.
 
-**Which browsers work?** Modern desktop and phone browsers. The automated tests cover Chromium and Firefox, plus a phone-sized Chromium. Safari (WebKit) tests exist but could not be run on the project's build machine, so Safari has not been confirmed.
+**Which browsers work?** Modern desktop and phone browsers. The automated tests cover Chromium, Firefox and WebKit (the engine behind Safari), plus a phone-sized Chromium. WebKit is not the Safari app itself, so Safari has not been confirmed.
 
 **Can I use it offline?** No. It reads live photos and orbit data from the internet.
 
