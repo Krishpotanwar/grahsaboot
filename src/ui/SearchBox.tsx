@@ -34,10 +34,12 @@ export function SearchBox({ onSelect }: { onSelect(place: Place): void }) {
 
   async function submit(e: FormEvent) {
     e.preventDefault()
-    // Pasted coordinates need no search, so they work while one is pending.
+    // Pasted coordinates need no search, so they work while one is pending, and they end it: it must not answer over them.
     const c = parseCoordinates(q)
-    if (c)
+    if (c) {
+      ac.current?.abort()
       return c.swappedHint ? setState({ kind: 'swapped', lat: c.lat, lon: c.lon }) : pick(point(c.lat, c.lon))
+    }
     if (state.kind === 'busy') return
     ac.current?.abort()
     const mine = new AbortController()

@@ -123,6 +123,34 @@ test('pasted coordinates still work while a place search is pending', async ({ p
   await expect(search).toHaveAttribute('aria-disabled', 'false')
 })
 
+test('a search still pending when coordinates are picked is ended there and does not answer afterwards', async ({
+  page,
+}) => {
+  await page.clock.install()
+  await page.route(NOMINATIM, () => {}) // accepted, never answered
+  await page.goto('/?tier=0')
+  const input = page.getByLabel(copy.search.label)
+  const search = page.getByRole('button', { name: copy.search.submit })
+  await input.fill('Nagpur')
+  await search.click()
+  await expect(search).toHaveAttribute('aria-disabled', 'true')
+  const ended = page.waitForEvent('requestfailed', {
+    predicate: (r) => r.url().includes('/nominatim/search'),
+    timeout: 5_000,
+  })
+  await input.fill('21.1458, 79.0882')
+  await search.click({ force: true })
+  await ended // the pick ended the request itself, it was not left to the time limit
+  await expect(page.getByRole('link', { name: copy.nav.startHere })).toHaveAttribute(
+    'href',
+    `/new?lat=21.145800&lon=79.088200&name=${encodeURIComponent(copy.search.coordsResult(21.1458, 79.0882))}`,
+  )
+  await page.clock.fastForward(11_000) // past the 10 s limit, which the ended search must not report
+  await page.waitForTimeout(300) // the failed line would show within a frame of the limit
+  await expect(page.getByText(copy.search.failed)).toHaveCount(0)
+  await expect(search).toHaveAttribute('aria-disabled', 'false')
+})
+
 test('selecting a place flies the globe there', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.goto('/?tier=2')

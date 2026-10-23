@@ -43,13 +43,25 @@ const TIMEOUT_MS = 20_000
 const WINDOW_MONTHS = 12
 const WINDOWS_AT_ONCE = 3
 /**
+ * WebKit collects an AbortSignal.any result that nothing but its fetch holds, and then the limit aborts nothing and the request hangs
+ * past it. Each one is held until it aborts, at the latest when its own limit fires.
+ */
+const held = new Set<AbortSignal>()
+function hold(c: AbortSignal): AbortSignal {
+  if (!c.aborted) {
+    held.add(c)
+    c.addEventListener('abort', () => held.delete(c), { once: true })
+  }
+  return c
+}
+/**
  * A stalled network ends in a retry or the fallback (TimeoutError), never a hung spinner; a caller abort stays an abort.
  * Without AbortSignal.any (Safari < 17.4) the caller's signal goes through untimed, else the timeout alone.
  */
 export function withTimeout(s?: AbortSignal): AbortSignal | undefined {
   if (s && typeof AbortSignal.any !== 'function') return s
   const t = typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(TIMEOUT_MS) : undefined
-  return s && t ? AbortSignal.any([s, t]) : (s ?? t)
+  return s && t ? hold(AbortSignal.any([s, t])) : (s ?? t)
 }
 /** A caller abort is the caller's own signal firing, never the error's name: WebKit rejects a timed-out fetch with an AbortError too. */
 const isAbort = (s?: AbortSignal) => !!s?.aborted

@@ -1,5 +1,7 @@
+import { setFlagsFromString } from 'node:v8'
+import { runInNewContext } from 'node:vm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { getItemById, SCENE_ID, searchSentinel2 } from './search.ts'
+import { getItemById, SCENE_ID, searchSentinel2, withTimeout } from './search.ts'
 
 const item = (id: string, date: string) => ({
   id,
@@ -496,6 +498,54 @@ describe('searchSentinel2 where a timed-out fetch rejects with an AbortError (We
     caller.abort()
     await expect(p).rejects.toMatchObject({ name: 'AbortError' })
     expect(fetchImpl).toHaveBeenCalledTimes(1)
+  })
+})
+
+// WebKit collects an AbortSignal.any result that nothing but its fetch holds, and the limit that fires later then aborts nothing: the
+// request would hang past 20 s. A collection can be made to happen here (V8, with gc() from a flag set at run time), so the tests watch a
+// signal through a WeakRef, from a different task than the one that made it (a WeakRef target lives to the end of its task).
+setFlagsFromString('--expose-gc')
+const collect = runInNewContext('gc') as () => void
+const settle = () => new Promise<void>((r) => setTimeout(r, 0))
+async function collected(ref: WeakRef<object>) {
+  for (let i = 0; i < 3; i++) {
+    await settle()
+    collect()
+  }
+  return ref.deref() === undefined
+}
+
+describe('withTimeout keeps the signal it hands out reachable', () => {
+  afterEach(() => vi.restoreAllMocks())
+  it('holds the combined signal until it aborts, then lets it go', async () => {
+    const limit = new AbortController() // the 20 s limit, fired by the test
+    vi.spyOn(AbortSignal, 'timeout').mockReturnValue(limit.signal)
+    const ref = new WeakRef(withTimeout(new AbortController().signal)!)
+    expect(await collected(ref)).toBe(false)
+    limit.abort()
+    expect(ref.deref()!.aborted).toBe(true)
+    expect(await collected(ref)).toBe(true)
+  })
+  it('holds nothing for a signal that is already aborted, which would never release it', async () => {
+    vi.spyOn(AbortSignal, 'timeout').mockReturnValue(new AbortController().signal)
+    const gone = new AbortController()
+    gone.abort()
+    const ref = new WeakRef(withTimeout(gone.signal)!)
+    expect(await collected(ref)).toBe(true)
+  })
+  it('keeps the signal of a search request that is still pending', async () => {
+    let seen: WeakRef<AbortSignal> | undefined
+    // not a vi.fn: a mock keeps every argument it was called with, and that would hold the signal
+    const pending = (_url: string, init: RequestInit) => {
+      seen = new WeakRef(init.signal!)
+      return new Promise<Response>(() => {})
+    }
+    void searchSentinel2({
+      ...args,
+      fetchImpl: pending as typeof fetch,
+      signal: new AbortController().signal,
+    }).catch(() => {})
+    expect(await collected(seen!)).toBe(false)
   })
 })
 
