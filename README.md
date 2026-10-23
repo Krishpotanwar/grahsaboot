@@ -140,9 +140,15 @@ This section shows the same system from five angles. Each diagram answers one qu
 
 Two more diagrams sit next to the text they explain: [which version of the site your device gets](#speed-and-different-devices) and [how a change goes live](#putting-it-online-deploy).
 
-The diagrams are drawn with Mermaid, which GitHub shows as pictures. **Colour key:** blue is you and the screens, green is our code that runs in your browser, yellow is our server on Cloudflare, grey is a public service we do not run, and orange with a dashed edge is built but switched off.
+The diagrams are drawn with Mermaid. Each one is shown as a picture, with its Mermaid source folded under it. **Colour key:** blue is you and the screens, green is our code that runs in your browser, yellow is our server on Cloudflare, grey is a public service we do not run, and orange with a dashed edge is built but switched off.
 
 ### 1. The big picture
+
+![Diagram: you use the app in your browser, where it runs a satellite worker and a photo worker. The app gets the site and orbit data from our Worker on Cloudflare, which fetches orbit data from CelesTrak. Your browser talks straight to public services for photos (Earth Search, Planetary Computer, Sentinel-2 files on AWS and Azure) and for maps and place search (Nominatim, NASA GIBS, OpenFreeMap, AWS Terrain). Supabase accounts are built but switched off.](docs/diagrams/big-picture.png)
+
+_Who talks to whom: your browser, our one Worker on Cloudflare, and the public services._
+
+<details><summary>Diagram source (Mermaid)</summary>
 
 ```mermaid
 flowchart LR
@@ -187,6 +193,8 @@ flowchart LR
   style ext fill:transparent,stroke:#94a3b8
 ```
 
+</details>
+
 Only one thing runs on our side: a small Cloudflare **Worker**. It hands out the website and one route, `/api/tle`, that serves satellite orbit data. Everything else happens in your browser, and your browser talks straight to public services:
 
 | Service                                                    | What we use it for                                                               |
@@ -201,6 +209,12 @@ Only one thing runs on our side: a small Cloudflare **Worker**. It hands out the
 | Supabase                                                   | Accounts (built, switched off)                                                   |
 
 ### 2. Inside the app: the layers
+
+![Diagram of four layers, each relying on the one below: the screens (globe and satellites, new investigation, workbench, report, limits and privacy); shared building blocks and memory (src/ui, src/lib, src/data, src/geo, src/map); the engines (orbit engine, evidence engine, report maker, place search, the optional satellite view, and accounts, built but switched off); and the internet: public services over HTTPS, plus our Cloudflare Worker for orbit data.](docs/diagrams/app-layers.png)
+
+_How the code is organised: four layers, from the screens down to the internet._
+
+<details><summary>Diagram source (Mermaid)</summary>
 
 ```mermaid
 flowchart TB
@@ -229,9 +243,17 @@ flowchart TB
   style engines fill:transparent,stroke:#94a3b8
 ```
 
+</details>
+
 Each layer relies on the layer below it. Two walls are checked by automatic tests: the optional satellite view (`src/context`) never feeds a report, and the accounts code (`src/accounts`) can only be reached through one switch.
 
 ### 3. Satellite positions and the Cloudflare Worker
+
+![Sequence diagram: your browser asks our Cloudflare Worker for orbit data at /api/tle. If the Worker holds a copy less than 2 hours old, it sends it straight away. If not, it asks CelesTrak. When CelesTrak answers within 0.8 seconds, the Worker sends the fresh data and keeps it for 2 hours; when CelesTrak is too slow or down, it sends the saved copy from the site files, marked as old, and keeps trying in the background for the next visitor.](docs/diagrams/satellite-positions.png)
+
+_How orbit data reaches your browser, and what happens when CelesTrak is slow._
+
+<details><summary>Diagram source (Mermaid)</summary>
 
 ```mermaid
 sequenceDiagram
@@ -257,9 +279,17 @@ sequenceDiagram
   end
 ```
 
+</details>
+
 Your browser works out where each satellite is by itself, using orbit data. The Worker's only job is to fetch that orbit data from CelesTrak, keep it for 2 hours, and never make you wait: if CelesTrak is slow it sends the saved copy at once.
 
 ### 4. From a place to a report
+
+![Sequence diagram in 15 steps: you type a place, the app asks Nominatim where it is, and the globe flies there. You draw an outline and pick dates; the photo worker asks the STAC photo catalogue which photos cover it, reads only the small pieces needed from the Sentinel-2 files, and returns a clear-view score and fingerprint for each date. The app shows the timeline and the before and after photos; you pin dates and add notes and a claim; the app saves on your device and gives you a report file, one web page.](docs/diagrams/place-to-report.png)
+
+_Every step between typing a place and getting a report._
+
+<details><summary>Diagram source (Mermaid)</summary>
 
 ```mermaid
 sequenceDiagram
@@ -287,7 +317,15 @@ sequenceDiagram
   App-->>You: A report file, one web page
 ```
 
+</details>
+
 ### 5. How a photo becomes evidence
+
+![Diagram of five steps in a row: 1, a public Sentinel-2 file; 2, read the exact window of dots for your outline; 3, fingerprint the dots with SHA-256; 4, write the file, window, recipe versions and fingerprint into the report; 5, anyone can read the same window and compare.](docs/diagrams/photo-to-evidence.png)
+
+_Why someone else can trust a report: they can read the same dots and compare the fingerprint._
+
+<details><summary>Diagram source (Mermaid)</summary>
 
 ```mermaid
 flowchart LR
@@ -297,6 +335,8 @@ flowchart LR
   classDef mine fill:#dcfce7,stroke:#15803d,color:#0f172a
   classDef ext fill:#f1f5f9,stroke:#64748b,color:#0f172a
 ```
+
+</details>
 
 A fingerprint (a "hash") is a short code worked out from the dots. If even one dot changed, the code would be completely different. That is how a reader can tell the photos in a report are the real ones.
 
@@ -444,6 +484,12 @@ npm run tle:snapshot   # optional: refresh the saved orbits, at most once every 
 npm run deploy         # runs npm run check, then wrangler deploy
 ```
 
+![Diagram in two rows. Every push to main and every pull request: a code change is pushed to GitHub, CI runs the checks with no secrets and never deploys, and GitHub shows green or red. Publishing, by the owner only: npm run deploy runs all the checks first, then wrangler deploy, the site is live on Cloudflare, then the smoke checklist; if there is a problem, npx wrangler rollback.](docs/diagrams/deploy.png)
+
+_How a change goes live: CI only checks, and only the owner publishes._
+
+<details><summary>Diagram source (Mermaid)</summary>
+
 ```mermaid
 flowchart TB
   subgraph push["Every push to main and every pull request"]
@@ -465,6 +511,8 @@ flowchart TB
   style push fill:transparent,stroke:#94a3b8
   style pub fill:transparent,stroke:#94a3b8
 ```
+
+</details>
 
 - Only the owner deploys. Pushing to GitHub deploys nothing.
 - `npm run deploy` always publishes the build **without** accounts.
@@ -510,6 +558,12 @@ The site checks your device and picks one of four levels:
 
 On T1 and T2 you can press "Switch to full". The choice is made in this order:
 
+![Decision diagram for your device: without 3D graphics and a real graphics chip, T0 (no 3D map; search and the list still work). Otherwise, with data saver, a slow network or 2 GB of memory or less, T1 (a flat 2D map, satellites in a list). Otherwise, with 4 cores or fewer or under 4 GB of memory, T2 (the globe with satellite markers, tracks and swaths). Otherwise T3 (everything in T2, plus 3D terrain).](docs/diagrams/device-level.png)
+
+_Which level your device gets: T0, T1, T2 or T3._
+
+<details><summary>Diagram source (Mermaid)</summary>
+
 ```mermaid
 flowchart TB
   start(["Your device"]):::you --> q1{"3D graphics, and a real<br/>graphics chip?"}
@@ -523,6 +577,8 @@ flowchart TB
   classDef you fill:#dbeafe,stroke:#1d4ed8,color:#0f172a
   classDef t fill:#dcfce7,stroke:#15803d,color:#0f172a
 ```
+
+</details>
 
 How it stays fast:
 
