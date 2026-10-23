@@ -350,7 +350,7 @@ test('once a place is picked, "Watch it change" sits beside "Start here", says i
   await page.getByLabel(copy.search.label).fill('21.1458, 79.0882')
   await page.getByRole('button', { name: copy.search.submit }).click()
   await expect(watch).toBeVisible()
-  await expect(watch).toHaveText(`Watch it change · about ${LOAD_MB} MB`)
+  await expect(watch).toHaveText(`Watch it change · about ${LOAD_MB} MB or more`)
   const start = page.getByRole('link', { name: copy.nav.startHere })
   expect(await start.evaluate((a) => a.parentElement)).toBe(await watch.evaluate((a) => a.parentElement)) // the same row
   await watch.click()

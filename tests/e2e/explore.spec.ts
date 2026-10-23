@@ -83,7 +83,7 @@ test('a link opens the start screen with the size and a Load button, and loads n
   await expect(page.getByRole('heading', { level: 1, name: explore.title })).toBeVisible()
   await expect(page.getByText(explore.squareAround(NAME))).toBeVisible()
   await expect(loadButton(page)).toBeVisible()
-  await expect(loadButton(page)).toHaveText(`Load the pictures · about ${LOAD_MB} MB`)
+  await expect(loadButton(page)).toHaveText(`Load the pictures · about ${LOAD_MB} MB or more`)
   await expect(page.getByText(explore.waitsForTap)).toBeVisible()
   await page.waitForTimeout(1500)
   expect([seen.search, seen.tif, seen.created, seen.closed]).toEqual([0, 0, 0, 0]) // not a search, not a picture, not a worker

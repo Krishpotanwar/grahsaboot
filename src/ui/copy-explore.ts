@@ -13,11 +13,12 @@ export const explore = {
   intro:
     'One satellite picture a year for the last six years, taken in the same season, played one after another.',
   squareAround: (name: string) => `A square 2 km across, around ${name}.`,
-  /** The home screen's button: it starts the load at once, so it says what the load costs, as the satellite switch does. */
-  watch: (mb: number) => `Watch it change · about ${mb} MB`,
+  /** The home screen's button: it starts the load at once, so it says what the load costs, as the satellite switch does. "Or more": the size grows with the place (src/explore/cost.ts). */
+  watch: (mb: number) => `Watch it change · about ${mb} MB or more`,
   /** The start screen's button, for a person who arrived from a link, a reload or a new tab. */
-  load: (mb: number) => `Load the pictures · about ${mb} MB`,
-  waitsForTap: 'Nothing is downloaded until you tap Load.',
+  load: (mb: number) => `Load the pictures · about ${mb} MB or more`,
+  /** Not "nothing": on a screen that can draw it the hidden map behind the page builds on its own (its code, style and first tiles). */
+  waitsForTap: 'No satellite pictures are downloaded until you tap Load.',
   /** The quiet link under the home screen's buttons. */
   exampleLink: 'Try the time-lapse: Navi Mumbai airport',
 

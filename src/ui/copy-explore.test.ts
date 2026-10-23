@@ -59,9 +59,13 @@ describe('the words of the time-lapse screen', () => {
     expect(explore.age(101)).toBe('101 days old.')
   })
 
-  it('says the size the way the satellite switch does, and the same size on every button', () => {
-    expect(explore.watch(13)).toBe('Watch it change · about 13 MB')
-    expect(explore.load(13)).toBe('Load the pictures · about 13 MB')
+  it('says the size the way the satellite switch does, as a least figure, and the same on every button', () => {
+    expect(explore.watch(13)).toBe('Watch it change · about 13 MB or more')
+    expect(explore.load(13)).toBe('Load the pictures · about 13 MB or more')
+  })
+
+  it('says only what is true before a tap: no satellite pictures are downloaded (the map library may be)', () => {
+    expect(explore.waitsForTap).toBe('No satellite pictures are downloaded until you tap Load.')
   })
 
   it('says what the pictures are for: looking, not evidence, and that a report fingerprints the exact pixels', () => {
