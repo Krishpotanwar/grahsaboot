@@ -66,9 +66,16 @@ const GLYPH =
 /**
  * DOM markers survive style reloads; one per satellite, glyph plus name. aria-hidden: the panel lists the same data as text.
  * opacityWhenCovered 0 hides a satellite while it is on the far side of the globe.
+ * An aborted call adds nothing: the markers were removed (hidden, or the screen left) while the class was still loading.
  */
-export async function syncSatMarkers(map: MlMap, markers: Map<number, Marker>, sats: SatPosition[]) {
+export async function syncSatMarkers(
+  map: MlMap,
+  markers: Map<number, Marker>,
+  sats: SatPosition[],
+  signal?: AbortSignal,
+) {
   const MarkerCtor = await loadMarker()
+  if (signal?.aborted) return
   for (const s of sats) {
     let m = markers.get(s.norad)
     if (!m) {
