@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
+import { LOAD_MB } from '../../src/explore/cost.ts'
 import { copy } from '../../src/ui/copy.ts'
+import { explore } from '../../src/ui/copy-explore.ts'
 import { tabKey } from './helpers.ts'
 
 const hasWebgl2 = (page: Page) => page.evaluate(() => !!document.createElement('canvas').getContext('webgl2'))
@@ -332,4 +334,51 @@ test('the globe auto-rotates on a large screen', async ({ page, isMobile }) => {
   const lng = () => page.evaluate(() => (window as any).__gs.map.getCenter().lng as number)
   const start = await lng()
   await expect.poll(lng, { timeout: 15_000 }).not.toBe(start)
+})
+
+// The time-lapse (src/explore): "Watch it change" beside "Start here" once a place is picked, which says what it costs and loads at
+// once; and a quiet link to the worked example, which waits for a tap like any link. The fixture scenes are dated 2027 to 2032, so
+// the page's clock is set to the day after the last of them.
+test('once a place is picked, "Watch it change" sits beside "Start here", says its size and loads at once; a reload waits for a tap', async ({
+  page,
+}) => {
+  await page.clock.setFixedTime(new Date('2032-03-10T12:00:00Z'))
+  await page.goto('/?tier=0')
+  const watch = page.getByRole('link', { name: explore.watch(LOAD_MB) })
+  await expect(page.getByRole('link', { name: copy.nav.newInvestigation }).first()).toBeVisible()
+  await expect(watch).toHaveCount(0) // no place yet
+  await page.getByLabel(copy.search.label).fill('21.1458, 79.0882')
+  await page.getByRole('button', { name: copy.search.submit }).click()
+  await expect(watch).toBeVisible()
+  await expect(watch).toHaveText(`Watch it change · about ${LOAD_MB} MB`)
+  const start = page.getByRole('link', { name: copy.nav.startHere })
+  expect(await start.evaluate((a) => a.parentElement)).toBe(await watch.evaluate((a) => a.parentElement)) // the same row
+  await watch.click()
+  await expect(page).toHaveURL(/\/explore\?lat=21\.145800&lon=79\.088200&name=/)
+  await expect(page).toHaveTitle(`${copy.titles.explore} · ${copy.app.name}`)
+  await expect(page.locator('main')).toBeFocused() // the shell moves focus on a change of page
+  await expect(page.getByRole('button', { name: explore.load(LOAD_MB) })).toHaveCount(0) // no second tap
+  await expect(page.locator('main p[role="status"]')).toHaveText(explore.loaded(6, 6), { timeout: 30_000 })
+  await page.reload() // the flag lives in memory: a reload is like a link
+  await expect(page.getByRole('button', { name: explore.load(LOAD_MB) })).toBeVisible()
+  await page.waitForTimeout(800)
+  await expect(page.locator('main p[role="status"]')).toHaveText('')
+})
+
+test('the quiet link opens the time-lapse of the worked example and waits for a tap on Load', async ({
+  page,
+}) => {
+  const searches: string[] = []
+  page.on('request', (r) => r.url().endsWith('/stac/search') && searches.push(r.url()))
+  await page.goto('/?tier=0')
+  const link = page.getByRole('link', { name: explore.exampleLink })
+  await expect(link).toBeVisible()
+  await link.click()
+  await expect(page).toHaveURL(
+    /\/explore\?lat=18\.991350&lon=73\.065750&name=Navi%20Mumbai%20International%20Airport$/,
+  )
+  await expect(page.getByText(explore.squareAround('Navi Mumbai International Airport'))).toBeVisible()
+  await expect(page.getByRole('button', { name: explore.load(LOAD_MB) })).toBeVisible()
+  await page.waitForTimeout(800)
+  expect(searches).toEqual([]) // pressed in the app, but nothing was said of the cost on the link: it waits
 })
