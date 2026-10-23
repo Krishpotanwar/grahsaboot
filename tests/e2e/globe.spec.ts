@@ -319,6 +319,11 @@ test('the picked place is still there after a trip to another page', async ({ pa
 
 test('the globe auto-rotates on a large screen', async ({ page, isMobile }) => {
   test.skip(isMobile, 'a 2200 px wide emulated phone (DPR 2.6) would need a ~12 MP canvas')
+  // The spin lasts 30 s from mount. GitHub's runner draws a 2200 px canvas in software: the style took about 32 s to load (47 s for this test, a few seconds on a laptop), so the spin was over before the poll began.
+  test.skip(
+    !!process.env.CI,
+    'a hosted runner loads the style of a 2200 px canvas after the 30 s spin has ended',
+  )
   await page.setViewportSize({ width: 2200, height: 1300 })
   await page.goto('/?tier=2')
   test.skip(!(await hasWebgl2(page)), 'no WebGL2 in this engine')
