@@ -9,9 +9,13 @@ export interface TierSignals {
   cores: number | null
 }
 
+/** The browser says the link is slow: Data Saver is on, or the connection is slow-2g, 2g or 3g. Chromium only; elsewhere it is false. */
+export const isSlowLink = (s: Pick<TierSignals, 'saveData' | 'effectiveType'>): boolean =>
+  s.saveData || (s.effectiveType !== null && /^(slow-2g|2g|3g)$/.test(s.effectiveType))
+
 export function chooseTier(s: TierSignals): Tier {
   if (!s.webgl2 || /swiftshader|llvmpipe|software/i.test(s.renderer)) return 0
-  if (s.saveData || (s.effectiveType !== null && /^(slow-2g|2g|3g)$/.test(s.effectiveType))) return 1
+  if (isSlowLink(s)) return 1
   if (s.deviceMemory !== null && s.deviceMemory <= 2) return 1
   if ((s.cores !== null && s.cores <= 4) || (s.deviceMemory !== null && s.deviceMemory < 4)) return 2
   return 3
