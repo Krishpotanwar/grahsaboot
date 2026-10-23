@@ -473,7 +473,7 @@ Accounts have their own settings (`VITE_ACCOUNTS`, `VITE_SUPABASE_URL`, `VITE_SU
 
 CI (`.github/workflows/ci.yml`) uses Node 22. It holds **no secrets** and **never deploys**. It runs `npm run check`, a check that the server's evidence copy is committed, the Deno checks and tests, and the browser tests in Chromium (the desktop, phone-sized and accounts projects). It does not run the live checks, Firefox or WebKit: those are run by hand.
 
-**What the checks held at this release.** All 1,542 unit tests (95 files, the database tests among them) and all 62 server-function tests in Deno pass. More than 600 browser tests pass in Chromium, a phone-sized Chromium and the accounts build, and more than 270 pass in WebKit; a few more skip themselves by design (a touch test on a desktop browser, for example). The first page's JavaScript is just under 100 KB compressed, inside the 150 KB limit.
+**What the checks held at this release.** All 1,554 unit tests (95 files, the database tests among them) and all 62 server-function tests in Deno pass. In the browser tests, run by hand on a laptop, 629 pass in Chromium, a phone-sized Chromium and the accounts build, 287 in WebKit and 287 in Firefox, and none fail; 24 more skip themselves by design (a touch test on a desktop browser, for example). The live checks pass in all three browsers. The first page's JavaScript is 99.8 KB compressed, inside the 150 KB limit.
 
 ## Putting it online (deploy)
 
