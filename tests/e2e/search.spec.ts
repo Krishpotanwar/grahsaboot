@@ -1,6 +1,7 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
 import { copy } from '../../src/ui/copy.ts'
+import { CORS } from './helpers.ts'
 
 // WCAG 2.4.3: the pressed result or fix button unmounts, so a mouse or keyboard user gets focus back in the input. A touch screen does not: focusing a text field there reopens the on-screen keyboard over the map.
 const checkFocusAfterPick = (page: Page, isMobile: boolean) =>
@@ -68,6 +69,58 @@ test('unknown places say so plainly', async ({ page }) => {
   await page.getByLabel(copy.search.label).fill('Zzzxq')
   await page.getByRole('button', { name: copy.search.submit }).click()
   await expect(page.getByText(copy.search.none)).toBeVisible()
+})
+
+// A search that fails must say so and give the box back; one that never answers must not keep it for ever.
+const NOMINATIM = '**/nominatim/search*'
+
+test('a place search that Nominatim refuses says so, and the Search button works again', async ({ page }) => {
+  // The 503 carries the CORS header a real answer has: the page sees a refusal, not a blocked request.
+  await page.route(NOMINATIM, (route) => route.fulfill({ status: 503, headers: CORS, body: 'unavailable' }))
+  await page.goto('/?tier=0')
+  await page.getByLabel(copy.search.label).fill('Nagpur')
+  const search = page.getByRole('button', { name: copy.search.submit })
+  await search.click()
+  await expect(page.getByText(copy.search.failed)).toBeVisible()
+  await expect(search).toHaveAttribute('aria-disabled', 'false')
+})
+
+test('a place search that never answers ends in the failed line after 10 s and frees the Search button', async ({
+  page,
+}) => {
+  await page.clock.install()
+  let asked = 0
+  await page.route(NOMINATIM, () => void asked++) // accepted, never answered
+  await page.goto('/?tier=0')
+  await page.getByLabel(copy.search.label).fill('Nagpur')
+  const search = page.getByRole('button', { name: copy.search.submit })
+  await search.click()
+  await expect(search).toHaveAttribute('aria-disabled', 'true')
+  await page.clock.fastForward(7_000)
+  await expect(page.getByText(copy.search.failed)).toHaveCount(0) // not before the limit
+  await expect(search).toHaveAttribute('aria-disabled', 'true')
+  await page.clock.fastForward(4_000)
+  await expect(page.getByText(copy.search.failed)).toBeVisible()
+  await expect(search).toHaveAttribute('aria-disabled', 'false')
+  expect(asked).toBe(1)
+})
+
+test('pasted coordinates still work while a place search is pending', async ({ page }) => {
+  await page.route(NOMINATIM, () => {}) // accepted, never answered
+  await page.goto('/?tier=0')
+  const input = page.getByLabel(copy.search.label)
+  const search = page.getByRole('button', { name: copy.search.submit })
+  await input.fill('Nagpur')
+  await search.click()
+  await expect(search).toHaveAttribute('aria-disabled', 'true')
+  await input.fill('21.1458, 79.0882')
+  // Forced: Playwright waits for an aria-disabled button to be enabled, and a finger can press the grey button at once.
+  await search.click({ force: true })
+  await expect(page.getByRole('link', { name: copy.nav.startHere })).toHaveAttribute(
+    'href',
+    `/new?lat=21.145800&lon=79.088200&name=${encodeURIComponent(copy.search.coordsResult(21.1458, 79.0882))}`,
+  )
+  await expect(search).toHaveAttribute('aria-disabled', 'false')
 })
 
 test('selecting a place flies the globe there', async ({ page }) => {

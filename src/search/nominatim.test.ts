@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createNominatim } from './nominatim.ts'
 
 const ROW = {
@@ -67,5 +67,68 @@ describe('nominatim', () => {
       'https://x/search?format=jsonv2&limit=5&q=Sitabuldi%20%26%20Fort',
     )
     expect(fetchImpl.mock.calls[0]![1].headers['Accept-Language']).toBe('en')
+  })
+})
+
+describe('the time limit', () => {
+  afterEach(() => vi.restoreAllMocks())
+  /** A server that accepts the request and never answers. Like the browser's fetch, it rejects with the signal's reason when the signal fires. */
+  const silent = () =>
+    vi
+      .fn()
+      .mockImplementation(
+        (_url: string, init: RequestInit) =>
+          new Promise<Response>((_, reject) =>
+            init.signal?.addEventListener('abort', () => reject(init.signal!.reason), { once: true }),
+          ),
+      )
+  const search = (fetchImpl: ReturnType<typeof silent>, signal?: AbortSignal) =>
+    createNominatim({ baseUrl: 'https://x', fetchImpl, sleep: async () => {} }).search('Nagpur', signal)
+  /**
+   * Node's AbortSignal.timeout is not driven by vitest's fake timers (measured: still not aborted after a faked 10 s), so the test
+   * holds the clock itself: each timeout signal it hands out fires when the test says. The real timer is the e2e's (Playwright's clock).
+   */
+  const clock = () => {
+    const fires: Array<{ ms: number; fire(): void }> = []
+    vi.spyOn(AbortSignal, 'timeout').mockImplementation((ms) => {
+      const c = new AbortController()
+      fires.push({ ms, fire: () => c.abort(new DOMException('The operation timed out.', 'TimeoutError')) })
+      return c.signal
+    })
+    return fires
+  }
+
+  it('ends a search that never answers after 10 s, with a timeout that is not an abort', async () => {
+    const fires = clock()
+    const pending = search(silent(), new AbortController().signal)
+    expect(fires.map((f) => f.ms)).toEqual([10_000])
+    fires[0]!.fire()
+    await expect(pending).rejects.toMatchObject({ name: 'TimeoutError' })
+  })
+  it('limits a search that has no caller signal the same way', async () => {
+    const fires = clock()
+    const pending = search(silent())
+    expect(fires.map((f) => f.ms)).toEqual([10_000])
+    fires[0]!.fire()
+    await expect(pending).rejects.toMatchObject({ name: 'TimeoutError' })
+  })
+  it('still ends at once when the caller aborts, whatever time is left', async () => {
+    clock() // the limit is there but never fires: nothing here may wait for it
+    const ac = new AbortController()
+    const pending = search(silent(), ac.signal)
+    ac.abort()
+    await expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+  })
+  it('passes the caller its own signal, untimed, where AbortSignal.any is missing (Safari before 17.4)', async () => {
+    const any = Object.getOwnPropertyDescriptor(AbortSignal, 'any')!
+    Object.defineProperty(AbortSignal, 'any', { ...any, value: undefined })
+    try {
+      const fetchImpl = vi.fn().mockResolvedValue(ok([]))
+      const ac = new AbortController()
+      await search(fetchImpl, ac.signal)
+      expect(fetchImpl.mock.calls[0]![1].signal).toBe(ac.signal)
+    } finally {
+      Object.defineProperty(AbortSignal, 'any', any)
+    }
   })
 })
