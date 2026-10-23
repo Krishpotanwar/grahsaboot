@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Download, type Page } from '@playwright/test'
+import { RECIPES } from '../../src/evidence/types.ts'
 import { copy } from '../../src/ui/copy.ts'
 import { flow } from '../../src/ui/copy-flow.ts'
 import {
@@ -410,7 +411,10 @@ for (const [name, open] of [
 // "What we measured": the change rule is run on the pinned pair in a worker of its own before the report is built (ruling R46). The
 // page is watched in two ways: through its Worker, whose one `change` request is let through, failed or never answered, and through
 // the documents its report preview is given.
+type Mode = 'pass' | 'fail' | 'silent'
 interface Watch {
+  /** What the worker does with the change request: `pass` lets it through, `fail` answers it with an error, `silent` never answers. */
+  mode: Mode
   /** Requests to the change rule, the round trip of its answer in ms, and the workers asked for it that were ended. */
   asked: number
   ms: number | null
@@ -419,13 +423,25 @@ interface Watch {
   docs: boolean[]
 }
 const watched = (page: Page) => page.evaluate(() => (window as unknown as { __watch: Watch }).__watch)
+const setMode = (page: Page, mode: Mode) =>
+  page.evaluate((m) => ((window as unknown as { __watch: Watch }).__watch.mode = m), mode)
 const measured = (page: Page) => reportFrame(page).locator('.measured')
 const SITE_SECTIONS = ['01', '02', '03', '04', '05', '06', '07', '08']
+/** The recipes every report listed before the change rule existed: a report that printed no block lists these and no more (ruling R55). */
+const BEFORE_THE_RULE = {
+  frame: RECIPES.frame,
+  scl: RECIPES.scl,
+  display: RECIPES.display,
+  diff: RECIPES.diff,
+}
+/** The `recipes` of the provenance the report page itself embeds (a JSON script in the preview). */
+const embeddedRecipes = async (page: Page) =>
+  JSON.parse((await reportFrame(page).locator('script#provenance').textContent())!).recipes as unknown
 
-async function watchReport(page: Page, how: 'pass' | 'fail' | 'silent') {
+async function watchReport(page: Page, how: Mode) {
   await page.addInitScript(
     ({ mode, title }) => {
-      const w: Watch = { asked: 0, ms: null, ended: 0, docs: [] }
+      const w: Watch = { mode, asked: 0, ms: null, ended: 0, docs: [] }
       ;(window as unknown as { __watch: Watch }).__watch = w
       const note = (el: Node) => {
         if (el instanceof HTMLIFrameElement && el.title === title)
@@ -452,9 +468,9 @@ async function watchReport(page: Page, how: 'pass' | 'fail' | 'silent') {
             return super.postMessage(message, ...(rest as []))
           w.asked++
           this.askedAt = performance.now()
-          if (mode === 'pass') return super.postMessage(message, ...(rest as []))
+          if (w.mode === 'pass') return super.postMessage(message, ...(rest as []))
           const { id } = message as { id: number }
-          if (mode === 'fail')
+          if (w.mode === 'fail')
             queueMicrotask(() =>
               this.onmessage?.(
                 new MessageEvent('message', {
@@ -526,9 +542,10 @@ test('the report prints what the change rule measured on the pair, in the first 
   const words = await measured(page).innerText()
   expect(words).not.toMatch(/nothing you can claim/i)
   expect(words).not.toMatch(/\bno change\b/i)
-  // The provenance lists the same rule among its recipes.
+  // The report printed the block, so the provenance, the page's own and the file, names the rule among its recipes.
+  expect(await embeddedRecipes(page)).toStrictEqual(RECIPES)
   const prov = JSON.parse(await fileOf(await download(page, flow.report.provenance)))
-  expect(prov.recipes.change).toBe('change-v1')
+  expect(prov.recipes).toStrictEqual(RECIPES)
   // The first sight was the finished page: the preview was given one document, with the block in it, and it was never rebuilt.
   await expect.poll(async () => (await watched(page)).ended).toBe(1)
   const w = await watched(page)
@@ -554,6 +571,11 @@ test('a worker that fails the change request leaves the report finished, with no
   const html = await fileOf(await download(page, flow.report.download))
   expect(html).not.toContain(flow.report.measured.title)
   expect(html).not.toContain('class="measured"')
+  // Nothing was printed from the rule, so the rule is named nowhere: not in the block, not in the provenance (ruling R55).
+  expect(html).not.toContain(RECIPES.change)
+  expect(await embeddedRecipes(page)).toStrictEqual(BEFORE_THE_RULE)
+  const prov = JSON.parse(await fileOf(await download(page, flow.report.provenance)))
+  expect(prov.recipes).toStrictEqual(BEFORE_THE_RULE)
   const w = await watched(page)
   expect([w.asked, w.ended, w.docs]).toEqual([1, 1, [false]]) // asked once, its worker ended, one document and never another
   expect(seen).toEqual([])
@@ -576,12 +598,19 @@ test('a worker that never answers is waited for 10 s at most, then the report is
   expect(waited, 'and not for the 120 s of the imagery client').toBeLessThan(20_000)
   await expect(reportFrame(page).locator('p', { hasText: CREDIT })).toBeVisible()
   await expect(measured(page)).toHaveCount(0)
+  // The same as a failed run: the rule is named nowhere (ruling R55).
+  expect(await fileOf(await download(page, flow.report.download))).not.toContain(RECIPES.change)
+  expect(await embeddedRecipes(page)).toStrictEqual(BEFORE_THE_RULE)
+  const prov = JSON.parse(await fileOf(await download(page, flow.report.provenance)))
+  expect(prov.recipes).toStrictEqual(BEFORE_THE_RULE)
   const w = await watched(page)
   expect([w.asked, w.ended, w.docs]).toEqual([1, 1, [false]])
   expect(seen).toEqual([])
 })
 
-test('leaving the report while the rule runs ends its worker at once and is quiet', async ({ page }) => {
+test('leaving the report while the rule runs ends its worker at once and is quiet, and leaves nothing for the next report', async ({
+  page,
+}) => {
   const seen = loud(page)
   await watchReport(page, 'silent')
   await openFixtureSite(page)
@@ -590,6 +619,15 @@ test('leaving the report while the rule runs ends its worker at once and is quie
   await expect(page).toHaveURL(/\/i\/local-[0-9a-f-]{36}$/)
   // Not at the deadline, 10 s later: now.
   await expect.poll(async () => (await watched(page)).ended, { timeout: 3_000 }).toBe(1)
-  expect((await watched(page)).docs).toEqual([]) // no report was ever shown
+  // The abandoned run built nothing, so there is no provenance of it to name the rule in: no report was ever shown.
+  expect((await watched(page)).docs).toEqual([])
+  // The next report is a run of its own: with the worker answering, it prints the block and its provenance names the rule.
+  await setMode(page, 'pass')
+  await openReport(page)
+  await expect(measured(page)).toHaveCount(1)
+  expect(await embeddedRecipes(page)).toStrictEqual(RECIPES)
+  const w = await watched(page)
+  expect([w.asked, w.docs]).toEqual([2, [true]])
+  await expect.poll(async () => (await watched(page)).ended).toBe(2)
   expect(seen).toEqual([])
 })
