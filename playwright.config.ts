@@ -35,10 +35,12 @@ export default defineConfig({
             ]
           : []),
       ],
+  // Vite listens on `localhost` unless told otherwise, which can resolve to ::1 alone (it does on macOS) while Playwright polls
+  // 127.0.0.1 and times out: every Vite server here says --host 127.0.0.1. The fixture server already listens there.
   webServer: live
     ? [
         {
-          command: 'npm run dev -- --port 5173 --strictPort',
+          command: 'npm run dev -- --host 127.0.0.1 --port 5173 --strictPort',
           url: 'http://127.0.0.1:5173',
           reuseExistingServer: true,
           // A developer's .env.development.local may switch accounts on; the live smoke test is of the site as deployed.
@@ -55,7 +57,7 @@ export default defineConfig({
         {
           // Its own folder: dist/ stays the build `npm run check` made (a test build there could be deployed by mistake).
           command:
-            'npx vite build --mode e2e --outDir dist-e2e && npx vite preview --outDir dist-e2e --port 4173 --strictPort',
+            'npx vite build --mode e2e --outDir dist-e2e && npx vite preview --outDir dist-e2e --host 127.0.0.1 --port 4173 --strictPort',
           url: 'http://127.0.0.1:4173',
           timeout: 180_000,
           reuseExistingServer: false,
@@ -66,7 +68,7 @@ export default defineConfig({
           ? [
               {
                 command:
-                  'npx vite build --mode accounts --outDir dist-accounts-e2e && npx vite preview --outDir dist-accounts-e2e --port 4174 --strictPort',
+                  'npx vite build --mode accounts --outDir dist-accounts-e2e && npx vite preview --outDir dist-accounts-e2e --host 127.0.0.1 --port 4174 --strictPort',
                 url: 'http://127.0.0.1:4174',
                 timeout: 180_000,
                 reuseExistingServer: false,
