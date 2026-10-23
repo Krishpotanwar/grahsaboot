@@ -24,11 +24,14 @@ variables today (`wrangler.jsonc` has no `vars` and no cron trigger).
 
 ## Smoke checklist
 
-- Every route answers 200 with HTML: `/`, `/new`, `/limits`, `/privacy`, and an unknown path such as `/i/anything` (the single
-  page app's fallback). Not `/api/*`.
+- Every route answers 200 with HTML: `/`, `/new`, `/limits`, `/privacy`, `/explore?lat=18.99135&lon=73.06575&name=Navi%20Mumbai%20airport`,
+  and an unknown path such as `/i/anything` (the single page app's fallback). Not `/api/*`.
 - `/api/tle` returns a JSON array of 5 objects. `/api/nothing` is a JSON 404 `{"error":"NOT_FOUND"}`; `POST /api/tle` is 405.
 - In a real browser, at 1440 px and 390 px: no page error and no console message about the content security policy; the
   satellites panel says `Live` (or `Orbits from ...` when it is on the snapshot).
+- The eye button next to "Start an investigation" hides the satellites panel and shows it again, and the choice survives a reload.
+- The time-lapse opens (the `/explore` address above, then "Load the pictures"): six pictures, 2021 to 2026, appear in about 20 s,
+  play by themselves, and the console stays quiet.
 - The worked example opens (`/new?example=navi-mumbai-airport`, then the review step's open button): both photos appear in
   about 10 s and the whole list of passes follows.
 - The map opens in the workbench (tier 2 and up), the report page shows its preview and downloads.
@@ -73,3 +76,4 @@ To see a violation locally, serve `dist/` with the headers applied to every same
 | 2026-10-18 | A map you can read, drawing aids and a size note | ccf42f10-c512-46cc-8f7d-7f602148fa73 |
 | 2026-10-19 | The satellite view of the outline step, and its lines on the limits and privacy pages | ffe08aed-8db6-4f77-a18d-9328b8455dd0 |
 | 2026-10-23 | Phase F stage 1: Look closer, Sharper, strict dates, the faster picture reader, the stale-tab reload, and the report's "What we measured" block | 242fa57b-175b-4b5f-8382-f3a0e7baf00c |
+| 2026-10-24 | Phase F stage 2: Watch it change (the time-lapse, with its two links on the home screen) and a switch that hides the satellites | 8eedae18-8f94-46bb-9479-d883cf714943 |
