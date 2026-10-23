@@ -1,5 +1,7 @@
+import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
 import { LOAD_MB } from '../../src/explore/cost.ts'
+import { PACE_MS } from '../../src/explore/playback.ts'
 import { copy } from '../../src/ui/copy.ts'
 import { explore } from '../../src/ui/copy-explore.ts'
 import { EXPLORE_PLACE } from '../fixtures/scene.ts'
@@ -194,4 +196,228 @@ test('an address with no usable place shows one plain message and a link home', 
   }
   await page.getByRole('link', { name: explore.home }).click()
   await expect(page).toHaveURL(/\/$/)
+})
+
+const AXE_TAGS = ['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']
+/** The page as it is, in both themes. */
+async function axeInBothThemes(page: Page) {
+  for (let i = 0; i < 2; i++) {
+    const results = await new AxeBuilder({ page }).withTags(AXE_TAGS).analyze()
+    expect(results.violations, JSON.stringify(results.violations, null, 2)).toEqual([])
+    await page.getByRole('button', { name: copy.nav.themeToggle }).click()
+  }
+}
+
+/** The cloud check of these years reads the cloudy day's file: nothing in them is clear, so each is a gap. */
+const cloudyYears = (page: Page, years: number[]) =>
+  page.route(new RegExp(`/cog/(${years.join('|')})-02-\\d\\d/SCL\\.tif$`), async (route) =>
+    route.fulfill({
+      response: await route.fetch({
+        url: route
+          .request()
+          .url()
+          .replace(/\/cog\/\d{4}-\d\d-\d\d\//, '/cog/2025-06-15/'),
+      }),
+    }),
+  )
+
+/** Loads the fixture square and waits until the load has ended. */
+async function loadAll(page: Page, extra = '', n = YEARS.length) {
+  await open(page, extra)
+  await loadButton(page).click()
+  await loaded(page, n)
+}
+
+test('Space, the arrows, Home and End work on the picture, each step is spoken, and the page never scrolls', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 800, height: 520 }) // shorter than the page: a key that scrolls would show
+  await loadAll(page)
+  await stage(page).focus() // may scroll the picture into view: where the page stands now is what no key may change
+  const top = await page.evaluate(() => scrollY)
+  await page.keyboard.press('Space') // it is playing: Space pauses
+  await expect(play(page)).toBeVisible()
+  await expect(spoken(page)).toHaveText(/^Paused\. Frame [1-6] of 6, .+, 100% clear$/)
+  const spokenAfter = async (key: string, year: number, text: string) => {
+    await page.keyboard.press(key)
+    await expect.poll(() => shownYear(page), { message: key }).toBe(year)
+    await expect(spoken(page)).toHaveText(text)
+  }
+  await spokenAfter('Home', 2027, 'Frame 1 of 6, 11 Feb 2027, 100% clear')
+  await spokenAfter('ArrowRight', 2028, 'Frame 2 of 6, 11 Feb 2028, 100% clear')
+  await spokenAfter('ArrowDown', 2029, 'Frame 3 of 6, 11 Feb 2029, 100% clear')
+  await spokenAfter('ArrowLeft', 2028, 'Frame 2 of 6, 11 Feb 2028, 100% clear')
+  await spokenAfter('ArrowUp', 2027, 'Frame 1 of 6, 11 Feb 2027, 100% clear')
+  await spokenAfter('ArrowLeft', 2032, 'Frame 6 of 6, 21 Feb 2032, 100% clear') // round to the last
+  await spokenAfter('ArrowRight', 2027, 'Frame 1 of 6, 11 Feb 2027, 100% clear') // and round to the first
+  await spokenAfter('End', 2032, 'Frame 6 of 6, 21 Feb 2032, 100% clear')
+  await page.keyboard.press('Space') // paused: Space plays
+  await expect(pause(page)).toBeVisible()
+  const line = await spoken(page).innerText()
+  const years = new Set<number>()
+  await expect
+    .poll(
+      async () => {
+        years.add(await shownYear(page))
+        return years.size
+      },
+      { timeout: 15_000, intervals: [200] },
+    )
+    .toBeGreaterThanOrEqual(3)
+  expect(await spoken(page).innerText()).toBe(line) // a loop that plays says nothing
+  expect(await page.evaluate(() => scrollY)).toBe(top) // not one of the keys scrolled the page
+})
+
+test('a key typed anywhere but on the picture is the page’s, and a shortcut with a modifier is the browser’s', async ({
+  page,
+}) => {
+  await loadAll(page)
+  await pause(page).click()
+  const was = await shownYear(page)
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
+  for (const key of ['ArrowRight', 'ArrowLeft', 'Home', 'End', 'Space']) await page.keyboard.press(key)
+  expect(await shownYear(page)).toBe(was)
+  await expect(play(page)).toBeVisible() // Space did not play it either
+  await stage(page).focus()
+  await page.keyboard.press('Alt+ArrowRight') // history Forward: not a step
+  await page.keyboard.press('Control+Home')
+  expect(await shownYear(page)).toBe(was)
+})
+
+test('Play, Pause, Previous and Next, and a labelled slider, do what the keys do, and the slider stops a loop it is reached in', async ({
+  page,
+}) => {
+  await loadAll(page)
+  await pause(page).click()
+  await expect(spoken(page)).toHaveText(/^Paused\. Frame [1-6] of 6, /)
+  await play(page).click()
+  await expect(pause(page)).toBeVisible()
+  await pause(page).click()
+  await page.getByRole('button', { name: explore.previous }).click()
+  await expect(spoken(page)).toHaveText(/^Frame [1-6] of 6, .+, 100% clear$/)
+  await page.getByRole('button', { name: explore.next }).click()
+  await play(page).click()
+  await slider(page).focus() // a slider that has focus is read out as it moves: the loop stops for it
+  await expect(play(page)).toBeVisible()
+  await slider(page).press('End')
+  await expect.poll(() => shownYear(page)).toBe(2032)
+  await expect(spoken(page)).toHaveText('Frame 6 of 6, 21 Feb 2032, 100% clear')
+  await slider(page).press('Home')
+  await expect.poll(() => shownYear(page)).toBe(2027)
+  await expect(slider(page)).toHaveAttribute('aria-valuetext', '2027, 11 Feb 2027')
+  await expect(slider(page)).toHaveAttribute('max', '5')
+})
+
+test('a person who asked for less motion gets no Play and no loop, and steps instead', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await loadAll(page)
+  await expect(play(page)).toHaveCount(0)
+  await expect(pause(page)).toHaveCount(0)
+  expect(await shownYear(page)).toBe(2032) // the newest, where it stopped
+  await page.waitForTimeout(PACE_MS * 2 + 500)
+  expect(await shownYear(page)).toBe(2032) // nothing moved by itself
+  await expect(page.getByText(explore.keysHintStill)).toBeAttached() // the keys line, without Space (hidden on a touch screen)
+  await page.getByRole('button', { name: explore.next }).click() // round to the first
+  await expect.poll(() => shownYear(page)).toBe(2027)
+  await expect(spoken(page)).toHaveText('Frame 1 of 6, 11 Feb 2027, 100% clear')
+  await stage(page).focus()
+  await page.keyboard.press('Space') // nothing to play: not a key of the page's either
+  await page.keyboard.press('ArrowRight')
+  await expect.poll(() => shownYear(page)).toBe(2028)
+  await page.waitForTimeout(PACE_MS + 300)
+  expect(await shownYear(page)).toBe(2028)
+})
+
+test('a year with no clear picture is a labelled gap, and the other five still play', async ({ page }) => {
+  await cloudyYears(page, [2028])
+  await loadAll(page, '', 5)
+  const years = strip(page).getByRole('listitem')
+  await expect(years.nth(1)).toContainText('2028')
+  await expect(years.nth(1)).toContainText(explore.gap['no-clear-picture'])
+  await expect(years.nth(1)).not.toContainText('Feb 2028')
+  await expect(slider(page)).toHaveAttribute('max', '4')
+  await expect(pause(page)).toBeVisible() // five are enough to play
+  await expect(page.getByText(explore.tooFew)).toHaveCount(0)
+  await expect(page.getByText(explore.credit([2027, 2029, 2030, 2031, 2032]))).toBeVisible()
+})
+
+test('fewer than 3 clear years show the plain line, the gaps and the pictures there are, and no Play', async ({
+  page,
+}) => {
+  await cloudyYears(page, [2027, 2028, 2029, 2030])
+  await loadAll(page, '', 2)
+  await expect(page.getByText(explore.tooFew)).toBeVisible()
+  await expect(strip(page).getByText(explore.gap['no-clear-picture'])).toHaveCount(4)
+  await expect(play(page)).toHaveCount(0)
+  await expect(pause(page)).toHaveCount(0)
+  expect(await shownYear(page)).toBe(2032)
+  await page.getByRole('button', { name: explore.previous }).click() // two pictures can still be stepped
+  await expect.poll(() => shownYear(page)).toBe(2031)
+  await expect(page.getByText(explore.credit([2031, 2032]))).toBeVisible()
+  await axeInBothThemes(page)
+})
+
+test('a place no scene holds says so, with no Try again', async ({ page }) => {
+  await page.goto('/explore?lat=18.99135&lon=73.06575&name=Navi%20Mumbai%20airport&now=2032-03-10')
+  await loadButton(page).click()
+  await expect(page.getByRole('alert')).toHaveText(explore.failed.NO_SCENES, { timeout: 30_000 })
+  await expect(page.getByRole('button', { name: copy.common.retry })).toHaveCount(0)
+  await expect(picture(page)).toHaveCount(0)
+})
+
+test('a catalogue that cannot be reached says so, and Try again loads once it can', async ({ page }) => {
+  await page.route('**/stac/search', (route) => route.abort())
+  await open(page)
+  await loadButton(page).click()
+  await expect(page.getByRole('alert')).toHaveText(explore.failed.OFFLINE, { timeout: 60_000 })
+  await page.unroute('**/stac/search')
+  await page.getByRole('button', { name: copy.common.retry }).click()
+  await loaded(page)
+  await expect(page.getByRole('alert')).toHaveCount(0)
+  await expect(picture(page)).toBeVisible()
+})
+
+for (const tier of [0, 3]) {
+  test(`the player is one plain canvas at tier ${tier}: the pictures play and no map is on the page`, async ({
+    page,
+  }) => {
+    await loadAll(page, `&tier=${tier}`)
+    await expect(picture(page)).toBeVisible()
+    await expect(page.locator('canvas.maplibregl-canvas')).toBeHidden()
+    await expect(pause(page)).toBeVisible()
+    await expect.poll(() => shownYear(page), { timeout: 15_000 }).not.toBe(2027)
+  })
+}
+
+test('the pictures come from the one data host of the build: no request leaves 127.0.0.1', async ({
+  page,
+}) => {
+  const hosts = new Set<string>()
+  page.on('request', (r) => hosts.add(new URL(r.url()).hostname))
+  await loadAll(page)
+  await page.getByRole('link', { name: explore.handOver }).hover()
+  expect([...hosts]).toEqual(['127.0.0.1'])
+})
+
+test('the picture shows a ring when it has the keyboard, and the page passes axe in both themes at every stage', async ({
+  page,
+}) => {
+  await open(page)
+  await axeInBothThemes(page) // the start screen
+  await loadButton(page).click()
+  await loaded(page)
+  await pause(page).click()
+  await axeInBothThemes(page) // the player with its six years
+  for (let i = 0; i < 12 && !(await stage(page).evaluate((e) => e === document.activeElement)); i++)
+    await page.keyboard.press('Tab')
+  await expect(stage(page)).toBeFocused()
+  const ring = await stage(page).evaluate((e) => {
+    const s = getComputedStyle(e)
+    return { style: s.outlineStyle, width: parseFloat(s.outlineWidth) }
+  })
+  expect(ring.style).not.toBe('none')
+  expect(ring.width).toBeGreaterThanOrEqual(2)
+  await page.goto('/explore?lat=abc&lon=10')
+  await expect(page.getByText(explore.bad)).toBeVisible()
+  await axeInBothThemes(page) // the plain message
 })

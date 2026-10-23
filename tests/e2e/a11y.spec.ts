@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
+import { LOAD_MB } from '../../src/explore/cost.ts'
 import { copy } from '../../src/ui/copy.ts'
+import { explore } from '../../src/ui/copy-explore.ts'
 import { flow } from '../../src/ui/copy-flow.ts'
 import {
   openFixtureRoad,
@@ -137,5 +139,24 @@ for (const [name, size] of [
       timeout: 30_000,
     })
     expect(await offenders(page), 'report screen').toEqual([])
+  })
+}
+
+// The time-lapse page: the start screen, then the player with its buttons, slider and links, on both sizes of screen.
+for (const [name, size] of [
+  ['desktop', { width: 1280, height: 900 }],
+  ['phone', { width: 390, height: 844 }],
+] as const) {
+  test(`every control on the time-lapse page is 44 px or more, before and after the load (${name})`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(size)
+    await page.goto('/explore?lat=21.148&lon=79.0863&name=Test%20square&now=2032-03-10')
+    await expect(page.getByRole('button', { name: explore.load(LOAD_MB) })).toBeVisible()
+    expect(await offenders(page), 'start screen').toEqual([])
+    await page.getByRole('button', { name: explore.load(LOAD_MB) }).click()
+    await expect(page.locator('main p[role="status"]')).toHaveText(explore.loaded(6, 6), { timeout: 30_000 })
+    await page.getByRole('button', { name: explore.pause, exact: true }).click()
+    expect(await offenders(page), 'player').toEqual([])
   })
 }
