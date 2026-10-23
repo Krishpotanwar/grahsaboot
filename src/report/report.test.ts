@@ -244,13 +244,13 @@ describe('buildProvenance', () => {
     expect(p.frames[3]).toMatchObject({ sha256: 'c'.repeat(64), transform: [20, 0, 300000, 0, -20, 2341000] })
   })
 
-  it('lists every recipe a report can use, the change rule among them, in every new report', () => {
-    expect(buildProvenance(inv, summary, entries, '0.1.0', T).recipes).toEqual({
+  // The change rule is named only by a report that printed its block (rulings D32, R55): src/report/provenance.test.ts.
+  it('lists the recipes of a report with no measured block as it did before the change rule: not the rule', () => {
+    expect(buildProvenance(inv, summary, entries, '0.1.0', T).recipes).toStrictEqual({
       frame: 'frame-v1',
       scl: 'scl-v2',
       display: 'display-v1',
       diff: 'diff-v1',
-      change: 'change-v1',
     })
   })
 

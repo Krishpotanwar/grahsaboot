@@ -165,9 +165,13 @@ export default function Report({ id }: { id: string }) {
   }, [ready, pair?.aoi, grid, beforeFull, afterFull, beforeEntry?.invalid, afterEntry?.invalid]) // eslint-disable-line react-hooks/exhaustive-deps
   const settled = ready && measured?.before === beforeFull && measured?.after === afterFull
 
+  // The provenance names the change rule only when the page prints its block, so it is given the result the page is (ruling R55).
   const provenance = useMemo(
-    () => (settled && pair && summary ? buildProvenance(pair, summary, state.entries, version) : null),
-    [settled, pair, summary, state.entries],
+    () =>
+      settled && pair && summary
+        ? buildProvenance(pair, summary, state.entries, version, undefined, measured?.change)
+        : null,
+    [settled, pair, summary, state.entries, measured],
   )
   // Apart from the HTML: typing in "Prepared by" builds the page again, never the four PNGs.
   const images = useMemo<ReportImage[]>(() => {
