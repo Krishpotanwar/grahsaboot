@@ -3,6 +3,7 @@ import { useMemo, useSyncExternalStore, type AnchorHTMLAttributes, type MouseEve
 export type Route =
   | { name: 'globe' }
   | { name: 'new' }
+  | { name: 'explore' }
   | { name: 'investigation'; id: string }
   | { name: 'report'; id: string }
   | { name: 'privacy' }
@@ -16,6 +17,7 @@ export function matchRoute(path: string): Route {
   const p = path.replace(/\/+$/, '') || '/'
   if (p === '/') return { name: 'globe' }
   if (p === '/new') return { name: 'new' }
+  if (p === '/explore') return { name: 'explore' }
   if (p === '/privacy') return { name: 'privacy' }
   if (p === '/limits') return { name: 'limits' }
   if (p === '/dev/kit') return { name: 'kit' }

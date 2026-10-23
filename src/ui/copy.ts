@@ -31,7 +31,12 @@ export const copy = {
     disclaimer:
       'Satellite photos show what is visible from above. They are not proof of contracts, payments or quality.',
   },
-  titles: { new: 'New investigation', investigation: 'Investigation', report: 'Evidence report' },
+  titles: {
+    new: 'New investigation',
+    explore: 'Watch it change',
+    investigation: 'Investigation',
+    report: 'Evidence report',
+  },
   notFound: { title: 'Page not found', body: 'That address does not exist.', home: 'Go to the globe' },
   map: {
     label: 'Map. Use the search box to move it.',
