@@ -34,17 +34,20 @@ export function SearchBox({ onSelect }: { onSelect(place: Place): void }) {
 
   async function submit(e: FormEvent) {
     e.preventDefault()
-    if (state.kind === 'busy') return
+    // Pasted coordinates need no search, so they work while one is pending.
     const c = parseCoordinates(q)
     if (c)
       return c.swappedHint ? setState({ kind: 'swapped', lat: c.lat, lon: c.lon }) : pick(point(c.lat, c.lon))
+    if (state.kind === 'busy') return
     ac.current?.abort()
-    ac.current = new AbortController()
+    const mine = new AbortController()
+    ac.current = mine
     setState({ kind: 'busy' })
     try {
-      setState({ kind: 'results', places: await nominatim.search(q, ac.current.signal) })
-    } catch (err) {
-      if ((err as Error).name !== 'AbortError') setState({ kind: 'error' })
+      setState({ kind: 'results', places: await nominatim.search(q, mine.signal) })
+    } catch {
+      // Only this search's own abort stays silent, never the error's name: WebKit rejects a timed-out fetch with an AbortError too.
+      if (!mine.signal.aborted) setState({ kind: 'error' })
     }
   }
 

@@ -89,7 +89,7 @@ function getCog(deps: CoreDeps, href: string): Promise<Cog> {
 
 async function readCached(
   deps: CoreDeps,
-  cog: Cog,
+  open: Promise<Cog>,
   href: string,
   level: number,
   win: Window,
@@ -100,7 +100,13 @@ async function readCached(
   const key = `${href.split('?')[0]}|${level}|${win.join(',')}|${samples.join('')}`
   const hit = await deps.cache?.get(key)
   if (hit) return hit
-  const bytes = await cog.read(level, win, samples, signal)
+  const cog = await open
+  const bytes = await cog.read(level, win, samples, signal).catch((e: unknown) => {
+    // geotiff keeps the promise of a failed tile-table lookup for the life of the opened file, so every later read of it would fail at
+    // once with no request: drop this open (never a newer one) and the next try opens the file afresh. An abort is the caller leaving.
+    if (!signal?.aborted && cogs.get(href) === open) cogs.delete(href)
+    throw e
+  })
   await deps.cache?.put(key, bytes)
   return bytes
 }
@@ -125,7 +131,8 @@ export async function runQuality(
 ): Promise<QualityResult> {
   signal?.throwIfAborted()
   // Openers are shared through the cache, so the first caller's abort must not poison later readers: no signal here.
-  const cog = await getCog(deps, req.item.scl.href)
+  const open = getCog(deps, req.item.scl.href)
+  const cog = await open
   const lvl = levelInfoFor(req.item.scl, cog, 0)
   const wins = aoiPixelWindow(aoiPointsUtm(req.aoi, req.item.epsg), lvl, 2)
   const parts = partsOf(req.aoi)
@@ -140,7 +147,7 @@ export async function runQuality(
       invalid: req.grid && new Uint8Array(req.grid.width * req.grid.height).fill(1),
     }
   }
-  const bytes = await readCached(deps, cog, req.item.scl.href, 0, wins.clamped, [0], signal)
+  const bytes = await readCached(deps, open, req.item.scl.href, 0, wins.clamped, [0], signal)
   signal?.throwIfAborted()
   const { width, height } = windowSize(wins.clamped)
   const statsFor = (g: AoiGeometry) => {
@@ -188,11 +195,12 @@ export async function runFrame(
   signal?: AbortSignal,
 ): Promise<FrameResult> {
   signal?.throwIfAborted()
-  const cog = await getCog(deps, req.item.visual.href)
+  const open = getCog(deps, req.item.visual.href)
+  const cog = await open
   const lvl = levelInfoFor(req.item.visual, cog, req.level)
   const wins = aoiPixelWindow(aoiPointsUtm(req.aoi, req.item.epsg), lvl, 2)
   if (!wins) throw new Error('AOI_OUTSIDE_SCENE')
-  const bytes = await readCached(deps, cog, req.item.visual.href, req.level, wins.clamped, [0, 1, 2], signal)
+  const bytes = await readCached(deps, open, req.item.visual.href, req.level, wins.clamped, [0, 1, 2], signal)
   signal?.throwIfAborted()
   const { width, height } = windowSize(wins.clamped)
   const rgba = reprojectToGrid(
