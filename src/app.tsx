@@ -12,6 +12,7 @@ import TextPage from './screens/TextPage.tsx'
 const GlobeScreen = lazy(() => import('./screens/GlobeScreen.tsx'))
 const KitScreen = lazy(() => import('./screens/KitScreen.tsx'))
 const NewInvestigation = lazy(() => import('./screens/NewInvestigation.tsx'))
+const ExploreScreen = lazy(() => import('./screens/ExploreScreen.tsx'))
 const Workbench = lazy(() => import('./screens/Workbench.tsx'))
 const Report = lazy(() => import('./screens/Report.tsx'))
 
@@ -25,6 +26,8 @@ export function screenFor(r: Route): ReactNode {
       return <TextPage page={copy.pages.limits} extra="limitsItems" />
     case 'new':
       return <NewInvestigation />
+    case 'explore':
+      return <ExploreScreen />
     case 'investigation':
       return <Workbench key={r.id} id={r.id} />
     case 'report':

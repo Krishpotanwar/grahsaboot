@@ -52,6 +52,7 @@ describe('context imagery module boundary', () => {
       expect.arrayContaining([
         'context/load.ts',
         'context/rank.ts',
+        'explore/load.ts',
         'explore/season.ts',
         'map/contextLayer.ts',
         'map/createMap.ts',

@@ -1,6 +1,10 @@
 import type { Marker } from 'maplibre-gl'
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { loadAccounts } from '../accounts/enabled.ts'
+import { EXAMPLES } from '../data/examples.ts'
+import { LOAD_MB } from '../explore/cost.ts'
+import { exploreHref, startKey } from '../explore/params.ts'
+import { armStart } from '../explore/startFlag.ts'
 import { Link } from '../lib/router.tsx'
 import { useMediaQuery } from '../lib/useMediaQuery.ts'
 import { flyToPlace, placeToQuery } from '../map/camera.ts'
@@ -15,6 +19,7 @@ import {
 import type { Place } from '../search/nominatim.ts'
 import { useSatellites } from '../sats/useSatellites.ts'
 import { copy } from '../ui/copy.ts'
+import { explore } from '../ui/copy-explore.ts'
 import { Button } from '../ui/kit.tsx'
 import { Optional } from '../ui/Optional.tsx'
 import { SatellitesPanel } from '../ui/SatellitesPanel.tsx'
@@ -25,6 +30,7 @@ const load = loadAccounts
 const LazyMine = load ? lazy(() => load().then((m) => ({ default: m.MyInvestigations }))) : null
 
 const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches
+const EXAMPLE_PLACE = EXAMPLES['navi-mumbai-airport']!.place
 
 // The map outlives this screen (it remounts on every visit to /), so the picked place has to as well: the pin and the next pass come back with it.
 let lastPlace: Place | null = null
@@ -145,6 +151,16 @@ export default function GlobeScreen() {
           >
             {place ? copy.nav.startHere : copy.nav.newInvestigation}
           </Link>
+          {place && (
+            // Our own button says what it costs and starts at once; a link to the same page waits for a tap (src/explore/startFlag.ts).
+            <Link
+              to={exploreHref(place)}
+              onClick={() => armStart(startKey(place))}
+              className="inline-flex h-11 items-center rounded-[6px] border border-control px-4 font-medium text-fg hover:bg-panel"
+            >
+              {explore.watch(LOAD_MB)}
+            </Link>
+          )}
           <Link
             to="/new?example=navi-mumbai-airport"
             className="inline-flex h-11 items-center rounded-[6px] px-4 text-fg-2 hover:bg-panel hover:text-fg"
@@ -152,6 +168,12 @@ export default function GlobeScreen() {
             {copy.nav.example}
           </Link>
         </div>
+        <Link
+          to={exploreHref(EXAMPLE_PLACE)}
+          className="inline-flex h-11 w-fit items-center rounded-[6px] px-4 text-fg-2 hover:bg-panel hover:text-fg"
+        >
+          {explore.exampleLink}
+        </Link>
         {LazyMine && (
           // Signed in: what this account has saved. Nothing at all (no gap) while signed out or before the list arrives.
           <Optional>
@@ -177,12 +199,15 @@ export default function GlobeScreen() {
       </section>
       {tier > 0 && (
         <div className="relative hidden lg:block">
-          {/* right-14 / bottom-14 keep the panel off MapLibre's zoom buttons and attribution (bottom right of the map); a touch screen has 44 px controls, so it clears them by more. */}
-          {desktop && (
-            <div className="pointer-events-auto absolute bottom-14 right-14 z-20 pointer-coarse:bottom-24 pointer-coarse:right-18">
-              {panel}
-            </div>
-          )}
+          {/* The panel is held to the screen, not to this column, which grows with the text beside it: it must stay clear of MapLibre's controls whatever is added there. */}
+          <div className="sticky top-16 h-[calc(100dvh-4rem)]">
+            {/* right-14 / bottom-14 keep the panel off MapLibre's zoom buttons and attribution (bottom right of the map); a touch screen has 44 px controls, so it clears them by more. */}
+            {desktop && (
+              <div className="pointer-events-auto absolute bottom-14 right-14 z-20 pointer-coarse:bottom-24 pointer-coarse:right-18">
+                {panel}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

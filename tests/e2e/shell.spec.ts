@@ -49,7 +49,13 @@ test('/new?example=navi-mumbai-airport opens the review step', async ({ page }) 
   await expect(page.locator('[aria-current="step"]')).toHaveText(flow.steps[3]!)
 })
 
-for (const path of ['/limits', '/privacy', '/dev/kit', '/new']) {
+for (const path of [
+  '/limits',
+  '/privacy',
+  '/dev/kit',
+  '/new',
+  '/explore?lat=21.148&lon=79.0863&name=Test%20square',
+]) {
   test(`${path} passes axe in both themes`, async ({ page }) => {
     await page.goto(path)
     // Lazy screens render after the load event; axe must not run on the Suspense fallback.

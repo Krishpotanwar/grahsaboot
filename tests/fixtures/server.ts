@@ -1,7 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import { readFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
-import { FIXTURE_DATES, fixtureItem, itemId, makeScl, makeTci } from './scene.ts'
+import { EXPLORE_DATES, FIXTURE_DATES, fixtureItem, itemId, makeScl, makeTci } from './scene.ts'
 
 const BLANK_PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
@@ -29,8 +29,10 @@ const style = (bg: string) =>
     ],
   })
 
+// The scenes of the other fixtures, then the time-lapse years (2027 to 2032, which no other search window reaches).
+const DATES = [...FIXTURE_DATES, ...EXPLORE_DATES]
 const files = new Map<string, Buffer>()
-for (const d of FIXTURE_DATES) {
+for (const d of DATES) {
   files.set(`/cog/${d.date}/TCI.tif`, Buffer.from(makeTci(d.roof)))
   files.set(`/cog/${d.date}/SCL.tif`, Buffer.from(makeScl(d.scl)))
 }
@@ -75,9 +77,9 @@ function handler(base: () => string) {
       const [a = '', b = a] = (body.datetime ?? '').split('/') // a single instant is both ends
       const from = a === '' || a === '..' ? '0000' : a
       const to = b === '' || b === '..' ? '9999' : b
-      const feats = FIXTURE_DATES.filter(
-        (d) => `${d.date}T05:30:00Z` >= from && `${d.date}T05:30:00Z` <= to,
-      ).map((d) => fixtureItem(base(), d))
+      const feats = DATES.filter((d) => `${d.date}T05:30:00Z` >= from && `${d.date}T05:30:00Z` <= to).map(
+        (d) => fixtureItem(base(), d),
+      )
       return send(
         res,
         200,
@@ -92,7 +94,7 @@ function handler(base: () => string) {
     }
     const itemMatch = url.pathname.match(/^\/stac\/collections\/sentinel-2-l2a\/items\/(.+)$/)
     if (itemMatch) {
-      const d = FIXTURE_DATES.find((x) => itemId(x.date) === itemMatch[1])
+      const d = DATES.find((x) => itemId(x.date) === itemMatch[1])
       return d
         ? send(res, 200, JSON.stringify(fixtureItem(base(), d)), 'application/geo+json')
         : send(res, 404, '{}', 'application/json')
