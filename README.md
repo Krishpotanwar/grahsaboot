@@ -337,6 +337,7 @@ src/
   app.tsx, main.tsx   routes and the app entry
   config.ts           the web addresses of every service it uses
   styles.css          colours and themes (dark and light)
+  screens/            the pages: globe, new investigation, workbench, report, limits and privacy, the design kit, not found
   ui/                 design building blocks, the shell, search box, satellites panel; copy.ts holds the words on screen
   map/                the persistent MapLibre globe, device levels, camera, satellite layers
   sats/               satellite list, orbit maths, next-pass search (in a background worker)
@@ -352,9 +353,11 @@ src/
   data/               the investigation model and the on-device store
   lib/                small helpers (router, caching of photo pieces, formatting)
   accounts/           sign-in, save and verify (built, switched off, reached through one flag)
+  explore/            the same-season picker and the share link: Phase F building blocks, not on a screen yet
 worker/               the Cloudflare Worker: /api/tle with cache, back-off and saved-copy fallback
 supabase/             database migrations and the verify and delete-account functions (not live)
 scripts/              the checks run by npm run check, the headers builder, probes, the orbit snapshot tool
+dev/                  a page the live checks open to read one photo window in a real browser
 public/               icons and tle-snapshot.json
 tests/                unit, db (database), e2e (browser), live (real services), fixtures, accounts
 docs/                 design mockups, plans, research, probes and operations guides
