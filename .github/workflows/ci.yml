@@ -16,7 +16,7 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -34,7 +34,8 @@ jobs:
       - run: npm run check:deno
       - run: DENO_NO_UPDATE_CHECK=1 npx deno test --config supabase/functions/deno.json supabase/functions
       - run: npx playwright install --with-deps chromium
-      # Chromium and the mobile project, plus the accounts project (it needs Chromium only).
-      - run: npm run e2e
+      # Chromium and the mobile project, plus the accounts project (it needs Chromium only). One worker, as every full run of the
+      # suite was made (about 24 minutes on a laptop); the job limit above leaves room for a runner that is slower than that.
+      - run: npm run e2e -- --workers=1
         env:
           E2E_BROWSERS: chromium
