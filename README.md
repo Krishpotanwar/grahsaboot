@@ -7,7 +7,7 @@ _Grah_ (ग्रह) means planet. _Saboot_ (सबूत) means proof.
 
 **Try it now:** <https://grahsaboot.grahsaboot.workers.dev> (free, no sign-in)
 
-> **Status:** a live, working prototype (version 0.1.0). Phases A to E are built and live. Accounts are built but switched off. Phase F is part built: the Look closer box, a Sharper viewing aid, a faster photo reader and a "What we measured" block in the report are built and merged, and wait for the owner to deploy them. The time-lapse is not built. See the [Roadmap](#roadmap).
+> **Status:** a live, working prototype (version 0.1.0). Phases A to E are built and live. Accounts are built but switched off. Phase F is part built, and its first stage has been live since 23 October 2026: the Look closer box, a Sharper viewing aid, a faster photo reader and a "What we measured" block in the report. The time-lapse is not built. See the [Roadmap](#roadmap).
 
 ## Contents
 
@@ -65,7 +65,7 @@ The report lists exactly which photos were used. Each photo gets a **digital fin
 - **Check a road in sections.** A road is cut into sections. A grid shows how clearly each section is seen on each pinned date.
 - **Write notes and a claim.** Say what you see, and what claim you are testing.
 - **Save a report.** One self-contained web page file with the photos, the table of dates, your notes and claim, the limits, and a "provenance" block (a list of every file, window and fingerprint used) so someone else can check your work.
-- **Phase F so far (built and merged, waiting to be deployed).**
+- **Phase F so far (live since 23 October 2026).**
   - **Look closer.** Once your outline is valid, a box offers two links, Street View and Google Earth. It sits in the outline step and at the top of the workbench. Each link opens Google's own page for the middle of your outline in a new tab. GrahSaboot does not check those pages, and they are never put in a report. In the notes panel, a button starts a note with "Street View, " and leaves the date for you to type from what Google shows.
   - **Sharper.** A switch in the workbench's tool row shows the photos with a little more contrast and a light sharpening. It is "a viewing aid: the same pixels, shown more clearly". It starts off at every visit, and it never changes a fingerprint or the report.
   - **What we measured.** The report gets a short block with a changed area in hectares, or a plain statement of why it has none. See [What the report measures](#what-the-report-measures).
@@ -114,7 +114,7 @@ The story in five steps:
 
 ### What the report measures
 
-This part is built and merged, and waits for the owner to deploy it.
+This part has been live since 23 October 2026.
 
 The Evidence part of the report ends with a short block called **What we measured**. A fixed rule, `change-v1`, compares your two pinned photos (the "before" and the "after"). It looks for patches of changed ground that are at least 0.3 ha (a hectare is 100 m by 100 m) and 30 m across. Those settings are provisional. The block says what the rule found, in one of five ways:
 
@@ -539,7 +539,7 @@ flowchart TB
 - **Map and globe pictures** come from OpenFreeMap, NASA GIBS and AWS. Those requests reveal your IP address and the area you are looking at.
 - **Satellite photos** are read straight from public Sentinel-2 files on Amazon Web Services (with Microsoft's Planetary Computer and Azure as backup). Those requests reveal an approximate area, never your name or email.
 - **The satellite view** is off until you switch it on. A choice you made earlier is remembered and starts it again by itself. It asks the Earth Search catalogue about a coarse version of your map area and reads one recent photo.
-- **The Look closer links** (built and merged, not yet deployed) open Google Street View and Google Earth in a new tab. Nothing is sent to Google until you click one. A click sends the middle of your outline, as latitude and longitude, to Google; what Google does with it is set by its own privacy policy.
+- **The Look closer links** (live since 23 October 2026) open Google Street View and Google Earth in a new tab. Nothing is sent to Google until you click one. A click sends the middle of your outline, as latitude and longitude, to Google; what Google does with it is set by its own privacy policy.
 - **Satellite positions** come through our Worker from CelesTrak. Nothing about you is sent to CelesTrak.
 - **Our host.** Cloudflare, which hosts the site, can see ordinary web request information, and the Worker's logs are switched on.
 
@@ -602,18 +602,18 @@ Sign-in with Google, saving, and a server re-check of every photo are written an
 
 ## Roadmap
 
-| Phase              | Status                 | What it delivers                                                                                                                                 |
-| ------------------ | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| A: Foundation      | Done                   | Tools, geometry, the evidence engine (photo pieces, fingerprints, cloud scores, shared grid, difference), photo search, the photo-reading worker |
-| B: Shell and globe | Done, live             | Design system, pages and navigation, the globe with device levels, place search, live satellites, next pass                                      |
-| C: Workbench       | Done, live             | New investigation, the workbench (swipe, side by side, difference), timeline, road sections, notes, report export                                |
-| D: Accounts        | Built, switched off    | Google sign-in, saving, a server re-check of every photo, privacy controls                                                                       |
-| E: Clear imagery   | Done, live             | A readable outline map in both themes, drawing aids, a size note, an optional recent satellite photo behind the map                              |
-| F: Look closer     | **Part built, merged** | See below                                                                                                                                        |
+| Phase              | Status                    | What it delivers                                                                                                                                 |
+| ------------------ | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| A: Foundation      | Done                      | Tools, geometry, the evidence engine (photo pieces, fingerprints, cloud scores, shared grid, difference), photo search, the photo-reading worker |
+| B: Shell and globe | Done, live                | Design system, pages and navigation, the globe with device levels, place search, live satellites, next pass                                      |
+| C: Workbench       | Done, live                | New investigation, the workbench (swipe, side by side, difference), timeline, road sections, notes, report export                                |
+| D: Accounts        | Built, switched off       | Google sign-in, saving, a server re-check of every photo, privacy controls                                                                       |
+| E: Clear imagery   | Done, live                | A readable outline map in both themes, drawing aids, a size note, an optional recent satellite photo behind the map                              |
+| F: Look closer     | **Part built, part live** | See below                                                                                                                                        |
 
-**Phase F, in plain words.** The aim is to type a place and watch a time-lapse of the same time of year across the last six years, one photo per year. Part of it is built and merged, and waits for the owner to deploy it. The time-lapse itself is not built.
+**Phase F, in plain words.** The aim is to type a place and watch a time-lapse of the same time of year across the last six years, one photo per year. The first stage has been live since 23 October 2026. The time-lapse itself is not built.
 
-- **Built and merged:** the Look closer box (Street View and Google Earth links, and a button that starts a Street View note), the Sharper viewing aid, a faster photo reader, two small fixes (dates, and a tab left open across an update), and the "What we measured" block in the report.
+- **Live:** the Look closer box (Street View and Google Earth links, and a button that starts a Street View note), the Sharper viewing aid, a faster photo reader, two small fixes (dates, and a tab left open across an update), and the "What we measured" block in the report.
 - **Building blocks:** the change rule, the same-season picker and the share-link codec are built and tested as building blocks, but only the change rule has a place on a screen so far (the "What we measured" block), and the other two have none.
 - **Not built:** the time-lapse itself (its loader, player and page, and the plain line it will show when 10 m photos cannot support a claim), the gallery of real big changes, a share link you can use, and the hand-over of two photos from the time-lapse into a full investigation. What is not built is a plan that may change, not a promise.
 
