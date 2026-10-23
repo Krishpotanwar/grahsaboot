@@ -206,6 +206,106 @@ describe('runFrame', () => {
   })
 })
 
+// geotiff keeps the promise of a failed tile-table lookup for the life of the opened file (node_modules/geotiff/src/imagefiledirectory.js),
+// so after one failed request every later read of that opened file fails at once, with no request. The openers below model that:
+// the first opened copy of a broken file fails every read, any later copy is healthy.
+describe('a read that fails', () => {
+  const frame = (d: CoreDeps, date: string, signal?: AbortSignal) =>
+    runFrame(d, { item: item(date), level: 0, aoi: SITE, grid: GRID }, signal)
+  const quality = (d: CoreDeps, date: string) => runQuality(d, { item: item(date), aoi: SITE })
+  const openers = (broken: string[]) => {
+    const calls: string[] = []
+    const d: CoreDeps = {
+      openCog: async (href) => {
+        calls.push(href)
+        const cog = await openCogBuffer(toArrayBuffer(files.get(href)!))
+        const first = calls.filter((h) => h === href).length === 1
+        return broken.includes(href) && first
+          ? { sizes: cog.sizes, read: () => Promise.reject(new Error('Request failed')) }
+          : cog
+      },
+    }
+    return { d, calls }
+  }
+
+  it.each([
+    ['runFrame', (d: CoreDeps) => frame(d, '2025-12-20')],
+    ['runQuality', (d: CoreDeps) => quality(d, '2025-12-20')],
+  ])('%s opens the file again after one read of it failed, so Try again recovers', async (_name, run) => {
+    const { d, calls } = openers([item('2025-12-20').visual.href, item('2025-12-20').scl.href])
+    await expect(run(d)).rejects.toThrow('Request failed')
+    expect((await run(d)).sha256).toMatch(/^[0-9a-f]{64}$/)
+    expect(calls).toHaveLength(2)
+  })
+  it('keeps the file when the read was aborted: the caller left, the file did not fail', async () => {
+    const ac = new AbortController()
+    const calls: string[] = []
+    let aborted = false
+    const d: CoreDeps = {
+      openCog: async (href) => {
+        calls.push(href)
+        const cog = await openCogBuffer(toArrayBuffer(files.get(href)!))
+        return {
+          sizes: cog.sizes,
+          read: (...a: Parameters<Cog['read']>) => {
+            if (aborted) return cog.read(...a)
+            aborted = true
+            ac.abort()
+            return Promise.reject(ac.signal.reason)
+          },
+        }
+      },
+    }
+    await expect(frame(d, '2025-12-20', ac.signal)).rejects.toMatchObject({ name: 'AbortError' })
+    expect((await frame(d, '2025-12-20')).window).toEqual([92, 94, 203, 211])
+    expect(calls).toHaveLength(1)
+  })
+  it('drops only the file whose read failed', async () => {
+    const a = item('2025-12-20').visual.href
+    const b = item('2025-01-10').visual.href
+    const { d, calls } = openers([a])
+    await frame(d, '2025-01-10')
+    await expect(frame(d, '2025-12-20')).rejects.toThrow('Request failed')
+    await frame(d, '2025-01-10')
+    expect(calls.filter((h) => h === b)).toHaveLength(1)
+    await frame(d, '2025-12-20')
+    expect(calls.filter((h) => h === a)).toHaveLength(2)
+  })
+  it('keeps a newer open of the file when an older read of it fails late', async () => {
+    const calls: string[] = []
+    const hung: Array<(e: Error) => void> = []
+    let failed = false
+    const d: CoreDeps = {
+      openCog: async (href) => {
+        calls.push(href)
+        const cog = await openCogBuffer(toArrayBuffer(files.get(href)!))
+        if (calls.length > 1) return cog
+        // The first copy: each read waits for the test to fail it, and once one has failed the copy stays failed.
+        const read = () =>
+          failed
+            ? Promise.reject(new Error('Request failed'))
+            : new Promise<Uint8Array>((_, reject) =>
+                hung.push((e) => {
+                  failed = true
+                  reject(e)
+                }),
+              )
+        return { sizes: cog.sizes, read }
+      },
+    }
+    const one = frame(d, '2025-12-20')
+    const two = frame(d, '2025-12-20') // the same opened file, a second read in flight
+    await vi.waitFor(() => expect(hung).toHaveLength(2))
+    hung[0]!(new Error('Request failed'))
+    await expect(one).rejects.toThrow('Request failed')
+    await frame(d, '2025-12-20') // opens the second copy, which now sits in the cache
+    hung[1]!(new Error('Request failed'))
+    await expect(two).rejects.toThrow('Request failed') // the old copy's late failure
+    await frame(d, '2025-12-20')
+    expect(calls).toHaveLength(2) // the second copy was not thrown out by it
+  })
+})
+
 describe('runChange', () => {
   // Two display pictures on GRID: flat grey, and the same with a block of 40 x 40 display pixels much lighter.
   const n = GRID.width * GRID.height
