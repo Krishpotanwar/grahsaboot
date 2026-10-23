@@ -151,7 +151,7 @@ for (const [name, size] of [
     page,
   }) => {
     await page.setViewportSize(size)
-    await page.goto('/explore?lat=21.148&lon=79.0863&name=Test%20square&now=2032-03-10')
+    await page.goto('/explore?lat=21.148&lon=79.0863&name=Test%20square&now=2032-03-10&tier=0') // no shared map, as in the other 44 px checks: a hidden map's own controls are not this page's
     await expect(page.getByRole('button', { name: explore.load(LOAD_MB) })).toBeVisible()
     expect(await offenders(page), 'start screen').toEqual([])
     await page.getByRole('button', { name: explore.load(LOAD_MB) }).click()

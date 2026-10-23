@@ -178,7 +178,7 @@ test('leaving the page ends the load: no call after it, and the imagery worker i
   await open(page)
   await loadButton(page).click()
   await expect.poll(() => search.arrived).toBe(1)
-  expect(seen.created).toBe(1)
+  await expect.poll(() => seen.created).toBe(1) // WebKit reports a worker a moment after it starts
   await page.getByRole('link', { name: copy.nav.home }).click()
   await expect(page).toHaveURL(/\/$|\/\?/)
   await expect.poll(() => seen.closed).toBe(1)
