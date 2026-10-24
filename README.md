@@ -1,24 +1,24 @@
 # GrahSaboot
 
-**Free, dated satellite photos of any place, side by side, so you can check a claim about it yourself.** It shows you the photos and what a fixed rule measured in them. It never says whether a claim is true.
+**Free, dated satellite photos of any place on land, side by side, so you can check a claim about it yourself.** It shows you the photos and what a fixed rule measured in them. It never says whether a claim is true.
 
 **Try it:** <https://grahsaboot.grahsaboot.workers.dev> (free, no sign-in)
 
 > [!IMPORTANT]
 > **What the photos cannot show.** One pixel covers 10 m by 10 m of ground, so a house is only 1 to 3 pixels. Clouds hide many dates, especially in the monsoon. The photos go back to 2017 only. The change rule (`change-v1`) is provisional and has not been validated: it cannot tell a building from a crop or a season. [Every limit](docs/guide.md#what-it-cannot-do)
 
-[![Play the GrahSaboot video, 3 minutes. The still shows public Sentinel-2 photos of the Kakhovka dam, Ukraine, before and after, on 5 and 18 June 2023, split by a swipe line, each with its date and SHA-256 fingerprint.](docs/media/grahsaboot-explainer-poster.jpg)](docs/media/grahsaboot-explainer.mp4)
+[![The GrahSaboot video, 3 minutes (the link opens the file page). The still shows public Sentinel-2 photos of the Kakhovka dam, Ukraine, before and after, on 5 and 18 June 2023, split by a swipe line, each with its date and SHA-256 fingerprint.](docs/media/grahsaboot-explainer-poster.jpg)](docs/media/grahsaboot-explainer.mp4)
 
 _The video takes 3 minutes. The captions are part of the picture, so it works with the sound off. GitHub does not play a video kept in a repository: the link opens the file's page, where Download saves it (7.3 MB)._
 
-**Status on 24 October 2026:** a live, working prototype (version 0.1.0). Phases A to E are built and live. Accounts are built but switched off. Phase F is part built: its first stage has been live since 23 October 2026, and its time-lapse, "Watch it change", and a switch that hides the satellites since 24 October 2026. [Roadmap](docs/roadmap.md)
+**Status on 24 October 2026:** a live, working prototype (version 0.1.0). Phases A, B, C and E are live. Phase D, accounts, is built but switched off. Phase F is part built: its first stage has been live since 23 October 2026, and its time-lapse, "Watch it change", and a switch that hides the satellites since 24 October 2026. [Roadmap](docs/roadmap.md)
 
 _Grah_ (ग्रह) means planet. _Saboot_ (सबूत) means proof.
 
 ## Why it is different
 
 - **Evidence, not verdicts.** You look at dated photos and decide. The report says what a fixed rule measured, with its caution, and never whether your claim is true.
-- **A report someone else can check.** Each photo's pixels get a SHA-256 fingerprint. The report lists the source file, the exact window read and the recipe versions, so anyone can read the same pixels later and compare.
+- **A report someone else can check.** Each photo's pixels get a SHA-256 fingerprint. The report lists the source file, the exact window read and the recipe versions, so someone else can read the same pixels later and compare the fingerprint.
 - **The limits are up front.** The site has a limits page, warns you when an outline is too small for 10 m photos, and every report carries the limits with it.
 - **Free, with no account.** The photos are public Sentinel-2 data. There is no sign-in, and your investigations stay in your browser.
 
@@ -30,12 +30,12 @@ Each part has earlier work behind it: the public Sentinel-2 archive, STAC photo 
 
 1. **Draw.** Pick a place on the globe and draw a site (an area) or a road (a line with a width).
 2. **Search.** The site finds every Sentinel-2 photo that covers your outline in your dates.
-3. **Score.** It reads only the pixels inside your outline and scores how much of it each photo sees clearly.
+3. **Score.** It reads only the small piece of each photo file that covers your outline, and scores how much of the outline each photo sees clearly.
 4. **Fingerprint.** It makes a SHA-256 fingerprint of those exact pixels.
 5. **Compare.** You swipe between a "before" and an "after" photo, pin the dates that matter, and write notes and the claim you are testing.
-6. **Report.** It saves one web page file with the photos, the dates, your notes, the limits, what a fixed rule measured, and where every pixel came from.
+6. **Report.** It saves one web page file with the photos, the dates, your notes, the limits, what a fixed rule measured (when the rule can run), and where every pixel came from.
 
-Everything runs in your browser. The only server is a small Cloudflare Worker that hands out the site and satellite orbit data. [How it works, with seven diagrams](docs/architecture.md)
+Everything runs in your browser. The only server is a small Cloudflare Worker that hands out the site and satellite orbit data. [How it works, with diagrams](docs/architecture.md)
 
 ## A worked example: the Navi Mumbai airport site
 
@@ -45,7 +45,7 @@ The site has one ready-made example, a 2 km square of land at the Navi Mumbai ai
 2. Open the workbench. It shows a clear photo from **22 February 2018** and one from **12 December 2025**. In both, 100% of the outline is in clear view.
 3. Swipe between them. Then look at the timeline and the report.
 
-On 24 October 2026 the report's "What we measured" block said this: between those two dates, the change rule found 10 changed patches of at least 0.3 ha and 30 m across, 21.4 ha in all, resting on 729,240 pixels that are clear in both photos. It cannot tell a building from a crop or a season, and the two dates are in different seasons, so seasonal change is included. You compare the photos by eye and decide.
+On 24 October 2026 the report's "What we measured" block said this: between those two dates, the change rule, which is provisional, found 10 changed patches of at least 0.3 ha and 30 m across, 21.4 ha in all. It cannot tell a building from a crop or a season, and the two dates are in different seasons, so seasonal change is included. You compare the photos by eye and decide.
 
 ## What you can do
 
@@ -53,11 +53,11 @@ On 24 October 2026 the report's "What we measured" block said this: between thos
 - **Search for a place** by name or coordinates, and see when a satellite will next pass over it in daylight.
 - **Start an investigation.** Draw a site or a road, choose dates, and open the workbench: swipe, side by side, or a brightness difference, with a timeline where a tall tick means a clear view.
 - **Check a road in sections**, write notes and a claim, and **save a report** as one web page file.
-- **Watch it change** (live since 24 October 2026). Six pictures of the same place, one a year and all from the same time of year, played one after another. They are for looking only: never saved, fingerprinted or put in a report. They load about 14 MB or more, which the button tells you first. While you wait, the start screen shows a small line drawing of six prints, which stays still if you have asked for less motion.
+- **Watch it change** (live since 24 October 2026). Up to six pictures of the same place, one a year and all from the same time of year, played one after another. They are for looking only: never saved, fingerprinted or put in a report. A year with no clear picture shows as a gap, and a place without enough clear pictures gets no time-lapse. The pictures take about 14 MB or more to load, which the button tells you first. While you wait, the start screen shows a small line drawing of six prints, which stays still if you have asked for less motion.
 - **Look closer** (live since 23 October 2026). Once your outline is valid, two links open Google's Street View and Google Earth for its middle, in a new tab. GrahSaboot does not check those pages, and they never go in a report.
 - **Sharper**, a viewing aid: the same pixels shown with a little more contrast and a light sharpening. It never changes a fingerprint or the report.
 
-[![The GrahSaboot globe with live satellites in the dark theme.](docs/screenshots/globe.png)](https://grahsaboot.grahsaboot.workers.dev)
+![The workbench for the Navi Mumbai airport example on the live site, 24 October 2026: the photos of 22 February 2018 and 12 December 2025 side by side, both clear, with the Look closer links above them and the photo timeline, 1,076 passes and 2 pinned dates, beside them.](docs/screenshots/workbench-navi-mumbai.jpg)
 
 [Everything it can do, in detail](docs/guide.md#what-you-can-do)
 
@@ -76,7 +76,7 @@ The full list is in the [guide](docs/guide.md#what-it-cannot-do) and on the site
 
 ## Accessibility and privacy
 
-- Every screen is tested with axe against WCAG 2.2 AA, in the dark and the light theme. The site works with a keyboard, focus is visible, and status messages are read out by screen readers.
+- Every screen is tested with axe against WCAG 2.2 AA, in the dark and the light theme. The site works with a keyboard, focus is visible, and status messages are announced to screen readers. These are automated checks: the site has not yet been tried with a real screen reader or on a real phone.
 - Reduced motion is respected. Photo-quality labels use a symbol and a word, never colour alone.
 - The live site has no accounts and no database. Your investigations and your theme choice stay in your browser.
 - Place searches go to OpenStreetMap Nominatim only when you press Search. Maps, globe pictures and photos come straight from public services, which see your IP address and the area you look at, never your name or email. Nothing goes to Google until you click a Look closer link. Cloudflare, which hosts the site, sees ordinary request information, and the Worker's logs are switched on.
@@ -100,7 +100,7 @@ npm run check   # the full gate: types, tests, three builds, size and security g
 | Where                                                                                                    | What is in it                                                                                                      |
 | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | [`docs/guide.md`](docs/guide.md)                                                                         | Everything you can do, every limit, the worked example, what the report measures, accessibility, Q and A, glossary |
-| [`docs/architecture.md`](docs/architecture.md)                                                           | How it works: seven diagrams with their Mermaid source, the services, the pages, device levels, the code map       |
+| [`docs/architecture.md`](docs/architecture.md)                                                           | How it works: the diagrams with their Mermaid source, the services, the pages, device levels, the code map         |
 | [`docs/privacy-and-security.md`](docs/privacy-and-security.md)                                           | What the site does with your data, and how it is kept safe                                                         |
 | [`docs/development.md`](docs/development.md)                                                             | Running it, commands, settings, the checks and what they held, deploying, accounts (built, switched off)           |
 | [`docs/roadmap.md`](docs/roadmap.md)                                                                     | The phases: what is live, what is built, what is planned                                                           |
@@ -134,4 +134,4 @@ npm run check   # the full gate: types, tests, three builds, size and security g
 
 ## How it was built
 
-Krish Potanwar built GrahSaboot in phases, starting on 5 October 2026. An AI coding assistant implemented the plan under his direction, and every task had to end with the automatic checks passing.
+Krish Potanwar built GrahSaboot in phases, starting on 5 October 2026, with an AI coding assistant working under direction. Every task had to end with the automatic checks passing.
