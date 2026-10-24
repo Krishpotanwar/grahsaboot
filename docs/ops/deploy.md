@@ -31,7 +31,8 @@ variables today (`wrangler.jsonc` has no `vars` and no cron trigger).
   satellites panel says `Live` (or `Orbits from ...` when it is on the snapshot).
 - The eye button next to "Start an investigation" hides the satellites panel and shows it again, and the choice survives a reload.
 - The time-lapse opens (the `/explore` address above, then "Load the pictures"): six pictures, 2021 to 2026, appear in about 20 s,
-  play by themselves, and the console stays quiet.
+  play by themselves, and the console stays quiet. Before the first picture the start screen shows a small line drawing of six
+  prints; it goes when the first picture is drawn.
 - The worked example opens (`/new?example=navi-mumbai-airport`, then the review step's open button): both photos appear in
   about 10 s and the whole list of passes follows.
 - The map opens in the workbench (tier 2 and up), the report page shows its preview and downloads.
@@ -77,3 +78,4 @@ To see a violation locally, serve `dist/` with the headers applied to every same
 | 2026-10-19 | The satellite view of the outline step, and its lines on the limits and privacy pages | ffe08aed-8db6-4f77-a18d-9328b8455dd0 |
 | 2026-10-23 | Phase F stage 1: Look closer, Sharper, strict dates, the faster picture reader, the stale-tab reload, and the report's "What we measured" block | 242fa57b-175b-4b5f-8382-f3a0e7baf00c |
 | 2026-10-24 | Phase F stage 2: Watch it change (the time-lapse, with its two links on the home screen) and a switch that hides the satellites | 8eedae18-8f94-46bb-9479-d883cf714943 |
+| 2026-10-24 | A small line drawing of six prints on the start screen of Watch it change (the Hairline engine, lazy, still unless the pointer moves it) | c66f28ae-2af1-4c58-ac17-b252e8579b17 |

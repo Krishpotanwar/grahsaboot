@@ -66,7 +66,7 @@ The report lists exactly which photos were used. Each photo gets a **digital fin
 - **Write notes and a claim.** Say what you see, and what claim you are testing.
 - **Save a report.** One self-contained web page file with the photos, the table of dates, your notes and claim, the limits, and a "provenance" block (a list of every file, window and fingerprint used) so someone else can check your work.
 - **Phase F so far (live since 23 and 24 October 2026).**
-  - **Watch it change (live since 24 October 2026).** Pick a place on the globe, or open a link to one, and press "Watch it change": six satellite pictures of the same place, one a year and all from the same time of year, played one after another, with Play, Previous, Next, a slider and the keyboard. It loads about 14 MB or more, which the button says before you press it (a link from outside waits for a tap on "Load the pictures"). The pictures are for looking: they are not saved, not fingerprinted and never put in a report. A link at the bottom opens the same place as a new investigation.
+  - **Watch it change (live since 24 October 2026).** Pick a place on the globe, or open a link to one, and press "Watch it change": six satellite pictures of the same place, one a year and all from the same time of year, played one after another, with Play, Previous, Next, a slider and the keyboard. It loads about 14 MB or more, which the button says before you press it (a link from outside waits for a tap on "Load the pictures"). The pictures are for looking: they are not saved, not fingerprinted and never put in a report. A link at the bottom opens the same place as a new investigation. While you wait, the start screen shows a small line drawing of six prints: it stays still unless you point at it, and it is fully still if you have asked for less motion.
   - **A switch that hides the satellites (live since 24 October 2026).** An eye button next to "Start an investigation" hides the live satellites panel, their markers and their tracks on the globe, and shows them again. Your choice is remembered in your browser.
   - **Look closer.** Once your outline is valid, a box offers two links, Street View and Google Earth. It sits in the outline step and at the top of the workbench. Each link opens Google's own page for the middle of your outline in a new tab. GrahSaboot does not check those pages, and they are never put in a report. In the notes panel, a button starts a note with "Street View, " and leaves the date for you to type from what Google shows.
   - **Sharper.** A switch in the workbench's tool row shows the photos with a little more contrast and a light sharpening. It is "a viewing aid: the same pixels, shown more clearly". It starts off at every visit, and it never changes a fingerprint or the report.
@@ -707,6 +707,7 @@ Sign-in with Google, saving, and a server re-check of every photo are written an
 - **Orbit data:** CelesTrak.
 - **Terrain:** AWS Terrain Tiles.
 - **Fonts:** Geist and Geist Mono.
+- **Line drawing:** the six-print drawing on the time-lapse start screen runs on the Hairline engine by Lucas Marques (MIT licence), kept unchanged in `src/lib/hairline/` with its licence text.
 - **Code libraries:** open-source packages listed in `package.json`, each under its own licence.
 
 ## Help, contributing and licence
