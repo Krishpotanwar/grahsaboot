@@ -510,8 +510,20 @@ for (const [name, width, height, limit, open] of [
         .getByRole('button', { name: flow.notes.add })
       await expect(add).toBeVisible()
       await expect(page.getByText(flow.workbench.searching)).toBeVisible()
-      await page.waitForTimeout(300) // the places are laid out
-      const held = (await add.boundingBox())!.y
+      // The places are laid out when the notes stop moving. A fixed wait is too short on a slow machine (a hosted runner):
+      // the notes were then measured while the page was still settling, and the test reported that as a jump.
+      let held = -1
+      await expect
+        .poll(
+          async () => {
+            const y = (await add.boundingBox())!.y
+            const unchanged = y === held
+            held = y
+            return unchanged
+          },
+          { intervals: [200], timeout: 15_000 },
+        )
+        .toBe(true)
       release()
       // The moment the timeline is there, and again once its date is checked and the photos are in.
       await expect(timelineSlider(page)).toBeVisible({ timeout: 30_000 })
