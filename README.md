@@ -7,6 +7,10 @@ _Grah_ (ग्रह) means planet. _Saboot_ (सबूत) means proof.
 
 **Try it now:** <https://grahsaboot.grahsaboot.workers.dev> (free, no sign-in)
 
+[![A 24-second silent preview of the GrahSaboot video, on a loop: the six-step diagram, a before and after swipe at the Navi Mumbai airport, the report's "What we measured" block, and a real case replayed, the Kakhovka dam in June 2023, with the fingerprint of each photo.](docs/media/grahsaboot-preview.gif)](docs/media/grahsaboot-explainer.mp4)
+
+_A 24-second silent preview, on a loop. The full video is 3 minutes with voice and captions (7.3 MB). GitHub does not play a video kept in a repository, so [its page](docs/media/grahsaboot-explainer.mp4) offers a Download button._
+
 > **Status:** a live, working prototype (version 0.1.0). Phases A to E are built and live. Accounts are built but switched off. Phase F is part built. Its first stage has been live since 23 October 2026: the Look closer box, a Sharper viewing aid, a faster photo reader and a "What we measured" block in the report. Its time-lapse, "Watch it change", and a switch that hides the satellites have been live since 24 October 2026. See the [Roadmap](#roadmap).
 
 ## Contents
