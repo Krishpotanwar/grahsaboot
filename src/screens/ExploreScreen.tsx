@@ -11,6 +11,7 @@ import { placeToQuery } from '../map/camera.ts'
 import type { Place } from '../search/nominatim.ts'
 import { copy } from '../ui/copy.ts'
 import { explore } from '../ui/copy-explore.ts'
+import { Figure } from '../ui/figure/Figure.tsx'
 import { Button } from '../ui/kit.tsx'
 
 const WRAP = 'mx-auto grid max-w-[46rem] gap-6 px-4 py-8 lg:px-6'
@@ -73,6 +74,11 @@ function Explore({ place }: { place: Place }) {
       <p role="status" className="sr-only">
         {status}
       </p>
+
+      {/* A picture for the wait, until the first year is drawn: the pictures themselves are never shown beside anything that moves. */}
+      {frames.length === 0 && (run.phase === 'idle' || run.phase === 'loading') && (
+        <Figure className="-my-4 -ml-11 w-64" />
+      )}
 
       {run.phase === 'idle' && (
         <div className="grid justify-items-start gap-3">

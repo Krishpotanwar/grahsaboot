@@ -8,3 +8,5 @@ docs
 output
 supabase/.temp
 *.tif
+src/lib/hairline/kernel.js
+src/ui/figure/prints.js
